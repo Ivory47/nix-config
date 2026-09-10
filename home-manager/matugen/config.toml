@@ -1,0 +1,15 @@
+[config]
+reload = true
+
+[templates.colors]
+input_path = "~/.config/matugen/templates/colors.conf"
+output_path = "~/.config/matugen/colors.conf"
+
+[templates.hyprland]
+input_path = '~/.config/matugen/templates/hyprland.lua'
+output_path = '~/.config/hypr/colors.lua'
+
+[templates.kitty]
+input_path = "~/.config/matugen/templates/kitty.conf"
+output_path = "~/.config/kitty/colors.conf"
+post_hook = "kitty @ set-colors --all ~/.config/kitty/colors.conf"
