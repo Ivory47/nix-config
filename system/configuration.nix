@@ -99,6 +99,7 @@
         git
         kitty
         htop
+        home-manager
     ];
 
     programs.zsh.enable = true;
