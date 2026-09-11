@@ -78,6 +78,7 @@
             la = "ls -lAh";
             cd = "z";
             fa = "f ~";
+            ssh = "kitty +kitten ssh";
             icat = "kitty +kitten icat";
             nixconf = "sudo -E nvim /etc/nixos/configuration.nix";
             rebuild = "sudo nixos-rebuild switch";
@@ -145,7 +146,6 @@
     programs.neovim = {
         enable = true;
         plugins = with pkgs.vimPlugins; [
-            # This bundles the grammars and queries together inside your Nix profile
             (nvim-treesitter.withPlugins (plugins: with plugins; [
                   tree-sitter-nix
                   tree-sitter-lua
@@ -156,11 +156,6 @@
     };
     xdg.configFile."nvim/init.lua".source = ./nvim/init.lua;
 
-    # 
-    # wayland.windowManager.hyprland = {
-    #     enable = true;
-    #     configType = "lua";
-    # };
     xdg.configFile."hypr/hyprland.lua".source = ./hypr/hyprland.lua;
 
     gtk = {
@@ -213,12 +208,6 @@
     xdg.configFile."fastfetch/config.jsonc".source = ./fastfetch/config.jsonc;
 
     # quickshell
-    # xdg.configFile."quickshell/status-bar/shell.qml".source = ./quickshell/status-bar/shell.qml;
-    # xdg.configFile."quickshell/status-bar/Battery.qml".source = ./quickshell/status-bar/Battery.qml;
-    # xdg.configFile."quickshell/status-bar/PowerMenu.qml".source = ./quickshell/status-bar/PowerMenu.qml;
-    # xdg.configFile."quickshell/status-bar/Audio.qml".source = ./quickshell/status-bar/Audio.qml;
-    # xdg.configFile."quickshell/status-bar/AudioMenu.qml".source = ./quickshell/status-bar/AudioMenu.qml;
-    # xdg.configFile."quickshell/status-bar/osd/OSD.qml".source = ./quickshell/status-bar/osd/OSD.qml;
     xdg.configFile."quickshell/status-bar".source = ./quickshell/status-bar;
 
     # normal programs
