@@ -118,9 +118,7 @@
         };
     };
 
-    systemd.services.greetd.environment = {
-        XDG_DATA_DIRS = "${config.services.displayManager.sessionData.desktops}/share";
-    };
+    services.displayManager.sessionPackages = [ pkgs.hyprland ];
 
     services.tailscale.enable = true;
     services.upower.enable = true;
