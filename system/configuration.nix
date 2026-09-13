@@ -118,6 +118,10 @@
         };
     };
 
+    services.greetd.environment = {
+        XDG_DATA_DIRS = "${config.services.displayManager.sessionData.desktops}/share";
+    };
+
     services.tailscale.enable = true;
     services.upower.enable = true;
     services.power-profiles-daemon.enable = true;
