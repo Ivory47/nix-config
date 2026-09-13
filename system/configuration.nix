@@ -118,7 +118,7 @@
         };
     };
 
-    services.greetd.environment = {
+    systemd.services.greetd.environment = {
         XDG_DATA_DIRS = "${config.services.displayManager.sessionData.desktops}/share";
     };
 
