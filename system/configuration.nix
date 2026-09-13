@@ -108,15 +108,16 @@
         enable = true;
         withUWSM = true;
     };
+
     programs.regreet = {
         enable = true;
 
         theme = {
             name = "Adwaita-dark";
+            package = pkgs.gnome-themes-extra; 
         };
     };
 
-    services.displayManager.regreet.enable = true;
     services.tailscale.enable = true;
     services.upower.enable = true;
     services.power-profiles-daemon.enable = true;
