@@ -19,5 +19,5 @@ in
         [ ]
     );
 
-    networking.hostName = "nixos-desktop";
+    # networking.hostName = "nixos-desktop";
 }

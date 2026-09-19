@@ -9,11 +9,16 @@
             inputs.nixpkgs.follows = "nixpkgs";
         };
 
-        nur.url = "github:nix-community/NUR";
-
         matugen = {
             url = "github:InioX/Matugen";
         };
+
+        hyprmod = {
+            url = "github:BlueManCZ/hyprmod";
+            inputs.nixpkgs.follows = "nixpkgs";
+        };
+
+        nur.url = "github:nix-community/NUR";
     };
 
     outputs =

@@ -9,6 +9,7 @@
 -- Create your files separately and then require them like this:
 -- require("myColors")
 
+require("hyprland-gui")
 local colors = require("colors")
 
 ------------------

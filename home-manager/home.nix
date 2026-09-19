@@ -13,6 +13,7 @@
         jq
         lazygit
         wl-clipboard
+        inputs.hyprmod.packages.${pkgs.stdenv.hostPlatform.system}.default
         fastfetch
         brightnessctl
         awww
