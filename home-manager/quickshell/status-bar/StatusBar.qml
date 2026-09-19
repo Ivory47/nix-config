@@ -82,7 +82,6 @@ PanelWindow {
 
             color: Theme.background
 
-            opacity: barContent.visibleAmount
             // opacity: statusBar.showing ? 1 : 0
             //
             // Behavior on opacity {
