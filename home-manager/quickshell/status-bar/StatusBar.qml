@@ -140,7 +140,7 @@ PanelWindow {
                 }
 
                 height: 1
-                color: "#9999a9"
+                color: "#494965"
             }
         }
     }
