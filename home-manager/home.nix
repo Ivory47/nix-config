@@ -162,7 +162,7 @@
         # name = "Bibata-Modern-Classic";
         package = pkgs.gnome-themes-extra;
         name = "Adwaita";
-        size = 22;
+        size = 24;
 
         gtk.enable = true;
         hyprcursor.enable = true;
