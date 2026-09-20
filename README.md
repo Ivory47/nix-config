@@ -1,11 +1,11 @@
 rebuild currently doesnt work and you should use
-``bash
+```sh
 # desktop:
-sudo nixos-rebuild switch --flake /etc/nixos#desktop
+sudo nixos-rebuild switch --impure --flake /etc/nixos#desktop
 
 # laptop:
-sudo nixos-rebuild switch --flake /etc/nixos#laptop
+sudo nixos-rebuild switch --impure --flake /etc/nixos#laptop
 
 # everything else:
-sudo nixos-rebuild switch --flake /etc/nixos#default
-``
+sudo nixos-rebuild switch --impure --flake /etc/nixos#default
+```
