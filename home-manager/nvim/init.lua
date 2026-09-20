@@ -105,6 +105,7 @@ require("lazy").setup({
         -- Bonus: A couple of other highly useful companion picker shortcuts
         { "<leader>ff", function() Snacks.picker.files() end, desc = "Find Files" },
         { "<leader>fg", function() Snacks.picker.grep() end, desc = "Live Grep (Search Text)" },
+        { "<leader>fo", function() Snacks.picker.buffers() end, desc = "Find Open Buffers" },
     },
 },
 
