@@ -81,9 +81,10 @@
             fa = "f ~";
             ssh = "kitty +kitten ssh";
             icat = "kitty +kitten icat";
-            nixconf = "sudo -E nvim /etc/nixos/configuration.nix";
+            nixconf = "sudo -E nvim /etc/nixos/common/configuration.nix";
             # rebuild = "sudo nixos-rebuild switch";
             hconf = "nvim ~/.config/home-manager/home.nix";
+            lg = "lazygit";
             hms = "home-manager switch --flake ~/.config/home-manager -b backup && source ~/.zshrc";
             qsr = "~/.config/home-manager/quickshell/reload.sh";
         };

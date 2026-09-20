@@ -105,6 +105,7 @@
         kitty
         htop
         home-manager
+        gnome-themes-extra
     ];
 
     programs.zsh.enable = true;
@@ -133,6 +134,7 @@
             };
 
             "LoginScreen.MenuArea.Session" = {
+                font-size = 14;
                 icon-size = 20;
             };
 
@@ -163,6 +165,11 @@
 
 
     users.users.user.shell = pkgs.zsh;
+
+    environment.variables = {
+        XCURSOR_THEME = "Adwaita";
+        XCURSOR_SIZE = "24";
+    };
 
     # Some programs need SUID wrappers, can be configured further or are
     # started in user sessions.
