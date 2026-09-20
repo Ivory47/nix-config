@@ -11,7 +11,15 @@
 
 -- require("hyprland-gui")
 local home = os.getenv("HOME")
-dofile(home .. "/src/nix-config/home-manager/hypr/hyprland-gui.lua")
+local file_path = home .. "/src/nix-config/home-manager/hypr/hyprland-gui.lua"
+
+-- check if file actually exists by trying to open it
+local f = io.open(file_path, "r")
+if f then
+    f:close()
+    dofile(file_path)
+end
+
 local colors = require("colors")
 
 ------------------
