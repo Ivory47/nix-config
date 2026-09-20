@@ -102,6 +102,8 @@
     environment.systemPackages = with pkgs; [
         neovim
         git
+        zip
+        unzip
         kitty
         htop
         home-manager
