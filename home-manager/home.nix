@@ -225,7 +225,10 @@
     programs.chromium = {
         enable = true;
 
-        package = pkgs.vivaldi;
+        package = pkgs.vivaldi.override {
+            proprietaryCodecs = true;
+            enableWidevine = true;
+        };
 
         extensions = [
             # Bitwarden

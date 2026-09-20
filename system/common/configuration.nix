@@ -121,7 +121,29 @@
 
     programs.silentSDDM = {
         enable = true;
-        theme = "rei";
+        theme = "default";
+
+        settings = {
+            "General" = {
+                scale = 1.3;
+            };
+
+            "LoginScreen.MenuArea.Buttons" = {
+                size = 42;
+            };
+
+            "LoginScreen.MenuArea.Session" = {
+                icon-size = 20;
+            };
+
+            "LoginScreen.MenuArea.Keyboard" = {
+                icon-size = 20;
+            };
+
+            "LoginScreen.MenuArea.Power" = {
+                icon-size = 20;
+            };
+        };
     };
 
     # programs.regreet = {

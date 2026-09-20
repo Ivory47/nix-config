@@ -14,9 +14,14 @@ Item {
         id: batteryText
 
         property real batteryLevel: UPower.displayDevice.percentage
+        property int batteryState: UPower.displayDevice.state
 
         text: {
             let percent = Math.round(batteryLevel * 100)
+
+            if (batteryState === UPowerDeviceState.Charging) {
+                return "󰂄 " + percent + "%"
+            }
 
             if (percent >= 90)
             return "󰁹 " + percent + "%"
