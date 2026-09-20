@@ -7,7 +7,7 @@ import Quickshell.Services.Pipewire
 PopupWindow {
     id: popup
 
-    implicitWidth: 42
+    implicitWidth: 44
     implicitHeight: 165
 
     color: "transparent"

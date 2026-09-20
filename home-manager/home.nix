@@ -157,7 +157,11 @@
     };
     xdg.configFile."nvim/init.lua".source = ./nvim/init.lua;
 
-    xdg.configFile."hypr/hyprland.lua".source = ./hypr/hyprland.lua;
+    # force is required cause hyprmod deletes the symlink :/
+    xdg.configFile."hypr/hyprland.lua" = {
+        source = ./hypr/hyprland.lua;
+        force = true;
+    };
 
     gtk = {
         enable = true;
@@ -231,6 +235,23 @@
                 sponsorblock
             ];
         };
+    };
+
+    programs.chromium = {
+        enable = true;
+
+        package = pkgs.vivaldi;
+
+        extensions = [
+            # Bitwarden
+            { id = "nngceckbapebfimnlniiiahkandclblb"; }
+
+            # uBlock Origin Lite
+            { id = "ddkjiahejlhfcafbddmgiahcphecmpfh"; }
+
+            # SponsorBlock
+            { id = "mnjggcdmjocbbbhaepdhchncahnbgone"; }
+        ];
     };
 
     home.stateVersion = "26.05";

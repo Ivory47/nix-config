@@ -9,7 +9,9 @@
 -- Create your files separately and then require them like this:
 -- require("myColors")
 
-require("hyprland-gui")
+-- require("hyprland-gui")
+local home = os.getenv("HOME")
+dofile(home .. "/src/nix-config/home-manager/hypr/hyprland-gui.lua")
 local colors = require("colors")
 
 ------------------
@@ -59,6 +61,7 @@ end)
 
 -- See https://wiki.hypr.land/Configuring/Advanced-and-Cool/Environment-variables/
 
+hl.env("XCURSOR_THEME", "Adwaita")
 hl.env("XCURSOR_SIZE", "20")
 hl.env("HYPRCURSOR_SIZE", "20")
 
@@ -120,7 +123,7 @@ hl.config({
 
         -- Change transparency of focused and unfocused windows
         active_opacity   = 1.0,
-        inactive_opacity = 0.9,
+        inactive_opacity = 1.0,
 
         shadow = {
             enabled      = true,
@@ -215,7 +218,7 @@ hl.config({
 
 hl.config({
     misc = {
-        force_default_wallpaper = -1,    -- Set to 0 or 1 to disable the anime mascot wallpapers
+        force_default_wallpaper = 1,    -- Set to 0 or 1 to disable the anime mascot wallpapers
         disable_hyprland_logo   = false, -- If true disables the random hyprland logo / anime girl background. :(
     },
 })
@@ -371,6 +374,12 @@ hl.window_rule({
     },
 
     no_focus = true,
+})
+
+hl.window_rule({
+    match   = { class = "HeadlessKitty" },
+    -- active inactive fullscreen
+    opacity = "1.0 override 0.9 override 1.0 override",
 })
 
 -- Layer rules also return a handle.

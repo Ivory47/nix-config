@@ -10,7 +10,6 @@
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;
 
-    # Use latest kernel.
     boot.kernelPackages = pkgs.linuxPackages;
 
     networking.hostName = "nixos-desktop";
@@ -21,7 +20,11 @@
     # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
     # Enable networking
-        networking.networkmanager.enable = true;
+    networking.networkmanager = {
+        enable = true;
+        wifi.powersave = false;
+        wifi.backend = "iwd";
+    };
 
     # Set your time zone.
     time.timeZone = "Europe/Berlin";
@@ -42,6 +45,8 @@
     };
 
     security.rtkit.enable = true;
+
+    hardware.bluetooth.enable = true;
 
     services.pipewire = {
         enable = true;
@@ -105,14 +110,24 @@
         withUWSM = true;
     };
 
-    programs.regreet = {
+    services.displayManager.sddm = {
         enable = true;
-
-        theme = {
-            name = "Adwaita-dark";
-            package = pkgs.gnome-themes-extra; 
-        };
+        wayland.enable = true;
     };
+
+    programs.silentSDDM = {
+        enable = true;
+        theme = "rei";
+    };
+
+    # programs.regreet = {
+    #     enable = true;
+    #
+    #     theme = {
+    #         name = "Adwaita-dark";
+    #         package = pkgs.gnome-themes-extra; 
+    #     };
+    # };
 
     services.displayManager.sessionPackages = [ pkgs.hyprland ];
 

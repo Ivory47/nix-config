@@ -5,6 +5,8 @@ import Quickshell.Services.UPower
 Item {
     id: battery 
 
+    visible: UPower.displayDevice.isLaptopBattery
+
     implicitWidth: batteryText.implicitWidth
     implicitHeight: batteryText.implicitHeight
 
