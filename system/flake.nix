@@ -11,16 +11,44 @@
     };
 
     outputs = inputs@{ nixpkgs, ... }: {
-        nixosConfigurations.default = nixpkgs.lib.nixosSystem {
-            system = "x86_64-linux";
+        nixosConfigurations = {
+            desktop = nixpkgs.lib.nixosSystem {
+                system = "x86_64-linux";
 
-            specialArgs = {
-                inherit inputs;
+                specialArgs = {
+                    inherit inputs;
+                };
+
+                modules = [
+                    ./configuration.nix
+                    ./hosts/desktop/configuration.nix
+                ];
             };
 
-            modules = [
-                ./configuration.nix
-            ];
+            laptop = nixpkgs.lib.nixosSystem {
+                system = "x86_64-linux";
+
+                specialArgs = {
+                    inherit inputs;
+                };
+
+                modules = [
+                    ./configuration.nix
+                    ./hosts/laptop/configuration.nix
+                ];
+            };
+
+            default = nixpkgs.lib.nixosSystem {
+                system = "x86_64-linux";
+
+                specialArgs = {
+                    inherit inputs;
+                };
+
+                modules = [
+                    ./configuration.nix
+                ];
+            };
         };
     };
 }

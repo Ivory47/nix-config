@@ -2,15 +2,20 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
 
 {
+    imports = [
+        inputs.silentSDDM.nixosModules.default
+    ];
 
     # Bootloader.
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;
 
     boot.kernelPackages = pkgs.linuxPackages;
+
+    hardware.enableRedistributableFirmware = true;
 
     networking.hostName = "nixos-desktop";
     # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
