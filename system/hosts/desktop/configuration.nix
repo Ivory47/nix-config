@@ -12,4 +12,8 @@
     '';
 
     networking.hostName = "nixos-desktop";
+
+    environment.sessionVariables = {
+        NIX_CONFIG_TYPE = "desktop";
+    };
 }

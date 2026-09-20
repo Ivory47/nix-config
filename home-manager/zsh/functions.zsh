@@ -63,3 +63,15 @@ function icats() {
 		icat "$file"
 	fi
 }
+
+
+function rebuild() {
+    if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" ]]; then
+        echo "Rebuilding $NIX_CONFIG_TYPE-Config..."
+        sudo nixos-rebuild switch --impure --flake "/etc/nixos#$NIX_CONFIG_TYPE"
+    else
+        echo "Warning: unknown NIX_CONFIG_TYPE (current: '$NIX_CONFIG_TYPE')."
+        echo "Rebuilding default-Config..."
+        sudo nixos-rebuild switch --impure --flake "/etc/nixos#default"
+    fi
+}

@@ -82,7 +82,7 @@
             ssh = "kitty +kitten ssh";
             icat = "kitty +kitten icat";
             nixconf = "sudo -E nvim /etc/nixos/configuration.nix";
-            rebuild = "sudo nixos-rebuild switch";
+            # rebuild = "sudo nixos-rebuild switch";
             hconf = "nvim ~/.config/home-manager/home.nix";
             hms = "home-manager switch --flake ~/.config/home-manager -b backup && source ~/.zshrc";
             qsr = "~/.config/home-manager/quickshell/reload.sh";
@@ -90,28 +90,11 @@
 
         initContent = ''
             
-            fzf_history_widget() {
-                # -n <number> outputs all commands since command <number>
-                # importantly it removes the numbers from the output as well
-                local selected=$(history -n 1 | tac | awk '!seen[$0]++' | fzf --no-sort --height 40%)
-                if [ -n "$selected" ]; then
-                    # everything left of the cursor is stored in LBUFFER
-                    LBUFFER+="$selected"
-                fi
-                # redraws the prompt
-                zle reset-prompt
-            }
-
-            # register function
-            zle -N fzf_history_widget
-
-            # bind
-            bindkey "^L" fzf_history_widget
-
             zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
             source ${pkgs.zsh-fzf-tab}/share/fzf-tab/fzf-tab.plugin.zsh
             source ${./zsh/functions.zsh}
+            source ${./zsh/widgets.zsh}
         '';
     };
 
@@ -175,9 +158,11 @@
     home.pointerCursor = {
         enable = true;
 
-        package = pkgs.bibata-cursors;
-        name = "Bibata-Modern-Classic";
-        size = 20;
+        # package = pkgs.bibata-cursors;
+        # name = "Bibata-Modern-Classic";
+        package = pkgs.gnome-themes-extra;
+        name = "Adwaita";
+        size = 22;
 
         gtk.enable = true;
         hyprcursor.enable = true;
