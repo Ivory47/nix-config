@@ -20,10 +20,11 @@
         inputs.matugen.packages.${system}.default
 
         mako # notification service
+        inkscape
 
-        nautilus
+        nautilus # file explorer
 
-        quickshell
+        quickshell # status bar, launcher and widgets
 
 
         # fonts 
@@ -200,6 +201,30 @@
 
     # quickshell
     xdg.configFile."quickshell/status-bar".source = ./quickshell/status-bar;
+    xdg.configFile."quickshell/app-launcher".source = ./quickshell/app-launcher;
+
+    # default apps 
+    xdg.enable = true;
+    xdg.mimeApps = {
+        enable = true;
+        defaultApplications = {
+            "text/html" = "firefox.desktop";
+            "x-scheme-handler/http" = "firefox.desktop";
+            "x-scheme-handler/https" = "firefox.desktop";
+            "x-scheme-handler/about" = "firefox.desktop";
+            "x-scheme-handler/unknown" = "firefox.desktop";
+
+            # Image files
+            "image/jpeg" = "firefox.desktop";
+            "image/png" = "firefox.desktop";
+            "image/gif" = "firefox.desktop";
+            "image/webp" = "firefox.desktop";
+            "image/svg+xml" = "firefox.desktop";
+            "image/bmp" = "firefox.desktop";
+            "image/tiff" = "firefox.desktop";
+            "image/x-icon" = "firefox.desktop";
+        };
+    };
 
     # normal programs
     programs.firefox = {
