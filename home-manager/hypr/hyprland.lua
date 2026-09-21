@@ -60,6 +60,7 @@ hl.on("hyprland.start", function ()
     --   hl.exec_cmd("nm-applet")
     hl.exec_cmd("awww-daemon")
     hl.exec_cmd("qs -c status-bar")
+    hl.exec_cmd("qs -c app-launcher")
     hl.exec_cmd("rm -f /tmp/kitty-socket && kitty --class HeadlessKitty --single-instance --listen-on unix:/tmp/kitty-socket --start-as=hidden tail -f /dev/null")
 end)
 

@@ -131,6 +131,11 @@
                 scale = 1.3;
             };
 
+            "LockScreen.Message" = {
+                font-size = 14;
+                icon-size = 20;
+            };
+
             "LoginScreen.MenuArea.Buttons" = {
                 size = 42;
             };

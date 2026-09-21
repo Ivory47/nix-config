@@ -91,6 +91,8 @@
         };
 
         initContent = ''
+            [[ -d ~/.cache/zsh ]] || mkdir -p ~/.cache/zsh
+            export ZSH_COMPDUMP="$HOME/.cache/zsh/zcompdump-$HOST-$ZSH_VERSION"
             
             zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 

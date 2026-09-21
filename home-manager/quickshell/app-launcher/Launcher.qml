@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import QtQuick.Effects
 
 PanelWindow {
     id: root
@@ -56,6 +57,20 @@ PanelWindow {
 
     LauncherModel {
         id: launcherModel
+    }
+
+    RectangularShadow {
+        anchors.fill: launcher
+
+        radius: launcher.radius
+
+        blur: 14
+        spread: 2
+
+        color: Theme.shadowColor
+
+        offset.x: 0
+        offset.y: 4
     }
 
     Rectangle {
