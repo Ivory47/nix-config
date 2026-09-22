@@ -237,6 +237,10 @@ hl.config({
 ---- INPUT ----
 ---------------
 
+local accel_profile = os.getenv("NIX_CONFIG_TYPE") == "laptop"
+    and "adaptive"
+    or "flat"
+
 hl.config({
     input = {
         kb_layout  = "gb",
@@ -248,6 +252,8 @@ hl.config({
         follow_mouse = 1,
 
         sensitivity = 0, -- -1.0 - 1.0, 0 means no modification.
+
+        accel_profile = accel_profile,
 
         touchpad = {
             natural_scroll = true,

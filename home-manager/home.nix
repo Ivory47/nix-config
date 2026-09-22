@@ -51,6 +51,8 @@
         };
     };
 
+    xdg.enable = true;
+
     # terminal
     programs.zsh = {
         enable = true;
@@ -206,7 +208,6 @@
     xdg.configFile."quickshell/app-launcher".source = ./quickshell/app-launcher;
 
     # default apps 
-    xdg.enable = true;
     xdg.mimeApps = {
         enable = true;
         defaultApplications = {
