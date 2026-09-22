@@ -155,6 +155,8 @@
         };
     };
 
+    qt.enable = true;
+
     # programs.regreet = {
     #     enable = true;
     #

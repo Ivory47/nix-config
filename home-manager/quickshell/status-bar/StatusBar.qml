@@ -1,10 +1,12 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.UPower
 
 PanelWindow {
     id: statusBar
+    WlrLayershell.namespace: "statusbar"
 
     anchors {
         top: true
@@ -15,6 +17,11 @@ PanelWindow {
     implicitHeight: Theme.statusBarHeight
 
     color: "transparent"
+
+
+    BackgroundEffect.blurRegion: Region {
+        item: statusBar.contentItem
+    }
 
     property bool showing: true
 
@@ -80,7 +87,7 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent
 
-            color: Theme.background
+            color: Qt.alpha(Theme.background, 0.95)
 
             // opacity: statusBar.showing ? 1 : 0
             //
@@ -140,7 +147,7 @@ PanelWindow {
                 }
 
                 height: 1
-                color: "#494965"
+                color: Qt.alpha("#494965", 0.85)
             }
         }
     }

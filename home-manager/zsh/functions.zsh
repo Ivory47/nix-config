@@ -60,10 +60,24 @@ function icats() {
 
 	# Open the selected file with icat if a choice was made
 	if [[ -n "$file" ]]; then
-		icat "$file"
+		kitty +kitten icat "$file"
 	fi
 }
 
+function awwws() {
+	local file
+	# Find images in the current directory using fd and preview them with kitty icat
+	file=$(fd --max-depth 1 --type file --extension png --extension jpg --extension jpeg --extension gif --extension webp | \
+		fzf --preview 'kitty +kitten icat --clear --transfer-mode=memory --stdin=no --place="${FZF_PREVIEW_COLUMNS}x${FZF_PREVIEW_LINES}@0x0" {}' \
+		--preview-window=right:60%)
+
+	kitty +kitten icat --clear
+
+	# Open the selected file with icat if a choice was made
+	if [[ -n "$file" ]]; then
+		awww img "$file"
+	fi
+}
 
 function rebuild() {
     if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" ]]; then

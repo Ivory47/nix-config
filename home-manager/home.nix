@@ -11,6 +11,7 @@
         file
         tree
         jq
+        ripgrep
         lazygit
         wl-clipboard
         inputs.hyprmod.packages.${pkgs.stdenv.hostPlatform.system}.default
@@ -25,6 +26,7 @@
         nautilus # file explorer
 
         quickshell # status bar, launcher and widgets
+        qt6Packages.qt5compat
 
 
         # fonts 
@@ -88,7 +90,7 @@
             # rebuild = "sudo nixos-rebuild switch";
             hconf = "nvim ~/.config/home-manager/home.nix";
             lg = "lazygit";
-            hms = "home-manager switch --flake ~/.config/home-manager -b backup && source ~/.zshrc";
+            hms = "home-manager switch --flake ~/.config/home-manager -b backup && source ~/.config/zsh/.zshrc";
             qsr = "~/.config/home-manager/quickshell/reload.sh";
         };
 
@@ -109,7 +111,7 @@
 
         settings = {
             font_size = 10;
-            background_opacity = 0.7;
+            background_opacity = 0.73;
             confirm_os_window_close = 0;
             window_padding_width = "3 6";
             allow_remote_control = true;

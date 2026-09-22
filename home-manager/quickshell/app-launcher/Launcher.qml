@@ -8,6 +8,7 @@ import QtQuick.Effects
 
 PanelWindow {
     id: root
+    WlrLayershell.namespace: "app-launcher"
 
     anchors {
         top: true
