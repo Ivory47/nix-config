@@ -39,13 +39,25 @@ PopupWindow {
         }
     }
 
+    onSelectedNetworkChanged: {
+        if (selectedNetwork !== null) {
+            Qt.callLater(function() {
+                passwordInput.forceActiveFocus()
+            })
+        }
+    }
+
     function connectSelectedNetwork() {
         if (!selectedNetwork || password.length === 0)
-            return
+        return
 
         connectionError = ""
         selectedNetwork.connectWithPsk(password)
     }
+
+    // ================================================================
+    // SHADOW
+    // ================================================================
 
     Rectangle {
         anchors {
@@ -67,6 +79,10 @@ PopupWindow {
         }
     }
 
+    // ================================================================
+    // MAIN BACKGROUND
+    // ================================================================
+
     Rectangle {
         anchors {
             fill: parent
@@ -76,9 +92,9 @@ PopupWindow {
         color: Theme.background
         radius: 6
 
-        // ------------------------------------------------------------
-        // Network list
-        // ------------------------------------------------------------
+        // ============================================================
+        // NETWORK LIST
+        // ============================================================
 
         Column {
             visible: popup.selectedNetwork === null
@@ -89,6 +105,7 @@ PopupWindow {
 
             Text {
                 text: "Wi-Fi"
+
                 color: Theme.text
                 font.pixelSize: 14
             }
@@ -96,6 +113,7 @@ PopupWindow {
             Rectangle {
                 width: parent.width
                 height: 1
+
                 color: Theme.surfaceAlt
             }
 
@@ -103,6 +121,7 @@ PopupWindow {
                 visible: !popup.wifiDevice
 
                 text: "No Wi-Fi device"
+
                 color: Theme.textMuted
                 font.pixelSize: 13
             }
@@ -111,8 +130,8 @@ PopupWindow {
                 visible: popup.wifiDevice && popup.networks.length === 0
 
                 text: popup.wifiDevice?.scannerEnabled
-                    ? "Scanning..."
-                    : "No networks found"
+                ? "Scanning..."
+                : "No networks found"
 
                 color: Theme.textMuted
                 font.pixelSize: 13
@@ -129,22 +148,35 @@ PopupWindow {
 
                 model: popup.networks
 
-                delegate: Rectangle {
+                delegate: Item {
+                    id: networkRow
+
                     required property var modelData
 
                     width: ListView.view.width
                     height: 38
-                    radius: 5
 
-                    color: {
-                        if (modelData.connected)
+                    property bool rowHovered: rowHoverHandler.hovered
+
+                    Rectangle {
+                        anchors.fill: parent
+
+                        radius: 5
+
+                        color: {
+                            if (networkRow.modelData.connected)
                             return Theme.surfaceAlt
 
-                        if (mouse.containsMouse)
+                            if (networkRow.rowHovered)
                             return Theme.surface
 
-                        return "transparent"
+                            return "transparent"
+                        }
                     }
+
+                    // ------------------------------------------------
+                    // Network name
+                    // ------------------------------------------------
 
                     Text {
                         anchors {
@@ -153,9 +185,9 @@ PopupWindow {
                             verticalCenter: parent.verticalCenter
                         }
 
-                        width: parent.width - 55
+                        width: parent.width - 95
 
-                        text: modelData.name || "Hidden network"
+                        text: networkRow.modelData.name || "Hidden network"
 
                         color: Theme.text
                         font.pixelSize: 13
@@ -163,7 +195,13 @@ PopupWindow {
                         elide: Text.ElideRight
                     }
 
+                    // ------------------------------------------------
+                    // Network status icon
+                    // ------------------------------------------------
+
                     Text {
+                        id: networkIcon
+
                         anchors {
                             right: parent.right
                             rightMargin: 8
@@ -171,63 +209,144 @@ PopupWindow {
                         }
 
                         text: {
-                            if (modelData.connected)
-                                return "✓"
+                            if (networkRow.modelData.connected)
+                            return "✓"
 
-                            if (modelData.stateChanging)
-                                return "…"
+                            if (networkRow.modelData.stateChanging)
+                            return "…"
 
-                            if (modelData.known)
-                                return "󰌪"
+                            if (networkRow.modelData.known)
+                            return "󰍁"
 
                             return ""
                         }
 
-                        color: modelData.connected
-                            ? Theme.green
-                            : Theme.textMuted
+                        color: networkRow.modelData.connected
+                        ? Theme.green
+                        : Theme.textMuted
 
                         font.pixelSize: 15
                     }
 
+                    // ------------------------------------------------
+                    // Trash icon
+                    // ------------------------------------------------
+
+                    Text {
+                        id: forgetIcon
+
+                        visible: networkRow.modelData.known
+                        && !networkRow.modelData.connected
+                        && networkRow.rowHovered
+
+                        anchors {
+                            right: networkIcon.left
+                            rightMargin: 10
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        text: "󰆴"
+
+                        color: forgetMouse.containsMouse
+                        ? Theme.red
+                        : Theme.textMuted
+
+                        font.pixelSize: 15
+                    }
+
+                    // ------------------------------------------------
+                    // Tracks hovering over the entire row.
+                    //
+                    // This does NOT handle clicks, so it cannot
+                    // interfere with the row or trash button.
+                    // ------------------------------------------------
+
+                    HoverHandler {
+                        id: rowHoverHandler
+                    }
+
+                    // ------------------------------------------------
+                    // Normal row click
+                    //
+                    // Covers the entire row, but the trash button
+                    // has a higher z-index and therefore receives
+                    // clicks on the trash.
+                    // ------------------------------------------------
+
                     MouseArea {
-                        id: mouse
+                        id: rowMouse
 
                         anchors.fill: parent
 
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
 
+                        z: 1
+
                         onClicked: {
-                            if (modelData.connected) {
-                                modelData.disconnect()
+                            if (networkRow.modelData.connected) {
+                                networkRow.modelData.disconnect()
                                 return
                             }
 
-                            if (modelData.known) {
-                                modelData.connect()
+                            if (networkRow.modelData.known) {
+                                networkRow.modelData.connect()
                                 return
                             }
 
-                            // Unknown network:
-                            // show the password screen.
-                            popup.selectedNetwork = modelData
+                            popup.selectedNetwork = networkRow.modelData
                             popup.password = ""
                             popup.connectionError = ""
                         }
                     }
 
+                    // ------------------------------------------------
+                    // Trash button
+                    //
+                    // Only this small area handles forgetting.
+                    // ------------------------------------------------
+
+                    MouseArea {
+                        id: forgetMouse
+
+                        visible: networkRow.modelData.known
+                        && !networkRow.modelData.connected
+                        && networkRow.rowHovered
+
+                        anchors {
+                            right: networkIcon.left
+                            rightMargin: 3
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        width: 24
+                        height: 24
+
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+
+                        z: 2
+
+                        onClicked: {
+                            networkRow.modelData.forget()
+                        }
+                    }
+
+                    // ------------------------------------------------
+                    // Connection failure
+                    // ------------------------------------------------
+
                     Connections {
-                        target: modelData
+                        target: networkRow.modelData
 
                         function onConnectionFailed(reason) {
                             console.log(
                                 "Wi-Fi connection failed:",
-                                modelData.name,
+                                networkRow.modelData.name,
                                 reason
                             )
 
-                            if (popup.selectedNetwork === modelData) {
+                            if (popup.selectedNetwork === networkRow.modelData) {
                                 popup.connectionError = "Connection failed."
                             }
                         }
@@ -236,9 +355,9 @@ PopupWindow {
             }
         }
 
-        // ------------------------------------------------------------
-        // Password screen
-        // ------------------------------------------------------------
+        // ============================================================
+        // PASSWORD SCREEN
+        // ============================================================
 
         Column {
             visible: popup.selectedNetwork !== null
@@ -302,8 +421,8 @@ PopupWindow {
                     font.pixelSize: 13
 
                     echoMode: popup.passwordVisible
-                        ? TextInput.Normal
-                        : TextInput.Password
+                    ? TextInput.Normal
+                    : TextInput.Password
 
                     text: popup.password
 
@@ -334,6 +453,7 @@ PopupWindow {
                 width: parent.width
                 height: 32
 
+                // Cancel
                 Rectangle {
                     anchors.left: parent.left
 
@@ -343,8 +463,8 @@ PopupWindow {
                     radius: 5
 
                     color: cancelMouse.containsMouse
-                        ? Theme.surface
-                        : "transparent"
+                    ? Theme.surface
+                    : "transparent"
 
                     Text {
                         anchors.centerIn: parent
@@ -371,6 +491,7 @@ PopupWindow {
                     }
                 }
 
+                // Connect
                 Rectangle {
                     anchors.right: parent.right
 
@@ -380,8 +501,8 @@ PopupWindow {
                     radius: 5
 
                     color: connectMouse.containsMouse
-                        ? Theme.surfaceAlt
-                        : Theme.surface
+                    ? Theme.surfaceAlt
+                    : Theme.surface
 
                     Text {
                         anchors.centerIn: parent
@@ -407,6 +528,10 @@ PopupWindow {
                 }
             }
         }
+
+        // ============================================================
+        // SELECTED NETWORK CONNECTION HANDLING
+        // ============================================================
 
         Connections {
             target: popup.selectedNetwork
