@@ -30,25 +30,25 @@ Item {
             ? Theme.text
             : Theme.textMuted
 
-        font.pixelSize: 18
+        font.pixelSize: 14
 
         text: {
             if (!root.wifiDevice)
-                return "󰤮"
+                return "󰤮 "
 
             if (!root.wifiDevice.connected)
-                return "󰤭"
+                return "󰤭 "
 
             if (root.signalStrength >= 75)
-                return "󰤨"
+                return "󰤨 "
 
             if (root.signalStrength >= 50)
-                return "󰤥"
+                return "󰤥 "
 
             if (root.signalStrength >= 25)
-                return "󰤢"
+                return "󰤢 "
 
-            return "󰤟"
+            return "󰤟 "
         }
     }
 
@@ -59,7 +59,15 @@ Item {
         cursorShape: Qt.PointingHandCursor
 
         onClicked: {
-            // WifiMenu will be opened here later.
+            menu.visible = !menu.visible
         }
+    }
+
+    WifiMenu {
+        id: menu
+
+        anchor.window: root
+        anchor.rect.x: 0
+        anchor.rect.y: root.height + 4
     }
 }
