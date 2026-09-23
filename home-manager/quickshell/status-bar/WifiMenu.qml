@@ -38,6 +38,7 @@ PopupWindow {
         radius: 6
 
         layer.enabled: true
+
         layer.effect: MultiEffect {
             shadowEnabled: true
             shadowColor: Theme.shadowColor
@@ -45,6 +46,16 @@ PopupWindow {
             shadowHorizontalOffset: 0
             shadowVerticalOffset: 3
         }
+    }
+
+    Rectangle {
+        anchors {
+            fill: parent
+            margins: 6
+        }
+
+        color: Theme.background
+        radius: 6
 
         Column {
             anchors.fill: parent

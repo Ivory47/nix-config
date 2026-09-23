@@ -59,15 +59,18 @@ Item {
         cursorShape: Qt.PointingHandCursor
 
         onClicked: {
-            menu.visible = !menu.visible
+            wifiMenu.visible = !wifiMenu.visible
         }
     }
 
     WifiMenu {
-        id: menu
+        id: wifiMenu
 
-        anchor.window: root
-        anchor.rect.x: 0
-        anchor.rect.y: root.height + 4
+        visible: false
+
+        anchor.item: root
+        anchor.edges: Edges.Bottom | Edges.HCenter
+        anchor.gravity: Edges.Bottom | Edges.HCenter
+        anchor.margins.top: 24
     }
 }
