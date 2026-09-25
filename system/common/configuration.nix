@@ -5,10 +5,6 @@
 { config, pkgs, inputs, ... }:
 
 {
-    imports = [
-        inputs.silentSDDM.nixosModules.default
-    ];
-
     # Bootloader.
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;
@@ -48,19 +44,6 @@
         LC_TIME = "de_DE.UTF-8";
     };
 
-    security.rtkit.enable = true;
-
-    hardware.bluetooth.enable = true;
-
-    services.pipewire = {
-        enable = true;
-
-        alsa.enable = true;
-        alsa.support32Bit = true;
-
-        pulse.enable = true;
-    };
-
     # Configure keymap in X11
     services.xserver.xkb = {
         layout = "gb";
@@ -71,14 +54,6 @@
         enable = true;
         nssmdns4 = true;
         openFirewall = true;
-    };
-
-    services.printing = {
-        enable = true;
-        drivers = with pkgs; [
-            cups-filters
-            cups-browsed
-        ];
     };
 
     # Configure console keymap
@@ -104,81 +79,15 @@
         git
         zip
         unzip
-        kitty
         htop
         home-manager
-        gnome-themes-extra
     ];
 
     programs.zsh.enable = true;
 
-    programs.hyprland = {
-        enable = true;
-        withUWSM = true;
-    };
-
-    services.displayManager.sddm = {
-        enable = true;
-        wayland.enable = true;
-    };
-
-    programs.silentSDDM = {
-        enable = true;
-        theme = "default";
-
-        settings = {
-            "General" = {
-                scale = 1.3;
-            };
-
-            "LockScreen.Message" = {
-                font-size = 14;
-                icon-size = 20;
-            };
-
-            "LoginScreen.MenuArea.Buttons" = {
-                size = 42;
-            };
-
-            "LoginScreen.MenuArea.Session" = {
-                font-size = 14;
-                icon-size = 20;
-            };
-
-            "LoginScreen.MenuArea.Keyboard" = {
-                icon-size = 20;
-            };
-
-            "LoginScreen.MenuArea.Power" = {
-                icon-size = 20;
-            };
-        };
-    };
-
-    qt.enable = true;
-
-    # programs.regreet = {
-    #     enable = true;
-    #
-    #     theme = {
-    #         name = "Adwaita-dark";
-    #         package = pkgs.gnome-themes-extra; 
-    #     };
-    # };
-
-    services.displayManager.sessionPackages = [ pkgs.hyprland ];
-
     services.tailscale.enable = true;
-    services.upower.enable = true;
-    services.power-profiles-daemon.enable = true;
-
 
     users.users.user.shell = pkgs.zsh;
-
-    environment.variables = {
-        XCURSOR_THEME = "Adwaita";
-        XCURSOR_SIZE = "24";
-    };
 
     # Some programs need SUID wrappers, can be configured further or are
     # started in user sessions.

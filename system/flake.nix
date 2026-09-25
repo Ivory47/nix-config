@@ -21,6 +21,7 @@
 
                 modules = [
                     ./configuration.nix
+                    ./common/configuration-gui.nix
                     ./hosts/desktop/configuration.nix
                 ];
             };
@@ -34,7 +35,22 @@
 
                 modules = [
                     ./configuration.nix
+                    ./common/configuration-gui.nix
                     ./hosts/laptop/configuration.nix
+                ];
+            };
+
+            nas-server = nixpkgs.lib.nixosSystem {
+                system = "x86_64-linux";
+
+                specialArgs = {
+                    inherit inputs;
+                };
+
+                modules = [
+                    ./configuration.nix
+                    ./common/configuration-server.nix
+                    ./hosts/nas-server/configuration.nix
                 ];
             };
 
@@ -47,6 +63,7 @@
 
                 modules = [
                     ./configuration.nix
+                    ./common/configuration-gui.nix
                 ];
             };
         };
