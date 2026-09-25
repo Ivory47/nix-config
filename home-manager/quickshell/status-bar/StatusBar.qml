@@ -127,6 +127,8 @@ PanelWindow {
 
                 spacing: 15
 
+                Wifi {}
+
                 Audio {}
 
                 Text {
