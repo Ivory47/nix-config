@@ -75,7 +75,7 @@ function awwws() {
 
 	# Open the selected file with icat if a choice was made
 	if [[ -n "$file" ]]; then
-		awww img "$file"
+		awww img -a "$file"
 	fi
 }
 

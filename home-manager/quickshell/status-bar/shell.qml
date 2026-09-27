@@ -11,12 +11,28 @@ ShellRoot {
         id: osdManager
 
         onShowingChanged: {
-            statusBar.showing = !showing
+            statusBars.forEach(bar => bar.showing = !showing)
         }
     }
 
-    StatusBar {
-        id: statusBar
+    property var statusBars: []
+
+    Variants {
+        model: Quickshell.screens
+
+        StatusBar {
+            required property var modelData
+
+            screen: modelData
+
+            Component.onCompleted: {
+                statusBars.push(this)
+            }
+
+            Component.onDestruction: {
+                statusBars.splice(statusBars.indexOf(this), 1)
+            }
+        }
     }
 
     Connections {
@@ -26,5 +42,4 @@ ShellRoot {
             osdManager.showBrightness()
         }
     }
-
 }
