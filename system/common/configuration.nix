@@ -80,6 +80,7 @@
         zip
         unzip
         htop
+        bind
         home-manager
     ];
 
