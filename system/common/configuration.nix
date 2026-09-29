@@ -81,6 +81,7 @@
         unzip
         htop
         bind
+        openssl
         home-manager
     ];
 
