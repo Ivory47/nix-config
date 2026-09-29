@@ -1,2 +1,3 @@
 system/hardware-configuration.nix
-/home-manager/hypr/hyprland-gui.lua
+system/local/local-config.nix
+home-manager/hypr/hyprland-gui.lua
