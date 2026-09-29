@@ -4,16 +4,6 @@ let
     localConfig = import ../local/local-config.nix;
 in
 {
-    config = lib.mkIf (localConfig.wakeOnLanInterface != null) {
-        networking.interfaces.${localConfig.wakeOnLanInterface} = {
-            wakeOnLan = {
-                enable = true;
-                policy = [ "magic" ];
-            };
-        };
-    };
-
-
     services.openssh = {
         enable = true;
         settings = {
@@ -71,4 +61,14 @@ in
     documentation.enable = false;
     documentation.nixos.enable = false;
     documentation.man.enable = false;
+    
+
+    networking.interfaces = if (localConfig.wakeOnLanInterface != null) then {
+        "${localConfig.wakeOnLanInterface}" = {
+            wakeOnLan = {
+                enable = true;
+                policy = [ "magic" ];
+            };
+        };
+    } else {};
 }
