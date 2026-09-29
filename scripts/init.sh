@@ -13,8 +13,8 @@ run_step() {
 
 run_step "Linking configuration" ./link.sh
 
-run_step "Creating local configuration" \
-    cp /etc/nixos/local/template.nix /etc/nixos/local/local-config.nix
+# run_step "Creating local configuration" \
+#     cp /etc/nixos/local/template.nix /etc/nixos/local/local-config.nix
 
 run_step "Initializing Git" ./init-git.sh
 
