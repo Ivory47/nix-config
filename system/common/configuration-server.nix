@@ -1,8 +1,5 @@
 { config, lib, pkgs, ... }:
 
-let
-    localConfig = import ../local/local-config.nix;
-in
 {
     services.openssh = {
         enable = true;
@@ -61,14 +58,4 @@ in
     documentation.enable = false;
     documentation.nixos.enable = false;
     documentation.man.enable = false;
-    
-
-    networking.interfaces = if (localConfig.wakeOnLanInterface != null) then {
-        "${localConfig.wakeOnLanInterface}" = {
-            wakeOnLan = {
-                enable = true;
-                policy = [ "magic" ];
-            };
-        };
-    } else {};
 }
