@@ -18,8 +18,8 @@ fi
 echo "Backing up /etc/nixos to /etc/nixos.bak..."
 sudo mv /etc/nixos /etc/nixos.bak
 echo "Linking system config..."
-sudo ln -s "$SCRIPT_DIR/system" /etc/nixos
-sudo ln -s /etc/nixos.bak/hardware-configuration.nix "$SCRIPT_DIR/system/"
+sudo ln -s "$SCRIPT_DIR/../system" /etc/nixos
+sudo ln -s /etc/nixos.bak/hardware-configuration.nix "$SCRIPT_DIR/../system/"
 
 if [ ! -d "$REAL_HOME/.config" ]; then
     echo "creating .config directory..."
@@ -32,4 +32,4 @@ if [ -d "$REAL_HOME/.config/home-manager" ] || [ -L "$REAL_HOME/.config/home-man
 fi 
 
 echo "Linking user config..."
-ln -s "$SCRIPT_DIR/home-manager" "$REAL_HOME/.config/home-manager"
+ln -s "$SCRIPT_DIR/../home-manager" "$REAL_HOME/.config/home-manager"
