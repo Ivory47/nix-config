@@ -9,7 +9,6 @@
         fzf
         fd
         file
-        tree
         jq
         ripgrep
         lazygit

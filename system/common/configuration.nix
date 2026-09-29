@@ -81,7 +81,9 @@
         unzip
         htop
         bind
+        tree
         openssl
+        cifs-utils
         home-manager
     ];
 

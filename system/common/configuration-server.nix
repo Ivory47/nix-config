@@ -1,6 +1,19 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
+let
+    localConfig = import ../local/local-config.nix;
+in
 {
+    config = lib.mkIf (localConfig.wakeOnLanInterface != null) {
+        networking.interfaces.${localConfig.wakeOnLanInterface} = {
+            wakeOnLan = {
+                enable = true;
+                policy = [ "magic" ];
+            };
+        };
+    };
+
+
     services.openssh = {
         enable = true;
         settings = {
@@ -34,7 +47,7 @@
         # Quick protection template for SSH
         jails.ssh-iptables = ''
             enabled  = true;
-        filter   = sshd
+            filter   = sshd
             action   = iptables[name=SSH, port=ssh, protocol=tcp]
             logpath  = /var/log/auth.log
             maxretry = 8

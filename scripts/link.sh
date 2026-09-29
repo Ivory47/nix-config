@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
 # stops script when something goes wrong
-set -euo pipefail
+set -Eeuo pipefail
+
+trap 'echo "ERROR: command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 REAL_USER="${SUDO_USER:-$USER}"
 REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)

@@ -51,6 +51,8 @@
                     ./configuration.nix
                     ./common/configuration-server.nix
                     ./hosts/nas-server/configuration.nix
+                    ./modules/nvidia.nix
+                    ./modules/docker.nix
                 ];
             };
 

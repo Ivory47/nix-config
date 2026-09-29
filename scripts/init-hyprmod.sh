@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+set -Eeuo pipefail
+
+trap 'echo "ERROR: command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TARGET_DIR="${SCRIPT_DIR}/../home-manager/hypr"
