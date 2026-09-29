@@ -18,9 +18,5 @@ run_step "Creating local configuration" \
 
 run_step "Initializing Git" ./init-git.sh
 
-run_step "Initializing Matugen" ./init-matugen.sh
-
-run_step "Initializing HyprMod" ./init-hyprmod.sh
-
 echo
 echo "==> Setup completed successfully!"
