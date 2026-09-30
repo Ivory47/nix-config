@@ -5,6 +5,8 @@
         inputs.silentSDDM.nixosModules.default
     ];
 
+    hardware.graphics.enable = true;
+
     hardware.bluetooth.enable = true;
 
     security.rtkit.enable = true;
