@@ -20,6 +20,29 @@
     ];
 
 
+    gtk = {
+        enable = true;
+
+        iconTheme = {
+            package = pkgs.papirus-icon-theme;
+            name = "Papirus-Dark";
+        };
+    };
+
+    home.pointerCursor = {
+        enable = true;
+
+        # package = pkgs.bibata-cursors;
+        # name = "Bibata-Modern-Classic";
+        package = pkgs.gnome-themes-extra;
+        name = "Adwaita";
+        size = 24;
+
+        gtk.enable = true;
+        hyprcursor.enable = true;
+    };
+
+
     # default apps 
     xdg.mimeApps = {
         enable = true;
