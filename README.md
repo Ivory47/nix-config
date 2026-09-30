@@ -22,16 +22,16 @@ after that you can use `rebuild` because the device is saved
 
 ```sh
 # desktop
-home-manager switch --flake .#desktop
+home-manager switch --flake $HOME/.config/home-manager#desktop
 
 # laptop
-home-manager switch --flake .#laptop
+home-manager switch --flake $HOME/.config/home-manager#laptop
 
 # nas-server
-home-manager switch --flake .#nas-server
+home-manager switch --flake $HOME/.config/home-manager#nas-server
 
 # everything else
-home-manager switch --flake .#default
+home-manager switch --flake $HOME/.config/home-manager#default
 ```
 
 <details>
