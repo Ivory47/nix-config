@@ -8,6 +8,6 @@
 
 
     # quickshell
-    xdg.configFile."quickshell/status-bar".source = ./quickshell/status-bar;
-    xdg.configFile."quickshell/app-launcher".source = ./quickshell/app-launcher;
+    xdg.configFile."quickshell/status-bar".source = ./status-bar;
+    xdg.configFile."quickshell/app-launcher".source = ./app-launcher;
 }

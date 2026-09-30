@@ -1,4 +1,4 @@
-{ ... }
+{ ... }:
 
 {
     programs.kitty = {
@@ -17,7 +17,7 @@
         '';
     };
     xdg.configFile."scripts/open-kitty.sh" = {
-        source = ./scripts/open-kitty.sh;
+        source = ../../../scripts/open-kitty.sh;
         executable = true;
     };
 }

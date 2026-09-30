@@ -73,8 +73,8 @@
             # rebuild = "sudo nixos-rebuild switch";
             hconf = "nvim ~/.config/home-manager/home.nix";
             lg = "lazygit";
-            hms = "home-manager switch --flake ~/.config/home-manager -b backup && source ~/.config/zsh/.zshrc";
-            qsr = "~/.config/home-manager/quickshell/reload.sh";
+            hms = "_home-manager-switch && source ~/.config/zsh/.zshrc";
+            qsr = "~/.config/home-manager/gui/quickshell/reload.sh";
         };
 
         initContent = ''
@@ -151,10 +151,6 @@
 
     # fastfetch 
     xdg.configFile."fastfetch/config.jsonc".source = ./fastfetch/config.jsonc;
-
-    # quickshell
-    xdg.configFile."quickshell/status-bar".source = ./quickshell/status-bar;
-    xdg.configFile."quickshell/app-launcher".source = ./quickshell/app-launcher;
 
 
     home.stateVersion = "26.05";

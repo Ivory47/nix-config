@@ -8,7 +8,7 @@
 
     # force is required cause hyprmod deletes the symlink :/
     xdg.configFile."hypr/hyprland.lua" = {
-        source = ./hypr/hyprland.lua;
+        source = ./hyprland.lua;
         force = true;
     };
 

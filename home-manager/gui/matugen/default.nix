@@ -7,10 +7,10 @@
 
 
     # colours matching wallpaper
-    xdg.configFile."matugen/config.toml".source = ./matugen/config.toml;
+    xdg.configFile."matugen/config.toml".source = ./config.toml;
 
-    xdg.configFile."matugen/templates/colors.conf".source = ./matugen/templates/colors.conf;
+    xdg.configFile."matugen/templates/colors.conf".source = ./templates/colors.conf;
 
-    xdg.configFile."matugen/templates/kitty.conf".source = ./matugen/templates/kitty.conf;
+    xdg.configFile."matugen/templates/kitty.conf".source = ./templates/kitty.conf;
 
 }
