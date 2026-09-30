@@ -6,7 +6,7 @@ trap 'echo "ERROR: command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-TARGET_DIR="${SCRIPT_DIR}/../home-manager/hypr"
+TARGET_DIR="${SCRIPT_DIR}/../home-manager/gui/hyprland/"
 TARGET_FILE="${TARGET_DIR}/hyprland-gui.lua"
 
 if [ -d "$TARGET_DIR" ]; then

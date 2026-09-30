@@ -37,13 +37,56 @@
             };
         in
         {
-            homeConfigurations."user" = home-manager.lib.homeManagerConfiguration {
-                inherit pkgs;
+            homeConfigurations = {
+                desktop = home-manager.lib.homeManagerConfiguration {
+                    inherit pkgs;
 
-                extraSpecialArgs = {
-                    inherit inputs;
+                    extraSpecialArgs = {
+                        inherit inputs;
+                    };
+
+                    modules = [
+                        ./home.nix
+                        ./gui
+                    ];
                 };
-                modules = [ ./home.nix ];
+
+                laptop = home-manager.lib.homeManagerConfiguration {
+                    inherit pkgs;
+
+                    extraSpecialArgs = {
+                        inherit inputs;
+                    };
+
+                    modules = [
+                        ./home.nix
+                        ./gui
+                    ];
+                };
+
+                default = home-manager.lib.homeManagerConfiguration {
+                    inherit pkgs;
+
+                    extraSpecialArgs = {
+                        inherit inputs;
+                    };
+
+                    modules = [
+                        ./home.nix
+                    ];
+                };
+
+                nas-server = home-manager.lib.homeManagerConfiguration {
+                    inherit pkgs;
+
+                    extraSpecialArgs = {
+                        inherit inputs;
+                    };
+
+                    modules = [
+                        ./home.nix
+                    ];
+                };
             };
         };
 }

@@ -80,12 +80,23 @@ function awwws() {
 }
 
 function rebuild() {
-    if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" || "nas-server" ]]; then
+    if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" || "$NIX_CONFIG_TYPE" == "nas-server" ]]; then
         echo "Rebuilding $NIX_CONFIG_TYPE-Config..."
         sudo nixos-rebuild switch --impure --flake "/etc/nixos#$NIX_CONFIG_TYPE"
     else
         echo "Warning: unknown NIX_CONFIG_TYPE (current: '$NIX_CONFIG_TYPE')."
         echo "Rebuilding default-Config..."
         sudo nixos-rebuild switch --impure --flake "/etc/nixos#default"
+    fi
+}
+
+function _home-manager-switch() {
+    if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" || "$NIX_CONFIG_TYPE" == "nas-server" ]]; then
+        echo "Rebuilding $NIX_CONFIG_TYPE-Home-Manager-Config..."
+        home-manager switch --flake "$HOME/.config/home-manager#$NIX_CONFIG_TYPE" -b backup
+    else
+        echo "Warning: unknown NIX_CONFIG_TYPE (current: '$NIX_CONFIG_TYPE')."
+        echo "Rebuilding default-Home-Manager-Config..."
+        home-manager switch --flake "$HOME/.config/home-manager#default" -b backup
     fi
 }

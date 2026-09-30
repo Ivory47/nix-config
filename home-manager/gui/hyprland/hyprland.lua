@@ -11,7 +11,7 @@
 
 -- require("hyprland-gui")
 local home = os.getenv("HOME")
-local file_path = home .. "/src/nix-config/home-manager/hypr/hyprland-gui.lua"
+local file_path = home .. "/src/nix-config/home-manager/gui/hyprland/hyprland-gui.lua"
 
 -- check if file actually exists by trying to open it
 local f = io.open(file_path, "r")
