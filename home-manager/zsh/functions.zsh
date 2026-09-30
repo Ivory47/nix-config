@@ -80,7 +80,7 @@ function awwws() {
 }
 
 function rebuild() {
-    if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" ]]; then
+    if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" || "nas-server" ]]; then
         echo "Rebuilding $NIX_CONFIG_TYPE-Config..."
         sudo nixos-rebuild switch --impure --flake "/etc/nixos#$NIX_CONFIG_TYPE"
     else
