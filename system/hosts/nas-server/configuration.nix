@@ -1,4 +1,4 @@
-{ ... }:
+{ pkgs, ... }:
 
 {
     imports = [
@@ -15,4 +15,8 @@
     environment.sessionVariables = {
         NIX_CONFIG_TYPE = "nas-server";
     };
+
+    environment.systemPackages = with pkgs; [
+        smartmontools
+    ];
 }
