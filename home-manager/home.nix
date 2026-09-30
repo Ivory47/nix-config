@@ -12,25 +12,9 @@
         jq
         ripgrep
         lazygit
-        wl-clipboard
-        inputs.hyprmod.packages.${pkgs.stdenv.hostPlatform.system}.default
         fastfetch
         brightnessctl
-        awww
-        inputs.matugen.packages.${system}.default
 
-        mako # notification service
-        inkscape
-
-        nautilus # file explorer
-
-        quickshell # status bar, launcher and widgets
-        qt6Packages.qt5compat
-
-
-        # fonts 
-        nerd-fonts.caskaydia-cove
-        font-awesome
     ];
 
     systemd.user.timers."gtrash-prune" = {
@@ -105,26 +89,6 @@
         '';
     };
 
-    programs.kitty = {
-        enable = true;
-
-        settings = {
-            font_size = 10;
-            background_opacity = 0.73;
-            confirm_os_window_close = 0;
-            window_padding_width = "3 6";
-            allow_remote_control = true;
-        };
-
-        extraConfig = ''
-            include ~/.config/kitty/colors.conf
-        '';
-    };
-    xdg.configFile."scripts/open-kitty.sh" = {
-        source = ./scripts/open-kitty.sh;
-        executable = true;
-    };
-
     programs.zoxide = {
         enable = true;
         enableZshIntegration = true;
@@ -146,12 +110,6 @@
         ];
     };
     xdg.configFile."nvim/init.lua".source = ./nvim/init.lua;
-
-    # force is required cause hyprmod deletes the symlink :/
-    xdg.configFile."hypr/hyprland.lua" = {
-        source = ./hypr/hyprland.lua;
-        force = true;
-    };
 
     gtk = {
         enable = true;
@@ -191,16 +149,6 @@
         projects = null;
     };
 
-    # colours matching wallpaper
-    xdg.configFile."matugen/config.toml".source = ./matugen/config.toml;
-
-    xdg.configFile."matugen/templates/colors.conf".source = ./matugen/templates/colors.conf;
-
-    
-    xdg.configFile."matugen/templates/hyprland.lua".source = ./matugen/templates/hyprland.lua;
-
-    xdg.configFile."matugen/templates/kitty.conf".source = ./matugen/templates/kitty.conf;
-
     # fastfetch 
     xdg.configFile."fastfetch/config.jsonc".source = ./fastfetch/config.jsonc;
 
@@ -208,69 +156,6 @@
     xdg.configFile."quickshell/status-bar".source = ./quickshell/status-bar;
     xdg.configFile."quickshell/app-launcher".source = ./quickshell/app-launcher;
 
-    # default apps 
-    xdg.mimeApps = {
-        enable = true;
-        defaultApplications = {
-            "text/html" = "firefox.desktop";
-            "x-scheme-handler/http" = "firefox.desktop";
-            "x-scheme-handler/https" = "firefox.desktop";
-            "x-scheme-handler/about" = "firefox.desktop";
-            "x-scheme-handler/unknown" = "firefox.desktop";
-
-            # Image files
-            "image/jpeg" = "firefox.desktop";
-            "image/png" = "firefox.desktop";
-            "image/gif" = "firefox.desktop";
-            "image/webp" = "firefox.desktop";
-            "image/svg+xml" = "firefox.desktop";
-            "image/bmp" = "firefox.desktop";
-            "image/tiff" = "firefox.desktop";
-            "image/x-icon" = "firefox.desktop";
-        };
-    };
-
-    # normal programs
-    programs.firefox = {
-        enable = true;
-
-        profiles.main = {
-            isDefault = true;
-
-            settings = {
-                # Dark Firefox UI
-                "extensions.autoDisableScopes" = 0;
-                # Dark websites
-                "layout.css.prefers-color-scheme.content-override" = 0;
-            };
-
-            extensions.packages = with pkgs.nur.repos.rycee.firefox-addons; [
-                bitwarden
-                ublock-origin
-                sponsorblock
-            ];
-        };
-    };
-
-    programs.chromium = {
-        enable = true;
-
-        package = pkgs.vivaldi.override {
-            proprietaryCodecs = true;
-            enableWidevine = true;
-        };
-
-        extensions = [
-            # Bitwarden
-            { id = "nngceckbapebfimnlniiiahkandclblb"; }
-
-            # uBlock Origin Lite
-            { id = "ddkjiahejlhfcafbddmgiahcphecmpfh"; }
-
-            # SponsorBlock
-            { id = "mnjggcdmjocbbbhaepdhchncahnbgone"; }
-        ];
-    };
 
     home.stateVersion = "26.05";
 
