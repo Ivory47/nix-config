@@ -14,6 +14,7 @@
         lazygit
         fastfetch
         brightnessctl
+        ghostty
 
     ];
 
