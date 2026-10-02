@@ -13,7 +13,6 @@
         ripgrep
         lazygit
         fastfetch
-        brightnessctl
         ghostty
 
     ];

@@ -37,7 +37,7 @@
 
         script = ''
             set -eu
-            docker compose pull --progress=plain
+            docker compose --progress plain pull
             docker compose up -d
             '';
 

@@ -1,4 +1,4 @@
-{ ... }:
+{ pkgs, ... }:
 
 {
 
@@ -7,4 +7,8 @@
     environment.sessionVariables = {
         NIX_CONFIG_TYPE = "laptop";
     };
+
+    environment.systemPackages = with pkgs; [
+        brightnessctl
+    ];
 }
