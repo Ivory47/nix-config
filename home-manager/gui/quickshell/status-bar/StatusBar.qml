@@ -24,6 +24,17 @@ PanelWindow {
     }
 
     property bool showing: true
+    property string currentTime: Qt.formatDateTime(new Date(), "HH:mm")
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+
+        onTriggered: {
+            currentTime = Qt.formatDateTime(new Date(), "HH:mm")
+        }
+    }
 
     onShowingChanged: {
         barContent.state = showing ? "visible" : "hidden"
@@ -132,7 +143,7 @@ PanelWindow {
                 Audio {}
 
                 Text {
-                    text: Qt.formatDateTime(new Date(), "HH:mm")
+                    text: statusBar.currentTime
                     color: Theme.text
                     font.pixelSize: 14
                 }
