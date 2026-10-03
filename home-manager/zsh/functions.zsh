@@ -90,6 +90,17 @@ function rebuild() {
     fi
 }
 
+function rebuild-boot() {
+    if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" || "$NIX_CONFIG_TYPE" == "nas-server" ]]; then
+        echo "Rebuilding $NIX_CONFIG_TYPE-Config..."
+        sudo nixos-rebuild boot --impure --flake "/etc/nixos#$NIX_CONFIG_TYPE"
+    else
+        echo "Warning: unknown NIX_CONFIG_TYPE (current: '$NIX_CONFIG_TYPE')."
+        echo "Rebuilding default-Config..."
+        sudo nixos-rebuild boot --impure --flake "/etc/nixos#default"
+    fi
+}
+
 function _home-manager-switch() {
     if [[ "$NIX_CONFIG_TYPE" == "desktop" || "$NIX_CONFIG_TYPE" == "laptop" || "$NIX_CONFIG_TYPE" == "nas-server" ]]; then
         echo "Rebuilding $NIX_CONFIG_TYPE-Home-Manager-Config..."
