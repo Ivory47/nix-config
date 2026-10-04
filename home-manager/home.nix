@@ -44,6 +44,9 @@
 
         sessionVariables = {
             FZF_DEFAULT_OPTS = "--height 40% --reverse";
+            EDITOR="nvim";
+            VISUAL="nvim";
+            SUDO_EDITOR="nvim";
         };
 
         oh-my-zsh = {

@@ -140,6 +140,9 @@
                 "valid users" = "@nas-backups";
                 "force group" = "nas-backups";
 
+                # hides the share from users without access permissions
+                "access based share enum" = true;
+
                 "create mask" = "0660";
                 "force create mode" = "0660";
 
@@ -153,6 +156,7 @@
     services.samba-wsdd = {
         enable = true;
         openFirewall = true;
+        interface = "enp8s0";
     };
 
     # samba should start after zfs shares are mounted
@@ -161,6 +165,68 @@
         "/tank/media"
         "/tank/backups"
     ];
+
+    # webui
+
+    # Cockpit
+    services.cockpit = {
+        enable = true;
+
+        port = 9090;
+
+        openFirewall = false;
+
+        settings = {
+            WebService = {
+                Origins = pkgs.lib.mkForce "https://cockpit.ilume.cc wss://cockpit.ilume.cc";
+                ProtocolHeader = "X-Forwarded-Proto";
+            };
+        };
+
+        # zfs management plugin
+        plugins = [
+            pkgs.cockpit-zfs
+        ];
+    };
+
+
+    # auth stuff
+    services.oauth2-proxy = {
+        enable = true;
+
+        provider = "oidc";
+
+        clientID = "393543785411248131";
+        clientSecretFile = "/var/lib/oauth2-proxy/client-secret";
+
+        oidcIssuerUrl = "https://auth.ilume.cc";
+        redirectURL = "https://cockpit.ilume.cc/oauth2/callback";
+
+        httpAddress = "http://0.0.0.0:4180";
+
+        upstream = [
+            "http://127.0.0.1:9090"
+        ];
+
+        reverseProxy = true;
+
+        trustedProxyIP = [
+            "192.168.178.85/32"
+        ];
+
+        email.domains = [ "*" ];
+
+        cookie.secretFile = "/var/lib/oauth2-proxy/cookie-secret";
+
+        extraConfig = {
+            "code-challenge-method" = "S256";
+            "oidc-groups-claim" = "groups";
+        };
+    };
+
+    networking.firewall.extraCommands = ''
+        iptables -A nixos-fw -s 192.168.178.85 -p tcp --dport 4180 -j nixos-fw-accept
+    '';
 
 
     # Timers
