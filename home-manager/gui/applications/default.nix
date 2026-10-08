@@ -13,6 +13,7 @@
         inkscape
 
         nautilus # file explorer
+        signal-desktop
 
         # fonts 
         nerd-fonts.caskaydia-cove
