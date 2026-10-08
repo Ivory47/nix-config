@@ -42,6 +42,7 @@
     users.groups = {
         alice = {};
         bob = {};
+        aaron = {};
 
         nas = {};
         nas-shared = {};
@@ -71,12 +72,25 @@
                 "nas-shared"
             ];
         };
+
+        aaron = {
+            isSystemUser = true;
+            group = "aaron";
+            description = "NAS user Aaron";
+            # extraGroups = [
+            #     "nas-aaron"
+            # ];
+        };
     };
 
     systemd.tmpfiles.rules = [
         "z /tank/shared  2770 root nas-shared  -"
         "z /tank/media   2770 root nas-media   -"
         "z /tank/backups 2770 root nas-backups -"
+
+        "d /tank/users         0755 root  root   -"
+        "d /tank/users/aaron   2770 root aaron -"
+        "d /tank/users/bob   2770 root bob -"
     ];
 
 
@@ -148,6 +162,16 @@
 
                 "directory mask" = "2770";
                 "force directory mode" = "2770";
+            };
+
+            users = {
+                path = "/tank/users";
+
+                browseable = true;
+                "read only" = false;
+                "guest ok" = false;
+
+                "valid users" = "@nas";
             };
         };
     };

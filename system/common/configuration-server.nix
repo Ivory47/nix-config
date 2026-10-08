@@ -25,8 +25,6 @@
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIINiKm+iNNuiBXKWdxsg18GiUrVL1vAnAW61CTP80PKs linux pc"
 
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFGIhjTHQ1T/K6XHqcN/dCdcLKJiBOR0aR7hDc/xNTtd nixos laptop"
-
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB8DpVF/WEL9cKkaShpYCm52vD9e0vACicilrd7cz0Lb windows pc"
     ];
 
     services.fail2ban = {
