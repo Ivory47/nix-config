@@ -84,7 +84,10 @@
         tree
         openssl
         cifs-utils
+        rsync
         home-manager
+
+        ffmpeg
     ];
 
     programs.zsh.enable = true;
