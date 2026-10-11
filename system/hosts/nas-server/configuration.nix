@@ -3,6 +3,7 @@
 {
     imports = [
         ../../modules/nvidia.nix
+        ./zfs.nix
     ];
 
     networking.hostName = "nixos-nas";
@@ -20,22 +21,6 @@
         smartmontools
     ];
 
-
-    # ZFS config 
-
-    boot.supportedFilesystems = [ "zfs" ];
-
-    boot.zfs.forceImportRoot = false;
-    boot.zfs.extraPools = [ "tank" ];
-    boot.zfs.devNodes = "/dev/disk/by-id/";
-
-    networking.hostId = "1d78b437";
-
-    services.zfs.autoScrub = {
-        enable = true;
-        pools = [ "tank" ];
-        interval = "monthly";
-    };
 
 
     # NAS groups
@@ -59,6 +44,7 @@
             extraGroups = [
                 "nas"
                 "nas-shared"
+                "nas-backups"
                 "nas-media"
             ];
         };
@@ -77,9 +63,9 @@
             isSystemUser = true;
             group = "aaron";
             description = "NAS user Aaron";
-            # extraGroups = [
-            #     "nas-aaron"
-            # ];
+            extraGroups = [
+                "nas"
+            ];
         };
     };
 
@@ -172,6 +158,12 @@
                 "guest ok" = false;
 
                 "valid users" = "@nas";
+
+                "create mask" = "0660";
+                "force create mode" = "0660";
+
+                "directory mask" = "2770";
+                "force directory mode" = "2770";
             };
         };
     };
