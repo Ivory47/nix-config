@@ -94,6 +94,12 @@
 
     services.tailscale.enable = true;
 
+    # pinned tailscale to 1.102.5
+    services.tailscale.package =
+        (import inputs.nixpkgs-tailscale {
+         system = pkgs.stdenv.hostPlatform.system;
+         }).tailscale;
+
     users.users.user.shell = pkgs.zsh;
 
     # Some programs need SUID wrappers, can be configured further or are
