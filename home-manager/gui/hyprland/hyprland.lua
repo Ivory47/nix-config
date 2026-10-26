@@ -371,6 +371,42 @@ hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { locked = tr
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
 
 
+-- Maximising windows
+local border_size_saved = hl.get_config("general.border_size")
+local gapsIn = hl.get_config("general.gaps_in")
+local gapsOut = hl.get_config("general.gaps_out")
+local rounding_saved = hl.get_config("decoration.rounding")
+local gapsRemoved = false
+
+hl.bind(mainMod .. " + ALT + F", function()
+    if gapsRemoved then
+        hl.config({
+            general = {
+                gaps_in = gapsIn,
+                gaps_out = gapsOut,
+            },
+
+            decoration = {
+                rounding = rounding_saved,
+            }
+        })
+    else
+        hl.config({
+            general = {
+                gaps_in = 0,
+                gaps_out = 0,
+            },
+
+            decoration = {
+                rounding = 0,
+            }
+        })
+    end
+
+    gapsRemoved = not gapsRemoved
+end)
+
+
 --------------------------------
 ---- WINDOWS AND WORKSPACES ----
 --------------------------------
@@ -426,4 +462,54 @@ hl.window_rule({
     move  = "20 monitor_h-120",
     float = true,
 })
+
+
+-- Maximising when only one window is on screen
+local maximise_blacklist = {
+    "HeadlessKitty",
+    "com.mitchellh.ghostty",
+}
+
+local function is_blacklisted(class)
+    for _, name in ipairs(maximise_blacklist) do
+        if name == class then
+            return true
+        end
+    end
+    return false
+end
+
+local function set_single_window_mode()
+    local ws = hl.get_active_workspace()
+    if ws == nil then return end
+
+    local windows = hl.get_workspace_windows(ws.id)
+    local count = 0
+
+    for _, w in ipairs(windows) do
+        if not w.floating and not w.pinned
+            and not is_blacklisted(w.class) then
+            count = count + 1
+        end
+    end
+
+    local single = count == 1
+
+    hl.config({
+        general = {
+            border_size = single and 0 or border_size_saved,
+            gaps_in = single and 0 or gapsIn,
+            gaps_out = single and 0 or gapsOut,
+        },
+        decoration = {
+            rounding = single and 0 or rounding_saved,
+        },
+    })
+
+    hl.exec_scheduled_prop_refresh_immediately()
+end
+
+hl.on("window.open", set_single_window_mode)
+hl.on("window.destroy", set_single_window_mode)
+hl.on("workspace.active", set_single_window_mode)
 
