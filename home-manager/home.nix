@@ -15,6 +15,11 @@
         fastfetch
         ghostty
 
+        python3
+        uv
+        nodejs
+        grim
+        slurp
     ];
 
     systemd.user.timers."gtrash-prune" = {

@@ -485,15 +485,18 @@ local function set_single_window_mode()
 
     local windows = hl.get_workspace_windows(ws.id)
     local count = 0
+    local bl_count = 0
 
     for _, w in ipairs(windows) do
-        if not w.floating and not w.pinned
-            and not is_blacklisted(w.class) then
+        if not w.floating and not w.pinned then
+            if is_blacklisted(w.class) then
+                bl_count = bl_count + 1
+            end
             count = count + 1
         end
     end
 
-    local single = count == 1
+    local single = (count == 1) and (bl_count == 0)
 
     hl.config({
         general = {
