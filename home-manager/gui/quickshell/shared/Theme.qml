@@ -2,6 +2,9 @@ pragma Singleton
 
 import QtQuick
 
+// Single source of truth for every Quickshell config (status-bar, app-launcher, clipboard).
+// Edit the theme here only. default.nix copies this folder into each config at build time,
+// and configs use it with `import qs.shared`.
 QtObject {
     // Colors
     readonly property color background: "#1e1e2e"
@@ -24,6 +27,9 @@ QtObject {
     readonly property int radiusSmall: 5
     readonly property int radiusMedium: 6
     readonly property int radiusLarge: 8
+
+    readonly property int statusBarHeight: 30
+    readonly property int osdIndicatorWidth: 120
 
     // Spacing
     readonly property int spacingSmall: 5

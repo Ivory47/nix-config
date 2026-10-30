@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Networking
+import qs.shared
 
 PopupWindow {
     id: popup

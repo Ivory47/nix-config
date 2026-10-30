@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import QtQuick.Effects
+import qs.shared
 
 PanelWindow {
     id: root
