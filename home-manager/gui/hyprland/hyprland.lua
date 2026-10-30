@@ -61,6 +61,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("awww-daemon")
     hl.exec_cmd("qs -c status-bar")
     hl.exec_cmd("qs -c app-launcher")
+    hl.exec_cmd("qs -c clipboard")
     hl.exec_cmd("rm -f /tmp/kitty-socket && kitty --class HeadlessKitty --single-instance --listen-on unix:/tmp/kitty-socket --start-as=hidden tail -f /dev/null")
 end)
 
@@ -290,7 +291,6 @@ local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close())
 -- closeWindowBind:set_enabled(false)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
-hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(menu))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 
@@ -322,6 +322,7 @@ hl.bind(mainMod .. " + DOWN",  hl.dsp.focus({ direction = "down" }))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
 
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("qs -c app-launcher ipc call launcher toggle"))
+hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("qs -c clipboard ipc call clipboard toggle"))
 
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]

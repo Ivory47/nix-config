@@ -37,7 +37,11 @@ PanelWindow {
         searchField.text = ""
         clipboardModel.refresh()
         root.visible = true
-        searchField.forceActiveFocus()
+
+        Qt.callLater(() => {
+            if (root.visible)
+            searchField.forceActiveFocus()
+        })
     }
 
     function close() {
