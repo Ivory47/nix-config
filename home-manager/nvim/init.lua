@@ -25,6 +25,26 @@ if vim.env.SSH_CONNECTION or vim.env.SSH_CLIENT then
   }
 end
 
+-- "nvim <directory path>" does the same as "nvim" except that file search
+-- etc are relative to the directory path
+vim.api.nvim_create_autocmd("VimEnter", {
+    callback = function()
+        local dir = vim.fn.argv(0)
+
+        if vim.fn.argc() == 1 and vim.fn.isdirectory(dir) == 1 then
+            vim.cmd("cd " .. vim.fn.fnameescape(dir))
+
+            -- Remove the netrw directory buffer
+            vim.cmd("silent! bwipeout!")
+
+            -- Open the normal Snacks dashboard
+            vim.schedule(function()
+                Snacks.dashboard()
+            end)
+        end
+    end,
+})
+
 vim.opt.tabstop = 4
 vim.opt.shiftwidth = 4
 vim.opt.softtabstop = 4
