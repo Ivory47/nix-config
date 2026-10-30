@@ -513,7 +513,7 @@ local function set_single_window_mode()
     hl.exec_scheduled_prop_refresh_immediately()
 end
 
-hl.on("window.open", set_single_window_mode)
-hl.on("window.destroy", set_single_window_mode)
-hl.on("workspace.active", set_single_window_mode)
+-- hl.on("window.open", set_single_window_mode)
+-- hl.on("window.destroy", set_single_window_mode)
+-- hl.on("workspace.active", set_single_window_mode)
 

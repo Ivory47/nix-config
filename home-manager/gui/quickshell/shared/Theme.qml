@@ -23,12 +23,16 @@ QtObject {
 
     readonly property color shadowColor: "#80000000"
 
+    // Backdrop blur, used by shared/BackdropBlur.qml (independent of the compositor's blur).
+    // 0.0 = off, 1.0 = strongest. Every config that uses BackdropBlur inherits this value.
+    readonly property real backdropBlur: 0.8
+
     // Shape
     readonly property int radiusSmall: 5
     readonly property int radiusMedium: 6
     readonly property int radiusLarge: 8
 
-    readonly property int statusBarHeight: 30
+    readonly property int statusBarHeight: 50
     readonly property int osdIndicatorWidth: 120
 
     // Spacing

@@ -19,11 +19,6 @@ PanelWindow {
 
     color: "transparent"
 
-
-    BackgroundEffect.blurRegion: Region {
-        item: statusBar.contentItem
-    }
-
     property bool showing: true
     property string currentTime: Qt.formatDateTime(new Date(), "HH:mm")
 
@@ -96,10 +91,18 @@ PanelWindow {
             }
         ]
 
+        // Shared backdrop blur (strength: Theme.backdropBlur)
+        BackdropBlur {
+            id: backdropBlur
+            anchors.fill: parent
+            screen: statusBar.screen
+        }
+
         Rectangle {
             anchors.fill: parent
+            visible: !backdropBlur.capturing
 
-            color: Qt.alpha(Theme.background, 0.95)
+            color: "transparent"
 
             // opacity: statusBar.showing ? 1 : 0
             //
