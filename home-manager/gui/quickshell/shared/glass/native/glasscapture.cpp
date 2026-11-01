@@ -158,13 +158,22 @@ qreal GlassCapture::effectiveInterval() const {
 
 qreal GlassCapture::pixelRatio() const {
 	auto* w = this->window();
-	return w ? w->effectiveDevicePixelRatio() : 1.0;
+	// devicePixelRatio(), not effectiveDevicePixelRatio(): that one is rounded up to a whole
+	// number here (2), while the window really renders at the fractional scale (checked with
+	// grabWindow(): 1920x67 for 1440x50 logical).
+	return w ? w->devicePixelRatio() : 1.0;
 }
 
 QColor GlassCapture::readPixel(const QVariant& image, int x, int y) const {
 	auto img = image.value<QImage>();
 	if (img.isNull() || x < 0 || y < 0 || x >= img.width() || y >= img.height()) return QColor();
 	return img.pixelColor(x, y);
+}
+
+QSize GlassCapture::debugRenderSize() const {
+	auto* w = this->window();
+	if (!w) return QSize();
+	return w->grabWindow().size();
 }
 
 void GlassCapture::nudge() {
@@ -226,7 +235,17 @@ void GlassCapture::bindWindow(QQuickWindow* window) {
 }
 
 // A frame of ours reached the compositor: what is behind may have to be seen again.
+// The window learns its fractional scale after it has been created, and Qt does not say so.
+void GlassCapture::checkRatio() {
+	const auto ratio = this->pixelRatio();
+	if (!qFuzzyCompare(ratio, this->mRatio)) {
+		this->mRatio = ratio;
+		emit this->pixelRatioChanged();
+	}
+}
+
 void GlassCapture::onFrameSwapped(int syncSerial) {
+	this->checkRatio();
 	this->mOwed = true;
 	emit this->swapped(syncSerial);
 	this->pump();

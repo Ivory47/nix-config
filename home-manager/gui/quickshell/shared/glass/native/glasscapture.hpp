@@ -127,6 +127,8 @@ public:
 	Q_INVOKABLE QColor readPixel(const QVariant& image, int x, int y) const;
 	// Ask for a capture as soon as the interval allows (a nudge).
 	Q_INVOKABLE void nudge();
+	// Debugging: the size in real pixels that the window really renders at (grabs a frame).
+	Q_INVOKABLE QSize debugRenderSize() const;
 	// How many times the window synchronised the scene so far (see swapped()).
 	Q_INVOKABLE int syncCount() const { return this->mSyncs.load(); }
 
@@ -180,6 +182,7 @@ private:
 	void setStatus(const QString& status);
 	void bindWindow(QQuickWindow* window);
 	void onFrameSwapped(int syncSerial);
+	void checkRatio();
 
 	bool mActive = false;
 	bool mHeld = false;
@@ -201,6 +204,7 @@ private:
 	bool mTextureDirty = false;
 	mutable GlassTextureProvider* mProvider = nullptr;
 
+	qreal mRatio = 0;
 	int mSerial = 0;
 	int mReceived = 0;
 	int mSkipped = 0;

@@ -18,7 +18,7 @@ PanelWindow {
 
     // The glass needs the surface to be a whole number of real pixels (see GlassGeometry),
     // which at a fractional scale can mean a pixel or two more than Theme.statusBarHeight.
-    implicitHeight: GlassGeometry.alignedSize(Theme.statusBarHeight, screen ? screen.devicePixelRatio : 1)
+    implicitHeight: GlassGeometry.alignedSize(Theme.statusBarHeight, statusBar.devicePixelRatio)
 
     color: "transparent"
 

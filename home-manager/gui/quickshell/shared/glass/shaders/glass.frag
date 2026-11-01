@@ -75,17 +75,6 @@ void main() {
     vec2 p = qt_TexCoord0 * sizePx;
     vec2 base = originPx + p;
 
-    if (debugView > 0.5 && debugView < 1.5) {
-        vec4 s = texture(sharp, backdropUv(base));
-        fragColor = vec4(s.a > 0.5 ? s.rgb : vec3(1.0, 0.0, 1.0), 1.0);
-        return;
-    }
-    if (debugView >= 1.5) {
-        vec3 fr = frostedAt(base);
-        fragColor = vec4(fr.r < 0.0 ? vec3(1.0, 0.0, 1.0) : fr, 1.0);
-        return;
-    }
-
     float b = max(bevel * pxRatio, 1.0);
 
     // Distance to the nearest bevelled edge, and which way is out there.
@@ -112,26 +101,37 @@ void main() {
     float depthPx = thickness * b * z * refraction;
 
     vec3 mid = vec3(0.5);
-    vec3 col;
-    col.r = seenAt(base + bendFor(ior - dispersion, N, depthPx), mid).r;
-    col.g = seenAt(base + bendFor(ior, N, depthPx), mid).g;
-    col.b = seenAt(base + bendFor(ior + dispersion, N, depthPx), mid).b;
+    vec3 col = vec3(0.0);
 
-    // Tone.
-    col = (col - 0.5) * contrast + 0.5 + brightness;
-    float luma = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(vec3(luma), col, saturation);
-    col = mix(col, tint.rgb, tint.a);
+    if (debugView > 0.5) {
+        // Show the backdrop itself, drawn like the glass (same alpha, same cancelling) so that
+        // it can still be recovered from the next capture. Magenta where unknown.
+        vec4 sh = texture(sharp, backdropUv(base));
+        vec3 fr = frostedAt(base);
+        vec3 shown = debugView < 1.5 ? (sh.a > 0.5 ? sh.rgb : vec3(1.0, 0.0, 1.0))
+                                     : (fr.r < 0.0 ? vec3(1.0, 0.0, 1.0) : fr);
+        col = shown;
+    } else {
+        col.r = seenAt(base + bendFor(ior - dispersion, N, depthPx), mid).r;
+        col.g = seenAt(base + bendFor(ior, N, depthPx), mid).g;
+        col.b = seenAt(base + bendFor(ior + dispersion, N, depthPx), mid).b;
 
-    // Light on the rim.
-    float rim = 1.0 - smoothstep(0.3 * pxRatio, 3.0 * pxRatio, inside);
-    float edgeLine = 1.0 - smoothstep(0.0, 1.5 * pxRatio, inside);
-    vec2 L = normalize(lightDir);
-    float facing = max(dot(n, L), 0.0);
-    float away = max(dot(n, -L), 0.0);
-    float fresnel = pow(u, 3.0) * 0.5;
-    col += vec3(shine * (0.65 * edgeLine * facing + 0.28 * rim * away + fresnel * 0.35));
-    col = clamp(col, 0.0, 1.0);
+        // Tone.
+        col = (col - 0.5) * contrast + 0.5 + brightness;
+        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+        col = mix(vec3(luma), col, saturation);
+        col = mix(col, tint.rgb, tint.a);
+
+        // Light on the rim.
+        float rim = 1.0 - smoothstep(0.3 * pxRatio, 3.0 * pxRatio, inside);
+        float edgeLine = 1.0 - smoothstep(0.0, 1.5 * pxRatio, inside);
+        vec2 L = normalize(lightDir);
+        float facing = max(dot(n, L), 0.0);
+        float away = max(dot(n, -L), 0.0);
+        float fresnel = pow(u, 3.0) * 0.5;
+        col += vec3(shine * (0.65 * edgeLine * facing + 0.28 * rim * away + fresnel * 0.35));
+        col = clamp(col, 0.0, 1.0);
+    }
 
     float seen = coverage * glassOpacity;
     float a = alpha * seen;

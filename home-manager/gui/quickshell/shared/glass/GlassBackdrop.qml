@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Glass.Native
 
 // The live backdrop of a layer-shell surface: what is really behind it, kept up to date.
@@ -38,6 +39,10 @@ Item {
         Math.max(1, Math.round(width * ratio)),
         Math.max(1, Math.round(height * ratio)))
     readonly property real ratio: cap.pixelRatio
+    // The compositor may take the surface at another scale than the one we render at (it
+    // resamples). Unmixing is done on the capture's own grid, and `own` is read by uv, as the
+    // compositor read the surface.
+    readonly property size texPx: cap.captureSize.width > 0 ? cap.captureSize : sizePx
     // True once a background has been settled; before that panels draw a plain tint.
     property bool ready: false
     readonly property alias capture: cap
@@ -92,8 +97,8 @@ Item {
 
     ShaderEffect {
         id: draftFx
-        width: root.sizePx.width
-        height: root.sizePx.height
+        width: root.texPx.width
+        height: root.texPx.height
         visible: false
         blending: false
 
@@ -111,13 +116,13 @@ Item {
         sourceItem: draftFx
         live: false
         visible: false
-        textureSize: root.sizePx
+        textureSize: root.texPx
     }
 
     ShaderEffect {
         id: flagFx
-        width: root.sizePx.width
-        height: root.sizePx.height
+        width: root.texPx.width
+        height: root.texPx.height
         visible: false
         blending: false
 
@@ -138,7 +143,7 @@ Item {
         visible: false
         mipmap: true
         format: ShaderEffectSource.RGBA16F
-        textureSize: root.sizePx
+        textureSize: root.texPx
     }
 
     GlassBundle {
@@ -146,8 +151,8 @@ Item {
         draft: draftSource
         flag: flagSource
         kept: bundle1.bg
-        sizePx: root.sizePx
-        sigma: root.blurRadius * root.ratio
+        sizePx: root.texPx
+        sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
     }
 
     GlassBundle {
@@ -155,9 +160,11 @@ Item {
         draft: draftSource
         flag: flagSource
         kept: bundle0.bg
-        sizePx: root.sizePx
-        sigma: root.blurRadius * root.ratio
+        sizePx: root.texPx
+        sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
     }
+
+    Component.onCompleted: if (debug) console.log("glass env: rounding", Quickshell.env("QT_SCALE_FACTOR_ROUNDING_POLICY"), "scale", Quickshell.env("QT_SCALE_FACTOR"), "autoscale", Quickshell.env("QT_AUTO_SCREEN_SCALE_FACTOR"), "rhi", Quickshell.env("QSG_RHI_BACKEND"), "loop", Quickshell.env("QSG_RENDER_LOOP"))
 
     Timer {
         interval: 500
@@ -174,6 +181,7 @@ Item {
             "windowDpr", root.Window.window ? root.Window.window.devicePixelRatio : -1,
             "screenDpr", root.Window.window && root.Window.window.screen ? root.Window.window.screen.devicePixelRatio : -1,
             "px", root.sizePx.width + "x" + root.sizePx.height,
+            "render", cap.debugRenderSize().width + "x" + cap.debugRenderSize().height,
             "capture", cap.captureSize.width + "x" + cap.captureSize.height,
             "status", cap.status)
     }
