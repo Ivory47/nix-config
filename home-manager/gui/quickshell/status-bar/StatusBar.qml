@@ -178,6 +178,5 @@ PanelWindow {
         id: glassBackdrop
         composite: barContent
         blurRadius: 14
-        debug: true
     }
 }

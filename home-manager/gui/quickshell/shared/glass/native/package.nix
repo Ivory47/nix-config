@@ -7,6 +7,10 @@
     wayland,
     wayland-scanner,
     wlr-protocols,
+    wayland-protocols,
+    libgbm,
+    libdrm,
+    libglvnd,
     qt6,
 }:
 
@@ -31,12 +35,16 @@ stdenv.mkDerivation {
         qt6.qtdeclarative
         qt6.qtwayland
         wayland
+        libgbm
+        libdrm
+        libglvnd
     ];
 
     dontWrapQtApps = true;
 
     cmakeFlags = [
         "-DWLR_SCREENCOPY_XML=${wlr-protocols}/share/wlr-protocols/unstable/wlr-screencopy-unstable-v1.xml"
+        "-DLINUX_DMABUF_XML=${wayland-protocols}/share/wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml"
     ];
 
     installPhase = ''

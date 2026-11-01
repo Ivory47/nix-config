@@ -5,8 +5,9 @@ import Glass.Native
 // The live backdrop of a layer-shell surface: what is really behind it, kept up to date.
 //
 // The pipeline is Pleamar's:
-//   1. GlassCapture asks the compositor for only this surface's region (wlr-screencopy),
-//      after every presented frame, and while idle for the next change (copy_with_damage).
+//   1. GlassCapture asks the compositor for only this surface's region (wlr-screencopy):
+//      always one request on its way, answered when something behind changes
+//      (copy_with_damage), at most once per refresh period of the monitor.
 //   2. The capture contains our own surface. `own`, a texture of exactly what we presented,
 //      is subtracted and the rest divided by what our surface lets through: the real
 //      background (unmix.frag). A second pass flags pixels where capture and own cannot belong
@@ -33,8 +34,9 @@ Item {
     property bool debug: false
 
     // What GlassPanel reads.
-    readonly property Item sharp: readIdx === 0 ? bundle0.bg : bundle1.bg
-    readonly property Item frosted: readIdx === 0 ? bundle0.frosted : bundle1.frosted
+    readonly property Item sharp: bundleAt(readIdx).bg
+    readonly property Item frosted: bundleAt(readIdx).frosted
+    // Size of the surface in real pixels, as we render it.
     readonly property size sizePx: Qt.size(
         Math.max(1, Math.round(width * ratio)),
         Math.max(1, Math.round(height * ratio)))
@@ -50,10 +52,18 @@ Item {
     width: composite.width
     height: composite.height
 
+    // Three backgrounds take turns. One is shown (readIdx); updates go to one that is not,
+    // and what was updated is shown once the frame that rendered it has been presented.
+    // So nothing that is being rebuilt is ever read by what is drawn in the same frame, and an
+    // update does not have to wait for the one before it.
     property int readIdx: 0
-    property int pendingIdx: 0
-    property bool flipPending: false
-    property int flipAfter: 0
+    property var pending: []
+    property bool again: false
+    property int flips: 0
+
+    function bundleAt(i) {
+        return i === 0 ? bundle0 : (i === 1 ? bundle1 : bundle2);
+    }
 
     GlassCapture {
         id: cap
@@ -64,26 +74,45 @@ Item {
         onSwapped: syncSerial => root.handleSwapped(syncSerial)
     }
 
-    // A capture arrived: unmix and blur it into the bundle that is not on screen.
+    // A capture arrived: unmix and blur it into a bundle that is not on screen.
     function process() {
-        const target = 1 - readIdx;
+        let target = -1;
+        for (let i = 0; i < 3; i++) {
+            if (i !== readIdx && !pending.some(p => p.idx === i)) {
+                target = i;
+                break;
+            }
+        }
+        if (target < 0) {
+            // Both free ones are waiting to be shown: do this capture when one is free.
+            again = true;
+            return;
+        }
         draftSource.scheduleUpdate();
         flagSource.scheduleUpdate();
-        (target === 0 ? bundle0 : bundle1).update();
-        pendingIdx = target;
+        bundleAt(target).update();
         // What the scene graph synchronises from now on includes this update.
-        flipAfter = cap.syncCount();
-        flipPending = true;
+        pending.push({ idx: target, after: cap.syncCount() });
     }
 
-    // The frame that did the work has been presented: show its result. Until then nothing that
-    // was being rebuilt is read by anything that is drawn.
+    // A frame was presented. If it was synchronised after an update was scheduled, that
+    // update was rendered by it: show the newest of those.
     function handleSwapped(syncSerial) {
-        if (!flipPending || syncSerial <= flipAfter)
+        let best = -1;
+        for (let i = 0; i < pending.length; i++) {
+            if (syncSerial > pending[i].after)
+                best = i;
+        }
+        if (best < 0)
             return;
-        readIdx = pendingIdx;
-        flipPending = false;
+        readIdx = pending[best].idx;
+        pending = pending.slice(best + 1);
         ready = true;
+        flips++;
+        if (again) {
+            again = false;
+            process();
+        }
     }
 
     // What we presented: the surface's content as the scene graph renders it.
@@ -150,7 +179,7 @@ Item {
         id: bundle0
         draft: draftSource
         flag: flagSource
-        kept: bundle1.bg
+        kept: root.sharp
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
     }
@@ -159,30 +188,47 @@ Item {
         id: bundle1
         draft: draftSource
         flag: flagSource
-        kept: bundle0.bg
+        kept: root.sharp
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
     }
 
-    Component.onCompleted: if (debug) console.log("glass env: rounding", Quickshell.env("QT_SCALE_FACTOR_ROUNDING_POLICY"), "scale", Quickshell.env("QT_SCALE_FACTOR"), "autoscale", Quickshell.env("QT_AUTO_SCREEN_SCALE_FACTOR"), "rhi", Quickshell.env("QSG_RHI_BACKEND"), "loop", Quickshell.env("QSG_RENDER_LOOP"))
+    GlassBundle {
+        id: bundle2
+        draft: draftSource
+        flag: flagSource
+        kept: root.sharp
+        sizePx: root.texPx
+        sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+    }
+
+    property int lastReceived: 0
+    property int lastFlips: 0
 
     Timer {
         interval: 500
         running: root.debug
         repeat: true
-        onTriggered: console.log(
-            "glass: ready", root.ready,
-            "serial", cap.serial,
-            "received", cap.received,
-            "skipped", cap.skipped,
-            "failed", cap.failed,
-            "interval", cap.effectiveInterval.toFixed(1) + "ms",
-            "ratio", root.ratio,
-            "windowDpr", root.Window.window ? root.Window.window.devicePixelRatio : -1,
-            "screenDpr", root.Window.window && root.Window.window.screen ? root.Window.window.screen.devicePixelRatio : -1,
-            "px", root.sizePx.width + "x" + root.sizePx.height,
-            "render", cap.debugRenderSize().width + "x" + cap.debugRenderSize().height,
-            "capture", cap.captureSize.width + "x" + cap.captureSize.height,
-            "status", cap.status)
+        onTriggered: {
+            console.log(
+                "glass: ready", root.ready,
+                "| captures/s", (cap.serial - root.lastReceived) * 2,
+                "flips/s", (root.flips - root.lastFlips) * 2,
+                "| dmabuf", cap.usingDmabuf,
+                "received", cap.received,
+                "published", cap.serial,
+                "skipped", cap.skipped,
+                "failed", cap.failed,
+                "| interval", cap.effectiveInterval.toFixed(1) + "ms",
+                "latency", cap.latency.toFixed(1) + "ms",
+                "setup", cap.setupLatency.toFixed(1) + "ms",
+                "cycle", cap.cycle.toFixed(1) + "ms",
+                "ratio", root.ratio,
+                "px", root.sizePx.width + "x" + root.sizePx.height,
+                "capture", cap.captureSize.width + "x" + cap.captureSize.height,
+                "status", cap.status);
+            root.lastReceived = cap.serial;
+            root.lastFlips = root.flips;
+        }
     }
 }
