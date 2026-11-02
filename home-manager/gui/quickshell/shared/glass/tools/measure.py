@@ -106,6 +106,11 @@ def drain(sock):
 
 # name: (description, settings applied through ipc, in order)
 SCENARIOS = {
+    "region-d1": ("REGION capture (compositor-side region), whole pipeline, 1 in flight", [("setGlass", "true"), ("setCapture", "true"), ("setProcessing", "true"), ("setWholeOutput", "false"), ("setDepth", 1), ("setDmabuf", "true")]),
+    "output-d1": ("WHOLE OUTPUT capture, cropped in the shader, whole pipeline, 1 in flight", [("setGlass", "true"), ("setCapture", "true"), ("setProcessing", "true"), ("setWholeOutput", "true"), ("setDepth", 1), ("setDmabuf", "true")]),
+    "output-d2": ("WHOLE OUTPUT capture, whole pipeline, 2 in flight", [("setGlass", "true"), ("setCapture", "true"), ("setProcessing", "true"), ("setWholeOutput", "true"), ("setDepth", 2), ("setDmabuf", "true")]),
+    "output-d3": ("WHOLE OUTPUT capture, whole pipeline, 3 in flight", [("setGlass", "true"), ("setCapture", "true"), ("setProcessing", "true"), ("setWholeOutput", "true"), ("setDepth", 3), ("setDmabuf", "true")]),
+    "output-only-d1": ("WHOLE OUTPUT capture received and thrown away, 1 in flight", [("setGlass", "true"), ("setCapture", "true"), ("setProcessing", "false"), ("setWholeOutput", "true"), ("setDepth", 1), ("setDmabuf", "true")]),
     "glass-off": ("glass switched off completely: bar with a plain tinted rectangle", [("setGlass", "false")]),
     "off": ("no capture requested at all; bar running", [("setGlass", "true"), ("setCapture", "false")]),
     "cap-only-d1": ("capture received and thrown away, 1 in flight, dmabuf", [("setGlass", "true"), ("setCapture", "true"), ("setProcessing", "false"), ("setDepth", 1), ("setDmabuf", "true")]),
@@ -118,6 +123,8 @@ SCENARIOS = {
 
 def run(name, seconds, settle=3.0):
     desc, settings = SCENARIOS[name]
+    if "output" not in name:
+        ipc("setWholeOutput", "false")  # these are the region-capture scenarios
     for fn, arg in settings:
         ipc(fn, arg)
     time.sleep(settle)
@@ -150,7 +157,7 @@ def run(name, seconds, settle=3.0):
         f"    per second: requests {rate('requests'):5.1f}  copies {rate('copies'):5.1f}  received {rate('received'):5.1f}  "
         f"published {rate('published'):5.1f}  skipped {rate('skipped'):5.1f}  cancelled {rate('cancelled'):5.1f}  flips {rate('flips'):5.1f}  window frames {rate('frames'):5.1f}"
     )
-    print(f"    screencast session events (start/stop) in {dt:.0f}s: {casts}   in flight now: {s1['inFlight']}   latency {s1['latency']:.0f} ms")
+    print(f"    screencast session events (start/stop) in {dt:.0f}s: {casts}   in flight now: {s1['inFlight']}   whole-output captures: {s1['lastWholeOutput']}  dmabuf broken: {s1['dmabufBroken']}   latency {s1['latency']:.0f} ms")
     sys.stdout.flush()
 
 
@@ -163,7 +170,7 @@ def main():
     for n in names:
         run(n, seconds)
     # leave it as it was meant to run
-    for fn, arg in SCENARIOS["full-d3"][1]:
+    for fn, arg in SCENARIOS["output-d2"][1]:
         ipc(fn, arg)
 
 

@@ -238,6 +238,7 @@ void GlassCapture::setDepth(int depth) {
 void GlassCapture::setAllowDmabuf(bool allow) {
 	if (allow == this->mAllowDmabuf) return;
 	this->mAllowDmabuf = allow;
+	this->mDmaBroken.store(false);
 	emit this->allowDmabufChanged();
 }
 
@@ -245,6 +246,15 @@ void GlassCapture::setPublishing(bool publishing) {
 	if (publishing == this->mPublishing) return;
 	this->mPublishing = publishing;
 	emit this->publishingChanged();
+}
+
+void GlassCapture::setWholeOutput(bool whole) {
+	if (whole == this->mWholeOutput) return;
+	this->mWholeOutput = whole;
+	this->mDmaBroken.store(false);
+	this->cancelFrames();
+	emit this->wholeOutputChanged();
+	if (this->mActive) QMetaObject::invokeMethod(this, &GlassCapture::pump, Qt::QueuedConnection);
 }
 
 void GlassCapture::setHeld(bool held) {
@@ -407,7 +417,9 @@ void GlassCapture::start() {
 	// Always with damage: a plain copy makes Hyprland redraw the whole monitor.
 	auto* frame = new GlassFrame(this, true);
 	// overlay_cursor = 0: the glass does not refract the cursor, it goes on top.
-	frame->init(manager->capture_output_region(0, output, r.x(), r.y(), r.width(), r.height()));
+	frame->wholeOutput = this->mWholeOutput && this->dmabufUsable();
+	if (frame->wholeOutput) frame->init(manager->capture_output(0, output));
+	else frame->init(manager->capture_output_region(0, output, r.x(), r.y(), r.width(), r.height()));
 	frame->started.start();
 	this->mFrames.append(frame);
 	this->mRequests++;
@@ -443,7 +455,9 @@ GlassDmaBuffer* GlassCapture::acquireDma(uint32_t format, uint32_t width, uint32
 		b->busy = true;
 		return b;
 	}
-	if (this->mDmaPool.size() >= 10) return nullptr;
+	// Buffers of another size (the mode or the monitor changed) are of no use any more.
+	this->trimDmaPool(format, width, height);
+	if (this->mDmaPool.size() >= 8) return nullptr;
 
 	auto* dev = glassGbm();
 	auto* bo = gbm_bo_create(dev, width, height, format, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
@@ -489,6 +503,29 @@ GlassDmaBuffer* GlassCapture::acquireDma(uint32_t format, uint32_t width, uint32
 	return b;
 }
 
+void GlassCapture::trimDmaPool(uint32_t format, uint32_t width, uint32_t height) {
+	std::vector<DestroyDmaJob::Item> items;
+	const auto now = nowMs();
+	const int syncs = this->mSyncs.load();
+	for (auto it = this->mDmaPool.begin(); it != this->mDmaPool.end();) {
+		auto* b = *it;
+		const bool other = b->format != format || b->width != width || b->height != height;
+		if (!other || b->busy || b->freeAtSync > syncs || b->freeAtMs > now || b == this->mCurrentDma) {
+			++it;
+			continue;
+		}
+		if (b->eglImage || b->texture) items.push_back({b->eglImage, b->texture});
+		if (b->map) munmap(const_cast<uchar*>(b->map), b->mapLength);
+		if (b->buffer) wl_buffer_destroy(b->buffer);
+		if (b->fd >= 0) close(b->fd);
+		if (b->bo) gbm_bo_destroy(b->bo);
+		delete b;
+		it = this->mDmaPool.erase(it);
+	}
+	if (!items.empty() && this->window())
+		this->window()->scheduleRenderJob(new DestroyDmaJob(std::move(items)), QQuickWindow::AfterSynchronizingStage);
+}
+
 void GlassCapture::destroyDmaPool() {
 	std::vector<DestroyDmaJob::Item> items;
 	for (auto* b: this->mDmaPool) {
@@ -507,11 +544,24 @@ void GlassCapture::destroyDmaPool() {
 }
 
 bool GlassCapture::ensureDmaBuffer(GlassFrame* frame) {
-	if (!frame->dmaOffered) return false;
-	if (frame->dmaFormat != DRM_FORMAT_XRGB8888 && frame->dmaFormat != DRM_FORMAT_ARGB8888) return false;
-	if (!GlassDmabufManager::instance()->acceptsLinear(frame->dmaFormat)) return false;
+	if (!frame->dmaOffered) {
+		qCWarning(logGlass) << "glass capture: the compositor offered no dmabuf for this capture";
+		return false;
+	}
+	if (frame->dmaFormat != DRM_FORMAT_XRGB8888 && frame->dmaFormat != DRM_FORMAT_ARGB8888) {
+		qCWarning(logGlass) << "glass capture: dmabuf format not usable:" << Qt::hex << frame->dmaFormat;
+		return false;
+	}
+	if (!GlassDmabufManager::instance()->acceptsLinear(frame->dmaFormat)) {
+		qCWarning(logGlass) << "glass capture: the compositor does not list linear for" << Qt::hex << frame->dmaFormat;
+		return false;
+	}
 	frame->dma = this->acquireDma(frame->dmaFormat, frame->dmaWidth, frame->dmaHeight);
-	return frame->dma != nullptr;
+	if (!frame->dma) {
+		qCWarning(logGlass) << "glass capture: could not allocate a dmabuf" << frame->dmaWidth << "x" << frame->dmaHeight << "(pool" << this->mDmaPool.size() << ")";
+		return false;
+	}
+	return true;
 }
 
 bool GlassCapture::ensureShmBuffer(GlassFrame* frame) {
@@ -603,7 +653,9 @@ void GlassCapture::frameBufferDone(GlassFrame* frame) {
 
 	bool ok = false;
 	if (this->dmabufUsable()) ok = this->ensureDmaBuffer(frame);
-	if (!ok) ok = this->ensureShmBuffer(frame);
+	// A whole output through shared memory would be far too much: stop asking for it.
+	if (!ok && frame->wholeOutput) this->mDmaBroken.store(true);
+	else if (!ok) ok = this->ensureShmBuffer(frame);
 	if (!ok) {
 		this->frameFailed(frame);
 		return;
@@ -629,15 +681,15 @@ void GlassCapture::frameFailed(GlassFrame* frame) {
 
 // Has anything changed since the capture that is shown? A few thousand bytes are compared; a
 // small change that does not touch any of them is caught by the next one that does.
-bool GlassCapture::sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, bool linear, int stride, uint32_t height) {
+bool GlassCapture::sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, bool linear, int stride, QRect crop) {
 	std::vector<uchar> sample;
 	if (linear) {
-		// Every second row, every 61st pixel.
+		// Inside the crop: every second row, every 61st pixel.
 		const int rowStep = 2;
 		const int pixelStep = 61;
-		for (uint32_t y = 0; y < height; y += rowStep) {
+		for (int y = crop.top(); y <= crop.bottom(); y += rowStep) {
 			const uchar* row = bits + size_t(y) * stride;
-			for (int x = 0; x < size.width(); x += pixelStep) sample.push_back(row[x * 4 + 1]);
+			for (int x = crop.left(); x <= crop.right(); x += pixelStep) sample.push_back(row[x * 4 + 1]);
 		}
 	} else {
 		sample.reserve(size_t(bytes / 13) + 1);
@@ -645,7 +697,7 @@ bool GlassCapture::sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, 
 	}
 
 	bool same = !this->mCaptureSize.isEmpty() && sample.size() == this->mSample.size()
-	         && this->mRegion == this->mSampleRegion && size == this->mCaptureSize;
+	         && this->mRegion == this->mSampleRegion && crop.size() == this->mCaptureSize;
 	if (same) {
 		for (size_t i = 0; i < sample.size(); i++) {
 			if (std::abs(int(sample[i]) - int(this->mSample[i])) > 3) {
@@ -658,10 +710,27 @@ bool GlassCapture::sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, 
 	return same;
 }
 
-void GlassCapture::publish(QSize size) {
+// Where the region is inside a capture of `buffer` pixels: the capture is of the whole output (the
+// region scaled by the buffer over the output's logical size) or of the region itself.
+QRect GlassCapture::cropFor(QSize buffer, bool wholeOutput) const {
+	const QRect all(QPoint(0, 0), buffer);
+	if (!wholeOutput) return all;
+	auto* wlw = waylandWindowOf(this->window());
+	if (!wlw || !wlw->waylandScreen()) return all;
+	const auto logical = wlw->waylandScreen()->geometry().size();
+	if (logical.isEmpty()) return all;
+	const double sx = double(buffer.width()) / logical.width();
+	const double sy = double(buffer.height()) / logical.height();
+	const auto r = this->mRegion.toAlignedRect();
+	QRect crop(qRound(r.x() * sx), qRound(r.y() * sy), qRound(r.width() * sx), qRound(r.height() * sy));
+	return crop.intersected(all);
+}
+
+void GlassCapture::publish(QSize size, QRectF cropUv) {
 	this->mSample = std::move(this->mNewSample);
 	this->mSampleRegion = this->mRegion;
 	this->mCaptureSize = size;
+	this->mCropUv = cropUv;
 	this->mTextureDirty = true;
 	this->mSerial++;
 	this->update();
@@ -674,6 +743,7 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 	if (!this->mFrames.contains(frame)) return;
 
 	this->mLatency = double(frame->started.nsecsElapsed()) / 1e6;
+	this->mLastWholeOutput = frame->wholeOutput;
 	this->mReceived++;
 	if (this->mLastReady.isValid()) this->mCycle = double(this->mLastReady.nsecsElapsed()) / 1e6;
 	this->mLastReady.start();
@@ -688,12 +758,14 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 
 	if (frame->dma) {
 		auto* dma = frame->dma;
+		const QSize buffer(int(dma->width), int(dma->height));
+		const QRect crop = this->cropFor(buffer, frame->wholeOutput);
 		bool same = false;
 		if (dma->map) {
 			dma_buf_sync sync {};
 			sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
 			ioctl(dma->fd, DMA_BUF_IOCTL_SYNC, &sync);
-			same = this->sameAsBefore(dma->map, qsizetype(dma->mapLength), QSize(int(dma->width), int(dma->height)), true, int(dma->stride), dma->height);
+			same = this->sameAsBefore(dma->map, qsizetype(dma->mapLength), QSize(int(dma->width), int(dma->height)), true, int(dma->stride), crop);
 			sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
 			ioctl(dma->fd, DMA_BUF_IOCTL_SYNC, &sync);
 		} else {
@@ -722,7 +794,7 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 		this->mCurrentDma = dma;
 		this->mImage = QImage();
 		this->mUsingDmabuf = true;
-		this->publish(QSize(int(dma->width), int(dma->height)));
+		this->publish(crop.size(), QRectF(double(crop.x()) / buffer.width(), double(crop.y()) / buffer.height(), double(crop.width()) / buffer.width(), double(crop.height()) / buffer.height()));
 		this->pump();
 		return;
 	}
@@ -734,7 +806,7 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 	if (frame->yInvert) image = image.flipped(Qt::Vertical);
 	this->dropFrame(frame);
 
-	const bool same = this->sameAsBefore(image.constBits(), image.sizeInBytes(), image.size(), false, int(image.bytesPerLine()), uint32_t(image.height()));
+	const bool same = this->sameAsBefore(image.constBits(), image.sizeInBytes(), image.size(), false, int(image.bytesPerLine()), QRect(QPoint(0, 0), image.size()));
 	if (same && !this->warming()) {
 		this->mSkipped++;
 		emit this->statsChanged();
@@ -750,7 +822,7 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 	}
 	this->mImage = image;
 	this->mUsingDmabuf = false;
-	this->publish(image.size());
+	this->publish(image.size(), QRectF(0, 0, 1, 1));
 	this->pump();
 }
 
@@ -795,6 +867,7 @@ QSGNode* GlassCapture::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 					dma->eglImage = image;
 					dma->texture = texture;
 				} else {
+					qCWarning(logGlass) << "glass capture: eglCreateImage failed, error" << Qt::hex << eglGetError();
 					ok = false;
 				}
 			}

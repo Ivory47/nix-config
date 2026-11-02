@@ -142,6 +142,8 @@ Item {
 
         property real mode: 0
         property real coverOpacity: 1
+        property vector2d capOrigin: Qt.vector2d(cap.cropUv.x, cap.cropUv.y)
+        property vector2d capScale: Qt.vector2d(cap.cropUv.width, cap.cropUv.height)
         property variant capture: cap
         property variant own: ownSource
         property variant previous: root.sharp
@@ -166,6 +168,8 @@ Item {
 
         property real mode: 1
         property real coverOpacity: 1
+        property vector2d capOrigin: Qt.vector2d(cap.cropUv.x, cap.cropUv.y)
+        property vector2d capScale: Qt.vector2d(cap.cropUv.width, cap.cropUv.height)
         property variant capture: cap
         property variant own: ownSource
         property variant previous: root.sharp
@@ -223,6 +227,8 @@ Item {
         function setProcessing(on: bool): void { root.processing = on; }
         function setDepth(n: int): void { cap.depth = n; }
         function setDmabuf(on: bool): void { cap.allowDmabuf = on; }
+        // On: capture the whole output and crop here. Off: ask the compositor for the region.
+        function setWholeOutput(on: bool): void { cap.wholeOutput = on; }
         function setInterval(ms: int): void { cap.minInterval = ms; }
         // Cumulative counters; take two readings and subtract.
         function stats(): string {
@@ -239,6 +245,9 @@ Item {
                 glass: root.glassEnabled,
                 inFlight: cap.inFlight,
                 dmabuf: cap.usingDmabuf,
+                wholeOutput: cap.wholeOutput,
+                lastWholeOutput: cap.lastWholeOutput,
+                dmabufBroken: cap.dmabufBroken,
                 depth: cap.depth,
                 active: root.active,
                 processing: root.processing,

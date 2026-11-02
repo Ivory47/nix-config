@@ -109,6 +109,8 @@ public:
 	bool formatOk = false;
 	bool yInvert = false;
 	bool copyAsked = false;
+	// Captured the whole output instead of a region (see GlassCapture::wholeOutput).
+	bool wholeOutput = false;
 	// The compositor offered a dmabuf of this format (DRM fourcc) and size.
 	bool dmaOffered = false;
 	uint32_t dmaFormat = 0;
@@ -160,6 +162,13 @@ class GlassCapture: public QQuickItem {
 	// Publishing: what arrives is looked at, compared and shown. Off: it is received and thrown
 	// away (for measuring what the capture alone costs).
 	Q_PROPERTY(bool publishing READ publishing WRITE setPublishing NOTIFY publishingChanged)
+	// Capture the whole output and crop to `region` ourselves, instead of asking the compositor for
+	// the region. Hyprland 0.56 keeps a session per distinct region request and compares the
+	// request with the scaled box it stored, so at any scale but 1 every request makes a new
+	// session that is never freed. Needs dmabuf (a whole output through shared memory is too much).
+	Q_PROPERTY(bool wholeOutput READ wholeOutput WRITE setWholeOutput NOTIFY wholeOutputChanged)
+	// Where `region` is inside the newest capture, in uv (x, y, width, height).
+	Q_PROPERTY(QRectF cropUv READ cropUv NOTIFY serialChanged)
 	// Held: no new captures (a glass that is not visible does not need any).
 	Q_PROPERTY(bool held READ held WRITE setHeld NOTIFY heldChanged)
 	// Increases each time a capture with something new was published.
@@ -176,6 +185,9 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(int copiesAsked READ copiesAsked NOTIFY statsChanged)
 	Q_PROPERTY(int cancelled READ cancelled NOTIFY statsChanged)
 	Q_PROPERTY(int inFlight READ inFlight NOTIFY statsChanged)
+	// Whether the newest capture was of the whole output, and whether dmabuf import failed.
+	Q_PROPERTY(bool lastWholeOutput READ lastWholeOutput NOTIFY statsChanged)
+	Q_PROPERTY(bool dmabufBroken READ dmabufBroken NOTIFY statsChanged)
 	// Frames the window presented (polled, not notified).
 	Q_PROPERTY(int frames READ frames NOTIFY statsChanged)
 	// The effective minimum interval in ms, and the pixel size of the last capture.
@@ -207,6 +219,9 @@ public:
 	void setAllowDmabuf(bool allow);
 	bool publishing() const { return this->mPublishing; }
 	void setPublishing(bool publishing);
+	bool wholeOutput() const { return this->mWholeOutput; }
+	void setWholeOutput(bool whole);
+	QRectF cropUv() const { return this->mCropUv; }
 	bool held() const { return this->mHeld; }
 	void setHeld(bool held);
 	int serial() const { return this->mSerial; }
@@ -219,6 +234,8 @@ public:
 	int copiesAsked() const { return this->mCopiesAsked; }
 	int cancelled() const { return this->mCancelled; }
 	int inFlight() const { return int(this->mFrames.size()); }
+	bool lastWholeOutput() const { return this->mLastWholeOutput; }
+	bool dmabufBroken() const { return this->mDmaBroken.load(); }
 	int frames() const { return this->mFramesSwapped.load(); }
 	qreal effectiveInterval() const;
 	qreal latency() const { return this->mLatency; }
@@ -250,6 +267,7 @@ signals:
 	void depthChanged();
 	void allowDmabufChanged();
 	void publishingChanged();
+	void wholeOutputChanged();
 	void heldChanged();
 	void serialChanged();
 	void statsChanged();
@@ -276,6 +294,7 @@ private:
 	bool ensureDmaBuffer(GlassFrame* frame);
 	GlassDmaBuffer* acquireDma(uint32_t format, uint32_t width, uint32_t height);
 	void destroyDmaPool();
+	void trimDmaPool(uint32_t format, uint32_t width, uint32_t height);
 	void dropFrame(GlassFrame* frame);
 	void cancelFrames();
 	void start();
@@ -283,17 +302,21 @@ private:
 	void bindWindow(QQuickWindow* window);
 	void onFrameSwapped(int syncSerial);
 	void checkRatio();
-	bool sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, bool linear, int stride, uint32_t height);
-	void publish(QSize size);
+	bool sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, bool linear, int stride, QRect crop);
+	void publish(QSize size, QRectF cropUv);
+	QRect cropFor(QSize buffer, bool wholeOutput) const;
 
 	bool mActive = false;
 	bool mHeld = false;
 	bool mAllowDmabuf = true;
 	bool mPublishing = true;
+	bool mWholeOutput = true;
+	bool mLastWholeOutput = false;
+	QRectF mCropUv = QRectF(0, 0, 1, 1);
 	bool mUsingDmabuf = false;
 	QRectF mRegion;
 	int mMinInterval = 0;
-	int mDepth = 3;
+	int mDepth = 2;
 
 	QList<GlassFrame*> mFrames;
 	QTimer mTimer;

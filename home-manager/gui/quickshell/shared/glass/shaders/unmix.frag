@@ -18,6 +18,8 @@ layout(std140, binding = 0) uniform buf {
     float qt_Opacity;
     float mode;
     float coverOpacity; // opacity the compositor applies to the surface (1.0 for a layer)
+    vec2 capOrigin;     // where our region is inside the capture (uv): the capture may be of the
+    vec2 capScale;      // whole output, and is cropped here
 };
 
 layout(binding = 1) uniform sampler2D capture;
@@ -26,7 +28,7 @@ layout(binding = 3) uniform sampler2D previous;
 
 void main() {
     vec2 uv = qt_TexCoord0;
-    vec3 f = texture(capture, uv).rgb;
+    vec3 f = texture(capture, capOrigin + uv * capScale).rgb;
     vec4 s = texture(own, uv) * coverOpacity;
     float remaining = 1.0 - s.a;
 
