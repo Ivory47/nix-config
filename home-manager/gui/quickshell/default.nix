@@ -31,7 +31,7 @@ let
         cp -r --no-preserve=mode ${src} $out
         rm -rf $out/shared
         cp -r --no-preserve=mode ${./shared} $out/shared
-        rm -rf $out/shared/glass/native $out/shared/glass/shaders
+        rm -rf $out/shared/glass/native $out/shared/glass/shaders $out/shared/glass/tools
         mkdir -p $out/shared/glass/shaders
         cp ${glassShaders}/*.qsb $out/shared/glass/shaders/
     '';

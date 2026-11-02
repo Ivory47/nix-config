@@ -241,6 +241,12 @@ void GlassCapture::setAllowDmabuf(bool allow) {
 	emit this->allowDmabufChanged();
 }
 
+void GlassCapture::setPublishing(bool publishing) {
+	if (publishing == this->mPublishing) return;
+	this->mPublishing = publishing;
+	emit this->publishingChanged();
+}
+
 void GlassCapture::setHeld(bool held) {
 	if (held == this->mHeld) return;
 	this->mHeld = held;
@@ -314,6 +320,7 @@ void GlassCapture::bindWindow(QQuickWindow* window) {
 	    &QQuickWindow::frameSwapped,
 	    this,
 	    [this]() {
+		    this->mFramesSwapped.fetch_add(1);
 		    const int syncs = this->mSyncs.load();
 		    QMetaObject::invokeMethod(
 		        this,
@@ -403,6 +410,7 @@ void GlassCapture::start() {
 	frame->init(manager->capture_output_region(0, output, r.x(), r.y(), r.width(), r.height()));
 	frame->started.start();
 	this->mFrames.append(frame);
+	this->mRequests++;
 	wl_display_flush(wlw->display()->wl_display());
 
 	this->mSinceStart.start();
@@ -583,7 +591,10 @@ void GlassCapture::dropFrame(GlassFrame* frame) {
 }
 
 void GlassCapture::cancelFrames() {
-	while (!this->mFrames.isEmpty()) this->dropFrame(this->mFrames.first());
+	while (!this->mFrames.isEmpty()) {
+		this->mCancelled++;
+		this->dropFrame(this->mFrames.first());
+	}
 }
 
 void GlassCapture::frameBufferDone(GlassFrame* frame) {
@@ -599,6 +610,7 @@ void GlassCapture::frameBufferDone(GlassFrame* frame) {
 	}
 
 	frame->copyAsked = true;
+	this->mCopiesAsked++;
 	auto* buffer = frame->dma ? frame->dma->buffer : frame->buffer;
 	if (frame->onDamage) frame->copy_with_damage(buffer);
 	else frame->copy(buffer);
@@ -665,6 +677,14 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 	this->mReceived++;
 	if (this->mLastReady.isValid()) this->mCycle = double(this->mLastReady.nsecsElapsed()) / 1e6;
 	this->mLastReady.start();
+
+	if (!this->mPublishing) {
+		// Measuring: the capture arrived, and that is all.
+		this->dropFrame(frame);
+		emit this->statsChanged();
+		this->pump();
+		return;
+	}
 
 	if (frame->dma) {
 		auto* dma = frame->dma;

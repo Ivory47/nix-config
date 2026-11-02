@@ -157,6 +157,9 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(int depth READ depth WRITE setDepth NOTIFY depthChanged)
 	// Use dmabuf if possible (else always shared memory).
 	Q_PROPERTY(bool allowDmabuf READ allowDmabuf WRITE setAllowDmabuf NOTIFY allowDmabufChanged)
+	// Publishing: what arrives is looked at, compared and shown. Off: it is received and thrown
+	// away (for measuring what the capture alone costs).
+	Q_PROPERTY(bool publishing READ publishing WRITE setPublishing NOTIFY publishingChanged)
 	// Held: no new captures (a glass that is not visible does not need any).
 	Q_PROPERTY(bool held READ held WRITE setHeld NOTIFY heldChanged)
 	// Increases each time a capture with something new was published.
@@ -166,6 +169,15 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(int skipped READ skipped NOTIFY statsChanged)
 	Q_PROPERTY(int failed READ failed NOTIFY statsChanged)
 	Q_PROPERTY(bool usingDmabuf READ usingDmabuf NOTIFY statsChanged)
+	// Counters for diagnosing the compositor side: capture requests made, copies asked for
+	// (after the compositor named its buffer), captures cancelled before they were done, and
+	// how many are on their way now.
+	Q_PROPERTY(int requests READ requests NOTIFY statsChanged)
+	Q_PROPERTY(int copiesAsked READ copiesAsked NOTIFY statsChanged)
+	Q_PROPERTY(int cancelled READ cancelled NOTIFY statsChanged)
+	Q_PROPERTY(int inFlight READ inFlight NOTIFY statsChanged)
+	// Frames the window presented (polled, not notified).
+	Q_PROPERTY(int frames READ frames NOTIFY statsChanged)
 	// The effective minimum interval in ms, and the pixel size of the last capture.
 	Q_PROPERTY(qreal effectiveInterval READ effectiveInterval NOTIFY statsChanged)
 	// How long the last capture took from the request to the pixels (ms), of which until the
@@ -193,6 +205,8 @@ public:
 	void setDepth(int depth);
 	bool allowDmabuf() const { return this->mAllowDmabuf; }
 	void setAllowDmabuf(bool allow);
+	bool publishing() const { return this->mPublishing; }
+	void setPublishing(bool publishing);
 	bool held() const { return this->mHeld; }
 	void setHeld(bool held);
 	int serial() const { return this->mSerial; }
@@ -201,6 +215,11 @@ public:
 	int skipped() const { return this->mSkipped; }
 	int failed() const { return this->mFailed; }
 	bool usingDmabuf() const { return this->mUsingDmabuf; }
+	int requests() const { return this->mRequests; }
+	int copiesAsked() const { return this->mCopiesAsked; }
+	int cancelled() const { return this->mCancelled; }
+	int inFlight() const { return int(this->mFrames.size()); }
+	int frames() const { return this->mFramesSwapped.load(); }
 	qreal effectiveInterval() const;
 	qreal latency() const { return this->mLatency; }
 	qreal setupLatency() const { return this->mSetup; }
@@ -230,6 +249,7 @@ signals:
 	void minIntervalChanged();
 	void depthChanged();
 	void allowDmabufChanged();
+	void publishingChanged();
 	void heldChanged();
 	void serialChanged();
 	void statsChanged();
@@ -269,6 +289,7 @@ private:
 	bool mActive = false;
 	bool mHeld = false;
 	bool mAllowDmabuf = true;
+	bool mPublishing = true;
 	bool mUsingDmabuf = false;
 	QRectF mRegion;
 	int mMinInterval = 0;
@@ -300,9 +321,13 @@ private:
 	int mReceived = 0;
 	int mSkipped = 0;
 	int mFailed = 0;
+	int mRequests = 0;
+	int mCopiesAsked = 0;
+	int mCancelled = 0;
 	QString mStatus;
 	QMetaObject::Connection mSwapConnection;
 	QMetaObject::Connection mSyncConnection;
 	std::atomic<int> mSyncs {0};
+	std::atomic<int> mFramesSwapped {0};
 	std::atomic<bool> mDmaBroken {false};
 };

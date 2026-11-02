@@ -96,8 +96,16 @@ PanelWindow {
 
         // Live liquid glass (shared/glass): the real background behind the bar, blurred and
         // refracted on the GPU. Its look is this GlassStyle; the blur radius is on the backdrop.
+        // Only for measuring (glassBackdrop.glassEnabled): the bar without glass.
+        Rectangle {
+            anchors.fill: parent
+            visible: !glassBackdrop.glassEnabled
+            color: Qt.rgba(0.12, 0.12, 0.18, 0.55)
+        }
+
         GlassPanel {
             anchors.fill: parent
+            visible: glassBackdrop.glassEnabled
             backdrop: glassBackdrop
             style: GlassStyle {}
         }
@@ -178,5 +186,6 @@ PanelWindow {
         id: glassBackdrop
         composite: barContent
         blurRadius: 14
+        ipcTarget: "glass"
     }
 }

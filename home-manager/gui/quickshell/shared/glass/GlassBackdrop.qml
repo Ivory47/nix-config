@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Glass.Native
 
 // The live backdrop of a layer-shell surface: what is really behind it, kept up to date.
@@ -30,8 +31,13 @@ Item {
     // Minimum time between captures in ms. 0 = one refresh period of the monitor.
     property int minInterval: 0
     property bool active: true
+    // Off: no capture, nothing kept up to date (for comparing against the bar without glass).
+    property bool glassEnabled: true
     // Log what the pipeline does (twice a second).
     property bool debug: false
+    // Name of an IPC target (`qs ipc call <target> ...`) to switch parts of the pipeline on and
+    // off and read counters while it runs, for measuring. Empty: none.
+    property string ipcTarget: ""
 
     // What GlassPanel reads.
     readonly property Item sharp: bundleAt(readIdx).bg
@@ -60,6 +66,8 @@ Item {
     property var pending: []
     property bool again: false
     property int flips: 0
+    // Off: captures are received and thrown away (see GlassCapture.publishing).
+    property bool processing: true
 
     function bundleAt(i) {
         return i === 0 ? bundle0 : (i === 1 ? bundle1 : bundle2);
@@ -67,10 +75,11 @@ Item {
 
     GlassCapture {
         id: cap
-        active: root.active
+        active: root.active && root.glassEnabled
         region: Qt.rect(root.origin.x, root.origin.y, root.width, root.height)
         minInterval: root.minInterval
         onCaptured: root.process()
+        publishing: root.processing
         onSwapped: syncSerial => root.handleSwapped(syncSerial)
     }
 
@@ -119,7 +128,7 @@ Item {
     ShaderEffectSource {
         id: ownSource
         sourceItem: root.composite
-        live: true
+        live: root.glassEnabled
         visible: false
         textureSize: root.sizePx
     }
@@ -200,6 +209,45 @@ Item {
         kept: root.sharp
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+    }
+
+    IpcHandler {
+        enabled: root.ipcTarget !== ""
+        target: root.ipcTarget
+
+        // Captures on / off (off: nothing is requested at all).
+        function setCapture(on: bool): void { root.active = on; }
+        // Off: the glass is not drawn and nothing of the pipeline runs.
+        function setGlass(on: bool): void { root.glassEnabled = on; }
+        // Off: captures are received and thrown away; nothing is shown or rendered.
+        function setProcessing(on: bool): void { root.processing = on; }
+        function setDepth(n: int): void { cap.depth = n; }
+        function setDmabuf(on: bool): void { cap.allowDmabuf = on; }
+        function setInterval(ms: int): void { cap.minInterval = ms; }
+        // Cumulative counters; take two readings and subtract.
+        function stats(): string {
+            return JSON.stringify({
+                requests: cap.requests,
+                copies: cap.copiesAsked,
+                received: cap.received,
+                published: cap.serial,
+                skipped: cap.skipped,
+                cancelled: cap.cancelled,
+                failed: cap.failed,
+                flips: root.flips,
+                frames: cap.frames,
+                glass: root.glassEnabled,
+                inFlight: cap.inFlight,
+                dmabuf: cap.usingDmabuf,
+                depth: cap.depth,
+                active: root.active,
+                processing: root.processing,
+                latency: cap.latency,
+                setup: cap.setupLatency,
+                capture: cap.captureSize.width + "x" + cap.captureSize.height,
+                region: cap.region.x + "," + cap.region.y + " " + cap.region.width + "x" + cap.region.height
+            });
+        }
     }
 
     property int lastReceived: 0
