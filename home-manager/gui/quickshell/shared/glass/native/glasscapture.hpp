@@ -109,6 +109,8 @@ public:
 	bool formatOk = false;
 	bool yInvert = false;
 	bool copyAsked = false;
+	// The compositor said it is done: the memory is ours again at once.
+	bool done = false;
 	// Captured the whole output instead of a region (see GlassCapture::wholeOutput).
 	bool wholeOutput = false;
 	// The compositor offered a dmabuf of this format (DRM fourcc) and size.
@@ -312,11 +314,15 @@ private:
 	bool mPublishing = true;
 	bool mWholeOutput = true;
 	bool mLastWholeOutput = false;
+	bool mWarnedRegion = false;
 	QRectF mCropUv = QRectF(0, 0, 1, 1);
 	bool mUsingDmabuf = false;
 	QRectF mRegion;
 	int mMinInterval = 0;
-	int mDepth = 2;
+	// One. Hyprland completes every pending capture at the same output commit, so a second request
+	// brings the same pixels again (measured: 6-9 duplicates per second, no more new captures) and
+	// costs the compositor one more copy pass per commit.
+	int mDepth = 1;
 
 	QList<GlassFrame*> mFrames;
 	QTimer mTimer;

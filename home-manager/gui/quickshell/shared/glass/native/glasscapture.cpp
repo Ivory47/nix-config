@@ -418,6 +418,11 @@ void GlassCapture::start() {
 	auto* frame = new GlassFrame(this, true);
 	// overlay_cursor = 0: the glass does not refract the cursor, it goes on top.
 	frame->wholeOutput = this->mWholeOutput && this->dmabufUsable();
+	if (!frame->wholeOutput && !qFuzzyCompare(this->pixelRatio(), 1.0) && !this->mWarnedRegion) {
+		this->mWarnedRegion = true;
+		qCWarning(logGlass) << "glass capture: asking for a region at scale" << this->pixelRatio()
+		                    << "- Hyprland 0.56 then makes a new screenshare session for every request and never frees it";
+	}
 	if (frame->wholeOutput) frame->init(manager->capture_output(0, output));
 	else frame->init(manager->capture_output_region(0, output, r.x(), r.y(), r.width(), r.height()));
 	frame->started.start();
@@ -448,10 +453,11 @@ bool GlassCapture::dmabufUsable() const {
 
 GlassDmaBuffer* GlassCapture::acquireDma(uint32_t format, uint32_t width, uint32_t height) {
 	const auto now = nowMs();
-	const int syncs = this->mSyncs.load();
+	// Time, not frames: with nothing changing no frames are made, and the buffers would never be
+	// given back. What reads a buffer (one pass in the frame after it was shown) is long done.
 	for (auto* b: this->mDmaPool) {
 		if (b->busy || b->format != format || b->width != width || b->height != height) continue;
-		if (b->freeAtSync > syncs || b->freeAtMs > now) continue;
+		if (b->freeAtMs > now) continue;
 		b->busy = true;
 		return b;
 	}
@@ -506,11 +512,10 @@ GlassDmaBuffer* GlassCapture::acquireDma(uint32_t format, uint32_t width, uint32
 void GlassCapture::trimDmaPool(uint32_t format, uint32_t width, uint32_t height) {
 	std::vector<DestroyDmaJob::Item> items;
 	const auto now = nowMs();
-	const int syncs = this->mSyncs.load();
 	for (auto it = this->mDmaPool.begin(); it != this->mDmaPool.end();) {
 		auto* b = *it;
 		const bool other = b->format != format || b->width != width || b->height != height;
-		if (!other || b->busy || b->freeAtSync > syncs || b->freeAtMs > now || b == this->mCurrentDma) {
+		if (!other || b->busy || b->freeAtMs > now || b == this->mCurrentDma) {
 			++it;
 			continue;
 		}
@@ -617,7 +622,7 @@ bool GlassCapture::ensureShmBuffer(GlassFrame* frame) {
 void GlassCapture::dropFrame(GlassFrame* frame) {
 	this->mFrames.removeOne(frame);
 	frame->owner = nullptr;
-	const bool maybeBusy = frame->copyAsked;
+	const bool maybeBusy = frame->copyAsked && !frame->done;
 
 	if (frame->dma) {
 		// Back to the pool, but not to be used again at once if the compositor may still write.
@@ -742,6 +747,7 @@ void GlassCapture::publish(QSize size, QRectF cropUv) {
 void GlassCapture::frameReady(GlassFrame* frame) {
 	if (!this->mFrames.contains(frame)) return;
 
+	frame->done = true;
 	this->mLatency = double(frame->started.nsecsElapsed()) / 1e6;
 	this->mLastWholeOutput = frame->wholeOutput;
 	this->mReceived++;
@@ -789,7 +795,7 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 		if (this->mCurrentDma) {
 			this->mCurrentDma->busy = false;
 			this->mCurrentDma->freeAtSync = this->mSyncs.load() + 4;
-			this->mCurrentDma->freeAtMs = nowMs() + 100;
+			this->mCurrentDma->freeAtMs = nowMs() + 250;
 		}
 		this->mCurrentDma = dma;
 		this->mImage = QImage();
@@ -817,7 +823,7 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 	if (this->mCurrentDma) {
 		this->mCurrentDma->busy = false;
 		this->mCurrentDma->freeAtSync = this->mSyncs.load() + 4;
-		this->mCurrentDma->freeAtMs = nowMs() + 100;
+		this->mCurrentDma->freeAtMs = nowMs() + 250;
 		this->mCurrentDma = nullptr;
 	}
 	this->mImage = image;
