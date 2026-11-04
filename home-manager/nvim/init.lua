@@ -164,7 +164,20 @@ require("lazy").setup({
             -- explorer = { enabled = true },
             indent = { enabled = true },
             input = { enabled = true },
-            picker = { enabled = true },
+            picker = { 
+                enabled = true,
+                win = {
+                    input = {
+                        keys = {
+                            -- Scrollt die Vorschau zeilenweise oder blockweise nach unten/oben
+                            ["<A-j>"] = { "preview_scroll_down", mode = { "i", "n" } },
+                            ["<A-k>"] = { "preview_scroll_up", mode = { "i", "n" } },
+                            ["<A-h>"] = { "preview_scroll_left", mode = { "i", "n" } },
+                            ["<A-l>"] = { "preview_scroll_right", mode = { "i", "n" } },
+                        },
+                    },
+                },
+            },
             -- notifier = { enabled = true },
             quickfile = { enabled = true },
             scope = { enabled = true },
