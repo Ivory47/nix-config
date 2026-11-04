@@ -3,19 +3,23 @@
 // Native part of the live glass pipeline.
 //
 // GlassCapture reproduces Pleamar's capture side for Quickshell:
-//   - zwlr_screencopy_manager_v1.capture_output_region() for only the glass region,
-//   - copy_with_damage: the compositor answers with the next frame it draws ("watch"),
-//   - a minimum interval between two captures (default: one refresh period of the monitor),
+//   - copy_with_damage on one capture request at a time, re-armed when it completes,
+//   - the whole output as a dmabuf (Hyprland 0.56 leaks a session per region request at any
+//     scale but 1), cropped to the glass region in the shader,
 //   - the sampled-bytes skip, so repainting the glass cannot feed itself,
-//   - the warm-up (first captures are never skipped; the compositor fades layers in).
+//   - a warm-up (the compositor fades a layer in: the first captures are not trusted).
 //
-// Two ways to receive the pixels:
-//   - dmabuf (preferred): we allocate linear buffers with GBM, the compositor renders into them
-//     on the GPU, and Qt samples them as textures (EGLImage) without a copy. This is what makes
-//     monitor-rate captures possible.
-//   - wl_shm (fallback): the compositor reads the pixels back to the CPU, which in Hyprland 0.56
-//     takes around 80 ms per capture, so about 12 per second.
-// Several captures are in flight at once (`depth`).
+// Buffers. The compositor renders into dmabufs that we allocate with GBM, and Qt samples them as
+// textures (EGLImage) without a copy. A buffer goes through these states:
+//
+//   Free -> InFlight (asked of the compositor) -> Pending (a published capture, waiting for the
+//   render thread to import it) -> Shown (what the texture provider holds) -> Retiring (replaced;
+//   an EGL fence created on the render thread at that moment tells when every GPU command that
+//   could still read it has finished) -> Free.
+//
+// A buffer is never handed to the compositor again before its fence has signalled. When none is
+// free the capture waits for one (counted as pool exhaustion); it is never a reason to give up on
+// dmabuf. Duplicates and dropped captures go back at once: the GPU never saw them.
 //
 // The captured pixels are handed to QML as a texture provider, so the unmixing, the validation
 // and all blur / glass shading run on the GPU in ShaderEffects.
@@ -29,6 +33,7 @@
 #include <QtCore/QList>
 #include <QtCore/QRectF>
 #include <QtCore/QTimer>
+#include <QtCore/QVariantMap>
 #include <QtGui/QColor>
 #include <QtGui/QImage>
 #include <QtQml/qqmlregistration.h>
@@ -73,6 +78,8 @@ private:
 
 // A buffer the compositor renders into: allocated by us, shared as a dmabuf.
 struct GlassDmaBuffer {
+	enum class State { Free, InFlight, Pending, Shown, Retiring };
+
 	gbm_bo* bo = nullptr;
 	int fd = -1;
 	wl_buffer* buffer = nullptr;
@@ -88,10 +95,12 @@ struct GlassDmaBuffer {
 	// For Qt (created on the render thread when first needed).
 	void* eglImage = nullptr;
 	unsigned int texture = 0;
-	// Taken by a capture / not to be reused before this many scene synchronisations.
-	bool busy = false;
-	int freeAtSync = 0;
-	qint64 freeAtMs = 0;
+
+	State state = State::Free;
+	// Retiring: the EGL fence that signals when the GPU is done with it (created on the render
+	// thread), or, for a buffer the compositor may still be writing into, a time to wait for.
+	void* fence = nullptr;
+	qint64 holdUntilMs = 0;
 };
 
 // One capture request. Events after the owner cancelled it are ignored.
@@ -118,6 +127,12 @@ public:
 	uint32_t dmaFormat = 0;
 	uint32_t dmaWidth = 0;
 	uint32_t dmaHeight = 0;
+	// Damage events of this capture: how many, and how many covered the whole buffer.
+	int damageRects = 0;
+	int damageFull = 0;
+	// Waiting for a free buffer.
+	bool waiting = false;
+	QElapsedTimer waitStarted;
 	QElapsedTimer started;
 
 	// What the compositor copies into: shared memory or a dmabuf.
@@ -129,6 +144,7 @@ public:
 protected:
 	void zwlr_screencopy_frame_v1_buffer(uint32_t format, uint32_t width, uint32_t height, uint32_t stride) override;
 	void zwlr_screencopy_frame_v1_flags(uint32_t flags) override;
+	void zwlr_screencopy_frame_v1_damage(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
 	void zwlr_screencopy_frame_v1_linux_dmabuf(uint32_t format, uint32_t width, uint32_t height) override;
 	void zwlr_screencopy_frame_v1_buffer_done() override;
 	void zwlr_screencopy_frame_v1_ready(uint32_t tvSecHi, uint32_t tvSecLo, uint32_t tvNsec) override;
@@ -157,22 +173,24 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(QRectF region READ region WRITE setRegion NOTIFY regionChanged)
 	// Minimum time between two requests, ms. 0 = one refresh period of the window's screen.
 	Q_PROPERTY(int minInterval READ minInterval WRITE setMinInterval NOTIFY minIntervalChanged)
-	// How many captures may be on their way at once.
+	// How many captures may be on their way at once. One: Hyprland completes every pending capture
+	// at the same output commit, so more requests only bring the same pixels again.
 	Q_PROPERTY(int depth READ depth WRITE setDepth NOTIFY depthChanged)
-	// Use dmabuf if possible (else always shared memory).
+	// Use dmabuf if possible (else shared memory).
 	Q_PROPERTY(bool allowDmabuf READ allowDmabuf WRITE setAllowDmabuf NOTIFY allowDmabufChanged)
 	// Publishing: what arrives is looked at, compared and shown. Off: it is received and thrown
 	// away (for measuring what the capture alone costs).
 	Q_PROPERTY(bool publishing READ publishing WRITE setPublishing NOTIFY publishingChanged)
-	// Capture the whole output and crop to `region` ourselves, instead of asking the compositor for
-	// the region. Hyprland 0.56 keeps a session per distinct region request and compares the
-	// request with the scaled box it stored, so at any scale but 1 every request makes a new
-	// session that is never freed. Needs dmabuf (a whole output through shared memory is too much).
+	// Capture the whole output and crop to `region` in the shader, instead of asking the
+	// compositor for the region (which Hyprland 0.56 turns into a leaked session per request at any
+	// scale but 1). Needs dmabuf.
 	Q_PROPERTY(bool wholeOutput READ wholeOutput WRITE setWholeOutput NOTIFY wholeOutputChanged)
 	// Where `region` is inside the newest capture, in uv (x, y, width, height).
 	Q_PROPERTY(QRectF cropUv READ cropUv NOTIFY serialChanged)
 	// Held: no new captures (a glass that is not visible does not need any).
 	Q_PROPERTY(bool held READ held WRITE setHeld NOTIFY heldChanged)
+	// For tests: at most this many dmabufs in the pool (0 = the default). Forces exhaustion.
+	Q_PROPERTY(int poolLimit READ poolLimit WRITE setPoolLimit NOTIFY poolLimitChanged)
 	// Increases each time a capture with something new was published.
 	Q_PROPERTY(int serial READ serial NOTIFY serialChanged)
 	Q_PROPERTY(bool warming READ warming NOTIFY serialChanged)
@@ -180,14 +198,12 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(int skipped READ skipped NOTIFY statsChanged)
 	Q_PROPERTY(int failed READ failed NOTIFY statsChanged)
 	Q_PROPERTY(bool usingDmabuf READ usingDmabuf NOTIFY statsChanged)
-	// Counters for diagnosing the compositor side: capture requests made, copies asked for
-	// (after the compositor named its buffer), captures cancelled before they were done, and
-	// how many are on their way now.
 	Q_PROPERTY(int requests READ requests NOTIFY statsChanged)
 	Q_PROPERTY(int copiesAsked READ copiesAsked NOTIFY statsChanged)
 	Q_PROPERTY(int cancelled READ cancelled NOTIFY statsChanged)
 	Q_PROPERTY(int inFlight READ inFlight NOTIFY statsChanged)
-	// Whether the newest capture was of the whole output, and whether dmabuf import failed.
+	// Whether the newest capture was of the whole output, and whether dmabuf is given up on
+	// (only for hard failures: unsupported format, allocation or import that keeps failing).
 	Q_PROPERTY(bool lastWholeOutput READ lastWholeOutput NOTIFY statsChanged)
 	Q_PROPERTY(bool dmabufBroken READ dmabufBroken NOTIFY statsChanged)
 	// Frames the window presented (polled, not notified).
@@ -226,10 +242,12 @@ public:
 	QRectF cropUv() const { return this->mCropUv; }
 	bool held() const { return this->mHeld; }
 	void setHeld(bool held);
+	int poolLimit() const { return this->mPoolLimit; }
+	void setPoolLimit(int limit);
 	int serial() const { return this->mSerial; }
 	bool warming() const;
 	int received() const { return this->mReceived; }
-	int skipped() const { return this->mSkipped; }
+	int skipped() const { return this->mDuplicates; }
 	int failed() const { return this->mFailed; }
 	bool usingDmabuf() const { return this->mUsingDmabuf; }
 	int requests() const { return this->mRequests; }
@@ -247,7 +265,9 @@ public:
 	qreal pixelRatio() const;
 	QString status() const { return this->mStatus; }
 
-	// Reads one pixel of a QQuickItemGrabResult.image (for debugging).
+	// Every counter of the capture side, by name (see the .cpp for what each one means).
+	Q_INVOKABLE QVariantMap diagnostics() const;
+	// Reads one pixel of a QQuickItemGrabResult.image.
 	Q_INVOKABLE QColor readPixel(const QVariant& image, int x, int y) const;
 	// Ask for a capture as soon as the interval allows (a nudge).
 	Q_INVOKABLE void nudge();
@@ -271,6 +291,7 @@ signals:
 	void publishingChanged();
 	void wholeOutputChanged();
 	void heldChanged();
+	void poolLimitChanged();
 	void serialChanged();
 	void statsChanged();
 	void pixelRatioChanged();
@@ -289,12 +310,23 @@ protected:
 
 private slots:
 	void pump();
+	void retryWaiting();
+	void warmupEnded();
+	void healDmabuf();
 
 private:
+	enum class DmaResult { Ok, Exhausted, Unsupported, AllocFailed };
+
 	bool dmabufUsable() const;
+	bool prepareBuffer(GlassFrame* frame);
+	void askCopy(GlassFrame* frame);
 	bool ensureShmBuffer(GlassFrame* frame);
-	bool ensureDmaBuffer(GlassFrame* frame);
-	GlassDmaBuffer* acquireDma(uint32_t format, uint32_t width, uint32_t height);
+	DmaResult ensureDmaBuffer(GlassFrame* frame);
+	GlassDmaBuffer* acquireDma(uint32_t format, uint32_t width, uint32_t height, DmaResult* result);
+	void reapRetired();
+	void releaseDma(GlassDmaBuffer* buffer);
+	void retireOnRenderThread(GlassDmaBuffer* buffer);
+	void giveUpOnDmabuf(const QString& why);
 	void destroyDmaPool();
 	void trimDmaPool(uint32_t format, uint32_t width, uint32_t height);
 	void dropFrame(GlassFrame* frame);
@@ -319,20 +351,29 @@ private:
 	bool mUsingDmabuf = false;
 	QRectF mRegion;
 	int mMinInterval = 0;
-	// One. Hyprland completes every pending capture at the same output commit, so a second request
-	// brings the same pixels again (measured: 6-9 duplicates per second, no more new captures) and
-	// costs the compositor one more copy pass per commit.
 	int mDepth = 1;
+	int mPoolLimit = 0;
 
 	QList<GlassFrame*> mFrames;
 	QTimer mTimer;
+	QTimer mBufferTimer;
+	QTimer mWarmupTimer;
+	QTimer mHealTimer;
 	QElapsedTimer mSinceStart;
 	QElapsedTimer mBorn;
+	QElapsedTimer mLastPublish;
 	bool mHasStarted = false;
+	// After the warm-up, the next capture is published even if it looks like the last one: the
+	// background was taken while the layer was fading in.
+	bool mForcePublish = false;
 
-	// What is shown: the newest published capture, as an image (shm) or a dmabuf.
+	// What is shown: the newest published capture, as an image (shm) or a dmabuf. A published
+	// dmabuf is Pending until the render thread has imported it, and only then replaces the one
+	// that was Shown.
 	QImage mImage;
 	GlassDmaBuffer* mCurrentDma = nullptr;
+	GlassDmaBuffer* mPendingDma = nullptr;
+	bool mDropShownForImage = false;
 	QSize mCaptureSize;
 	std::vector<GlassDmaBuffer*> mDmaPool;
 	std::vector<uchar> mSample;
@@ -340,23 +381,40 @@ private:
 	QRectF mSampleRegion;
 	bool mTextureDirty = false;
 	mutable GlassTextureProvider* mProvider = nullptr;
+	GlassFrame* mWaiting = nullptr;
 
 	qreal mRatio = 0;
 	qreal mLatency = 0;
 	qreal mCycle = 0;
 	qreal mSetup = 0;
 	QElapsedTimer mLastReady;
-	int mSerial = 0;
-	int mReceived = 0;
-	int mSkipped = 0;
-	int mFailed = 0;
-	int mRequests = 0;
-	int mCopiesAsked = 0;
-	int mCancelled = 0;
 	QString mStatus;
 	QMetaObject::Connection mSwapConnection;
 	QMetaObject::Connection mSyncConnection;
 	std::atomic<int> mSyncs {0};
 	std::atomic<int> mFramesSwapped {0};
 	std::atomic<bool> mDmaBroken {false};
+	std::atomic<void*> mEglDisplay {nullptr};
+
+	// Counters.
+	int mSerial = 0;           // published
+	int mReceived = 0;         // completed by the compositor
+	int mDuplicates = 0;       // looked like the one shown
+	int mFailed = 0;           // `failed` events from the compositor
+	int mRequests = 0;
+	int mCopiesAsked = 0;
+	int mCancelled = 0;
+	int mWarmupDropped = 0;    // differing captures dropped to keep the warm-up to ten per second
+	int mDamageEvents = 0;
+	int mDamageFull = 0;
+	int mPoolExhausted = 0;    // times a capture had to wait for a free buffer
+	int mBufferWaitTimeouts = 0;
+	int mAllocFailures = 0;
+	int mConsecutiveAllocFailures = 0;
+	int mImportFailures = 0;
+	int mConsecutiveImportFailures = 0;
+	int mFallbackActivations = 0;
+	int mHeals = 0;
+	int mFencesWaited = 0;     // retired buffers given back after their fence signalled
+	int mTimedRetired = 0;     // ... or after their hold time (no fence available / compositor writing)
 };

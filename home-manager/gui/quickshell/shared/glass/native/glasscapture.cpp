@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -32,6 +33,15 @@
 Q_LOGGING_CATEGORY(logGlass, "glass.capture", QtWarningMsg)
 
 namespace {
+
+constexpr int kDefaultPoolLimit = 12;
+// How long the compositor may take to hand back a canceled capture's buffer, when nothing can
+// tell us (no fence, or a capture that was canceled while the compositor was copying).
+constexpr qint64 kHoldMs = 250;
+// A capture that waits for a free buffer for longer than this is dropped (counted).
+constexpr qint64 kBufferWaitMs = 100;
+// After this long without success, dmabuf is tried again once it was given up on.
+constexpr int kHealMs = 30000;
 
 qint64 nowMs() {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -74,15 +84,31 @@ gbm_device* glassGbm() {
 PFNEGLCREATEIMAGEKHRPROC eglCreateImage_ = nullptr;
 PFNEGLDESTROYIMAGEKHRPROC eglDestroyImage_ = nullptr;
 PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glImageTarget_ = nullptr;
+PFNEGLCREATESYNCKHRPROC eglCreateSync_ = nullptr;
+PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSync_ = nullptr;
+PFNEGLDESTROYSYNCKHRPROC eglDestroySync_ = nullptr;
+bool fencesAvailable = false;
 
-bool loadGlFunctions() {
+// Needs the EGL display of Qt's render thread.
+bool loadGlFunctions(EGLDisplay dpy) {
 	static bool loaded = false;
-	if (loaded) return eglCreateImage_ && eglDestroyImage_ && glImageTarget_;
-	loaded = true;
-	eglCreateImage_ = reinterpret_cast<PFNEGLCREATEIMAGEKHRPROC>(eglGetProcAddress("eglCreateImageKHR"));
-	eglDestroyImage_ = reinterpret_cast<PFNEGLDESTROYIMAGEKHRPROC>(eglGetProcAddress("eglDestroyImageKHR"));
-	glImageTarget_ =
-	    reinterpret_cast<PFNGLEGLIMAGETARGETTEXTURE2DOESPROC>(eglGetProcAddress("glEGLImageTargetTexture2DOES"));
+	if (!loaded) {
+		loaded = true;
+		eglCreateImage_ = reinterpret_cast<PFNEGLCREATEIMAGEKHRPROC>(eglGetProcAddress("eglCreateImageKHR"));
+		eglDestroyImage_ = reinterpret_cast<PFNEGLDESTROYIMAGEKHRPROC>(eglGetProcAddress("eglDestroyImageKHR"));
+		glImageTarget_ =
+		    reinterpret_cast<PFNGLEGLIMAGETARGETTEXTURE2DOESPROC>(eglGetProcAddress("glEGLImageTargetTexture2DOES"));
+
+		const char* extensions = dpy != EGL_NO_DISPLAY ? eglQueryString(dpy, EGL_EXTENSIONS) : nullptr;
+		if (extensions && strstr(extensions, "EGL_KHR_fence_sync")) {
+			eglCreateSync_ = reinterpret_cast<PFNEGLCREATESYNCKHRPROC>(eglGetProcAddress("eglCreateSyncKHR"));
+			eglClientWaitSync_ = reinterpret_cast<PFNEGLCLIENTWAITSYNCKHRPROC>(eglGetProcAddress("eglClientWaitSyncKHR"));
+			eglDestroySync_ = reinterpret_cast<PFNEGLDESTROYSYNCKHRPROC>(eglGetProcAddress("eglDestroySyncKHR"));
+			fencesAvailable = eglCreateSync_ && eglClientWaitSync_ && eglDestroySync_;
+		}
+		if (!fencesAvailable)
+			qCWarning(logGlass) << "glass capture: no EGL fences; retired buffers are held for" << kHoldMs << "ms instead";
+	}
 	return eglCreateImage_ && eglDestroyImage_ && glImageTarget_;
 }
 
@@ -172,6 +198,15 @@ void GlassFrame::zwlr_screencopy_frame_v1_flags(uint32_t flags) {
 	this->yInvert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
 }
 
+// Hyprland 0.56.2 always reports the whole buffer here ("TODO: damage ring" in its source), so the
+// events say nothing about what changed; they are counted to show that.
+void GlassFrame::zwlr_screencopy_frame_v1_damage(uint32_t, uint32_t, uint32_t width, uint32_t height) {
+	this->damageRects++;
+	const uint32_t w = this->dmaOffered ? this->dmaWidth : this->width;
+	const uint32_t h = this->dmaOffered ? this->dmaHeight : this->height;
+	if (width >= w && height >= h) this->damageFull++;
+}
+
 void GlassFrame::zwlr_screencopy_frame_v1_linux_dmabuf(uint32_t format, uint32_t width, uint32_t height) {
 	this->dmaOffered = true;
 	this->dmaFormat = format;
@@ -197,6 +232,12 @@ GlassCapture::GlassCapture(QQuickItem* parent): QQuickItem(parent) {
 	this->setFlag(QQuickItem::ItemHasContents, true);
 	this->mTimer.setSingleShot(true);
 	QObject::connect(&this->mTimer, &QTimer::timeout, this, &GlassCapture::pump);
+	this->mBufferTimer.setSingleShot(true);
+	QObject::connect(&this->mBufferTimer, &QTimer::timeout, this, &GlassCapture::retryWaiting);
+	this->mWarmupTimer.setSingleShot(true);
+	QObject::connect(&this->mWarmupTimer, &QTimer::timeout, this, &GlassCapture::warmupEnded);
+	this->mHealTimer.setSingleShot(true);
+	QObject::connect(&this->mHealTimer, &QTimer::timeout, this, &GlassCapture::healDmabuf);
 }
 
 GlassCapture::~GlassCapture() {
@@ -239,6 +280,8 @@ void GlassCapture::setAllowDmabuf(bool allow) {
 	if (allow == this->mAllowDmabuf) return;
 	this->mAllowDmabuf = allow;
 	this->mDmaBroken.store(false);
+	this->mConsecutiveAllocFailures = 0;
+	this->mConsecutiveImportFailures = 0;
 	emit this->allowDmabufChanged();
 }
 
@@ -251,7 +294,6 @@ void GlassCapture::setPublishing(bool publishing) {
 void GlassCapture::setWholeOutput(bool whole) {
 	if (whole == this->mWholeOutput) return;
 	this->mWholeOutput = whole;
-	this->mDmaBroken.store(false);
 	this->cancelFrames();
 	emit this->wholeOutputChanged();
 	if (this->mActive) QMetaObject::invokeMethod(this, &GlassCapture::pump, Qt::QueuedConnection);
@@ -265,10 +307,24 @@ void GlassCapture::setHeld(bool held) {
 	emit this->heldChanged();
 }
 
-// The compositor fades a layer in when it appears; what is unmixed from those first
-// captures is wrong. Never skip them for a little while.
+void GlassCapture::setPoolLimit(int limit) {
+	limit = std::max(limit, 0);
+	if (limit == this->mPoolLimit) return;
+	this->mPoolLimit = limit;
+	emit this->poolLimitChanged();
+}
+
+// The compositor fades a layer in when it appears; what is unmixed from those first captures is
+// not to be trusted. Until it is over, captures are published at most ten per second, and one more
+// is published once it ends (see warmupEnded()).
 bool GlassCapture::warming() const {
 	return this->mReceived < 3 || (this->mBorn.isValid() && this->mBorn.elapsed() < 1500);
+}
+
+void GlassCapture::warmupEnded() {
+	this->mForcePublish = true;
+	// Make a frame, so that the capture that is waiting is answered even if nothing else changes.
+	if (this->window()) this->window()->update();
 }
 
 qreal GlassCapture::effectiveInterval() const {
@@ -303,6 +359,58 @@ void GlassCapture::setStatus(const QString& status) {
 	this->mStatus = status;
 	if (!status.isEmpty()) qCWarning(logGlass) << "glass capture:" << status;
 	emit this->statusChanged();
+}
+
+QVariantMap GlassCapture::diagnostics() const {
+	int free = 0, inFlight = 0, pending = 0, shown = 0, retiring = 0;
+	for (auto* b: this->mDmaPool) {
+		switch (b->state) {
+		case GlassDmaBuffer::State::Free: free++; break;
+		case GlassDmaBuffer::State::InFlight: inFlight++; break;
+		case GlassDmaBuffer::State::Pending: pending++; break;
+		case GlassDmaBuffer::State::Shown: shown++; break;
+		case GlassDmaBuffer::State::Retiring: retiring++; break;
+		}
+	}
+
+	QVariantMap m;
+	// Requests and completions.
+	m["requests"] = this->mRequests;
+	m["copiesAsked"] = this->mCopiesAsked;
+	m["completions"] = this->mReceived;
+	m["compositorFailed"] = this->mFailed;
+	m["cancelled"] = this->mCancelled;
+	m["inFlight"] = int(this->mFrames.size());
+	// What became of the completions.
+	m["duplicates"] = this->mDuplicates;
+	m["published"] = this->mSerial;
+	m["warmupDropped"] = this->mWarmupDropped;
+	// Damage events (Hyprland 0.56.2 always sends the whole buffer).
+	m["damageEvents"] = this->mDamageEvents;
+	m["damageFull"] = this->mDamageFull;
+	// Buffers.
+	m["poolSize"] = int(this->mDmaPool.size());
+	m["poolFree"] = free;
+	m["poolInFlight"] = inFlight;
+	m["poolPending"] = pending;
+	m["poolShown"] = shown;
+	m["poolRetiring"] = retiring;
+	m["poolExhausted"] = this->mPoolExhausted;
+	m["bufferWaitTimeouts"] = this->mBufferWaitTimeouts;
+	m["allocFailures"] = this->mAllocFailures;
+	m["importFailures"] = this->mImportFailures;
+	m["fallbackActivations"] = this->mFallbackActivations;
+	m["heals"] = this->mHeals;
+	m["fencesWaited"] = this->mFencesWaited;
+	m["timedRetired"] = this->mTimedRetired;
+	m["fencesAvailable"] = fencesAvailable;
+	m["dmabufBroken"] = this->mDmaBroken.load();
+	m["usingDmabuf"] = this->mUsingDmabuf;
+	m["lastWholeOutput"] = this->mLastWholeOutput;
+	m["frames"] = this->mFramesSwapped.load();
+	m["latency"] = this->mLatency;
+	m["setupLatency"] = this->mSetup;
+	return m;
 }
 
 void GlassCapture::itemChange(ItemChange change, const ItemChangeData& data) {
@@ -385,11 +493,10 @@ void GlassCapture::pump() {
 		return;
 	}
 
-	// Captures are on their way all the time. The compositor answers each with the next frame
-	// it draws, and draws none while nothing changes.
+	// One capture is on its way at a time (a request that waits for a free buffer counts).
 	if (this->mFrames.size() >= this->mDepth) return;
 
-	// Not more than one per refresh period, so that a depth of three does not mean three at once.
+	// Not more than one per refresh period.
 	if (this->mHasStarted) {
 		auto left = this->effectiveInterval() - double(this->mSinceStart.nsecsElapsed()) / 1e6;
 		if (left > 0.5) {
@@ -432,10 +539,13 @@ void GlassCapture::start() {
 
 	this->mSinceStart.start();
 	this->mHasStarted = true;
-	if (!this->mBorn.isValid()) this->mBorn.start();
+	if (!this->mBorn.isValid()) {
+		this->mBorn.start();
+		this->mWarmupTimer.start(1500);
+	}
 	this->setStatus(QString());
 
-	// Room for another one? (Not at once: the interval above decides when.)
+	// Room for another one? (Only with a depth above one.)
 	if (this->mFrames.size() < this->mDepth) this->mTimer.start(int(std::ceil(this->effectiveInterval())));
 }
 
@@ -451,20 +561,84 @@ bool GlassCapture::dmabufUsable() const {
 	return GlassDmabufManager::instance()->isActive();
 }
 
-GlassDmaBuffer* GlassCapture::acquireDma(uint32_t format, uint32_t width, uint32_t height) {
+// Dmabuf is given up on only for hard reasons (a format or modifier the compositor does not take,
+// allocation or import that keeps failing), never because the pool was in use. Shared memory then
+// takes over, loudly, and dmabuf is tried again after a while.
+void GlassCapture::giveUpOnDmabuf(const QString& why) {
+	if (this->mDmaBroken.exchange(true)) return;
+	this->mFallbackActivations++;
+	qCWarning(logGlass) << "glass capture: giving up on dmabuf (" << why << ") - falling back to shared memory, trying again in" << kHealMs / 1000 << "s";
+	this->mHealTimer.start(kHealMs);
+	emit this->statsChanged();
+}
+
+void GlassCapture::healDmabuf() {
+	if (!this->mDmaBroken.exchange(false)) return;
+	this->mHeals++;
+	this->mConsecutiveAllocFailures = 0;
+	this->mConsecutiveImportFailures = 0;
+	qCWarning(logGlass) << "glass capture: trying dmabuf again";
+	this->cancelFrames();
+	this->pump();
+}
+
+// Gives back the retired buffers that nothing can be using any more.
+void GlassCapture::reapRetired() {
 	const auto now = nowMs();
-	// Time, not frames: with nothing changing no frames are made, and the buffers would never be
-	// given back. What reads a buffer (one pass in the frame after it was shown) is long done.
+	auto* dpy = this->mEglDisplay.load();
 	for (auto* b: this->mDmaPool) {
-		if (b->busy || b->format != format || b->width != width || b->height != height) continue;
-		if (b->freeAtMs > now) continue;
-		b->busy = true;
+		if (b->state != GlassDmaBuffer::State::Retiring) continue;
+		if (b->fence) {
+			if (!dpy || !eglClientWaitSync_) continue;
+			// Zero timeout: a poll. Signalled means every GPU command issued before the fence was
+			// made, the ones that read this buffer included, has finished.
+			if (eglClientWaitSync_(dpy, b->fence, 0, 0) == EGL_CONDITION_SATISFIED_KHR) {
+				eglDestroySync_(dpy, b->fence);
+				b->fence = nullptr;
+				b->state = GlassDmaBuffer::State::Free;
+				this->mFencesWaited++;
+			}
+		} else if (b->holdUntilMs && now >= b->holdUntilMs) {
+			b->holdUntilMs = 0;
+			b->state = GlassDmaBuffer::State::Free;
+			this->mTimedRetired++;
+		}
+	}
+}
+
+// Render thread, in the scene synchronisation that replaces the texture: a fence made now signals
+// when everything the GPU was given before, the frames that sampled `buffer` included, is done.
+void GlassCapture::retireOnRenderThread(GlassDmaBuffer* buffer) {
+	buffer->state = GlassDmaBuffer::State::Retiring;
+	buffer->fence = nullptr;
+	buffer->holdUntilMs = 0;
+	auto dpy = eglGetCurrentDisplay();
+	if (fencesAvailable && dpy != EGL_NO_DISPLAY) {
+		buffer->fence = eglCreateSync_(dpy, EGL_SYNC_FENCE_KHR, nullptr);
+		// Without this the fence might not be submitted until something else flushes.
+		glFlush();
+	}
+	if (!buffer->fence) buffer->holdUntilMs = nowMs() + kHoldMs;
+}
+
+GlassDmaBuffer* GlassCapture::acquireDma(uint32_t format, uint32_t width, uint32_t height, DmaResult* result) {
+	this->reapRetired();
+	for (auto* b: this->mDmaPool) {
+		if (b->state != GlassDmaBuffer::State::Free || b->format != format || b->width != width || b->height != height) continue;
+		b->state = GlassDmaBuffer::State::InFlight;
+		*result = DmaResult::Ok;
 		return b;
 	}
 	// Buffers of another size (the mode or the monitor changed) are of no use any more.
 	this->trimDmaPool(format, width, height);
-	if (this->mDmaPool.size() >= 8) return nullptr;
 
+	const int limit = this->mPoolLimit > 0 ? this->mPoolLimit : kDefaultPoolLimit;
+	if (int(this->mDmaPool.size()) >= limit) {
+		*result = DmaResult::Exhausted;
+		return nullptr;
+	}
+
+	*result = DmaResult::AllocFailed;
 	auto* dev = glassGbm();
 	auto* bo = gbm_bo_create(dev, width, height, format, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
 	if (!bo) return nullptr;
@@ -504,18 +678,18 @@ GlassDmaBuffer* GlassCapture::acquireDma(uint32_t format, uint32_t width, uint32
 	void* map = mmap(nullptr, b->mapLength, PROT_READ, MAP_SHARED, b->fd, 0);
 	if (map != MAP_FAILED) b->map = static_cast<const uchar*>(map);
 
-	b->busy = true;
+	b->state = GlassDmaBuffer::State::InFlight;
 	this->mDmaPool.push_back(b);
+	*result = DmaResult::Ok;
 	return b;
 }
 
 void GlassCapture::trimDmaPool(uint32_t format, uint32_t width, uint32_t height) {
 	std::vector<DestroyDmaJob::Item> items;
-	const auto now = nowMs();
 	for (auto it = this->mDmaPool.begin(); it != this->mDmaPool.end();) {
 		auto* b = *it;
 		const bool other = b->format != format || b->width != width || b->height != height;
-		if (!other || b->busy || b->freeAtMs > now || b == this->mCurrentDma) {
+		if (!other || b->state != GlassDmaBuffer::State::Free) {
 			++it;
 			continue;
 		}
@@ -533,7 +707,9 @@ void GlassCapture::trimDmaPool(uint32_t format, uint32_t width, uint32_t height)
 
 void GlassCapture::destroyDmaPool() {
 	std::vector<DestroyDmaJob::Item> items;
+	auto* dpy = this->mEglDisplay.load();
 	for (auto* b: this->mDmaPool) {
+		if (b->fence && dpy && eglDestroySync_) eglDestroySync_(dpy, b->fence);
 		if (b->eglImage || b->texture) items.push_back({b->eglImage, b->texture});
 		if (b->map) munmap(const_cast<uchar*>(b->map), b->mapLength);
 		if (b->buffer) wl_buffer_destroy(b->buffer);
@@ -543,30 +719,19 @@ void GlassCapture::destroyDmaPool() {
 	}
 	this->mDmaPool.clear();
 	this->mCurrentDma = nullptr;
-	if (!items.empty()) {
-		if (this->window()) this->window()->scheduleRenderJob(new DestroyDmaJob(std::move(items)), QQuickWindow::AfterSynchronizingStage);
-	}
+	this->mPendingDma = nullptr;
+	if (!items.empty() && this->window())
+		this->window()->scheduleRenderJob(new DestroyDmaJob(std::move(items)), QQuickWindow::AfterSynchronizingStage);
 }
 
-bool GlassCapture::ensureDmaBuffer(GlassFrame* frame) {
-	if (!frame->dmaOffered) {
-		qCWarning(logGlass) << "glass capture: the compositor offered no dmabuf for this capture";
-		return false;
-	}
-	if (frame->dmaFormat != DRM_FORMAT_XRGB8888 && frame->dmaFormat != DRM_FORMAT_ARGB8888) {
-		qCWarning(logGlass) << "glass capture: dmabuf format not usable:" << Qt::hex << frame->dmaFormat;
-		return false;
-	}
-	if (!GlassDmabufManager::instance()->acceptsLinear(frame->dmaFormat)) {
-		qCWarning(logGlass) << "glass capture: the compositor does not list linear for" << Qt::hex << frame->dmaFormat;
-		return false;
-	}
-	frame->dma = this->acquireDma(frame->dmaFormat, frame->dmaWidth, frame->dmaHeight);
-	if (!frame->dma) {
-		qCWarning(logGlass) << "glass capture: could not allocate a dmabuf" << frame->dmaWidth << "x" << frame->dmaHeight << "(pool" << this->mDmaPool.size() << ")";
-		return false;
-	}
-	return true;
+GlassCapture::DmaResult GlassCapture::ensureDmaBuffer(GlassFrame* frame) {
+	if (!frame->dmaOffered) return DmaResult::Unsupported;
+	if (frame->dmaFormat != DRM_FORMAT_XRGB8888 && frame->dmaFormat != DRM_FORMAT_ARGB8888) return DmaResult::Unsupported;
+	if (!GlassDmabufManager::instance()->acceptsLinear(frame->dmaFormat)) return DmaResult::Unsupported;
+
+	auto result = DmaResult::AllocFailed;
+	frame->dma = this->acquireDma(frame->dmaFormat, frame->dmaWidth, frame->dmaHeight, &result);
+	return result;
 }
 
 bool GlassCapture::ensureShmBuffer(GlassFrame* frame) {
@@ -617,18 +782,25 @@ bool GlassCapture::ensureShmBuffer(GlassFrame* frame) {
 	return true;
 }
 
-// Forgets a capture: it is destroyed (the compositor drops it if it is not done), and so is
-// its memory, a little later if the compositor may still be writing into it.
+// Forgets a capture: it is destroyed (the compositor drops it if it is not done). A buffer the
+// compositor may still be writing into is held back for a while; one it never touched, or one it
+// has finished, is free at once.
 void GlassCapture::dropFrame(GlassFrame* frame) {
 	this->mFrames.removeOne(frame);
+	if (this->mWaiting == frame) this->mWaiting = nullptr;
 	frame->owner = nullptr;
 	const bool maybeBusy = frame->copyAsked && !frame->done;
 
 	if (frame->dma) {
-		// Back to the pool, but not to be used again at once if the compositor may still write.
-		frame->dma->busy = false;
-		if (maybeBusy) frame->dma->freeAtMs = nowMs() + 1000;
+		auto* dma = frame->dma;
 		frame->dma = nullptr;
+		if (maybeBusy) {
+			dma->state = GlassDmaBuffer::State::Retiring;
+			dma->fence = nullptr;
+			dma->holdUntilMs = nowMs() + kHoldMs;
+		} else {
+			dma->state = GlassDmaBuffer::State::Free;
+		}
 	}
 
 	auto* buffer = frame->buffer;
@@ -652,20 +824,49 @@ void GlassCapture::cancelFrames() {
 	}
 }
 
-void GlassCapture::frameBufferDone(GlassFrame* frame) {
-	if (!this->mFrames.contains(frame)) return;
-	this->mSetup = double(frame->started.nsecsElapsed()) / 1e6;
+// The compositor has named the buffer it wants. Dmabuf: take one from the pool; none free is no
+// reason to give up, the capture waits a moment for one. Shared memory only for a region capture
+// (dmabuf given up on, or not available at all).
+bool GlassCapture::prepareBuffer(GlassFrame* frame) {
+	if (frame->wholeOutput || this->dmabufUsable()) {
+		if (!this->dmabufUsable()) {
+			// Dmabuf was given up on while this whole-output capture was on its way.
+			this->mCancelled++;
+			this->dropFrame(frame);
+			this->mTimer.start(10);
+			return false;
+		}
 
-	bool ok = false;
-	if (this->dmabufUsable()) ok = this->ensureDmaBuffer(frame);
-	// A whole output through shared memory would be far too much: stop asking for it.
-	if (!ok && frame->wholeOutput) this->mDmaBroken.store(true);
-	else if (!ok) ok = this->ensureShmBuffer(frame);
-	if (!ok) {
-		this->frameFailed(frame);
-		return;
+		switch (this->ensureDmaBuffer(frame)) {
+		case DmaResult::Ok: this->mConsecutiveAllocFailures = 0; return true;
+		case DmaResult::Exhausted:
+			this->mPoolExhausted++;
+			frame->waiting = true;
+			frame->waitStarted.start();
+			this->mWaiting = frame;
+			this->mBufferTimer.start(2);
+			return false;
+		case DmaResult::Unsupported:
+			this->giveUpOnDmabuf(QStringLiteral("the compositor offers no usable dmabuf format"));
+			this->mCancelled++;
+			this->dropFrame(frame);
+			this->mTimer.start(10);
+			return false;
+		case DmaResult::AllocFailed:
+			this->mAllocFailures++;
+			if (++this->mConsecutiveAllocFailures >= 4) this->giveUpOnDmabuf(QStringLiteral("allocation keeps failing"));
+			this->frameFailed(frame);
+			return false;
+		}
+		return false;
 	}
 
+	if (this->ensureShmBuffer(frame)) return true;
+	this->frameFailed(frame);
+	return false;
+}
+
+void GlassCapture::askCopy(GlassFrame* frame) {
 	frame->copyAsked = true;
 	this->mCopiesAsked++;
 	auto* buffer = frame->dma ? frame->dma->buffer : frame->buffer;
@@ -673,6 +874,52 @@ void GlassCapture::frameBufferDone(GlassFrame* frame) {
 	else frame->copy(buffer);
 
 	if (auto* wlw = waylandWindowOf(this->window())) wl_display_flush(wlw->display()->wl_display());
+}
+
+void GlassCapture::frameBufferDone(GlassFrame* frame) {
+	if (!this->mFrames.contains(frame)) return;
+	this->mSetup = double(frame->started.nsecsElapsed()) / 1e6;
+	if (!this->prepareBuffer(frame)) return;
+	this->askCopy(frame);
+}
+
+// A capture that was waiting for a free buffer tries again.
+void GlassCapture::retryWaiting() {
+	auto* frame = this->mWaiting;
+	if (!frame || !this->mFrames.contains(frame)) {
+		this->mWaiting = nullptr;
+		return;
+	}
+
+	if (frame->waitStarted.elapsed() > kBufferWaitMs) {
+		// Counted, dropped, and asked for again: the glass keeps what it has meanwhile.
+		this->mBufferWaitTimeouts++;
+		this->mCancelled++;
+		this->dropFrame(frame);
+		this->mTimer.start(10);
+		return;
+	}
+
+	switch (this->ensureDmaBuffer(frame)) {
+	case DmaResult::Ok:
+		frame->waiting = false;
+		this->mWaiting = nullptr;
+		this->mConsecutiveAllocFailures = 0;
+		this->askCopy(frame);
+		return;
+	case DmaResult::Exhausted: this->mBufferTimer.start(2); return;
+	case DmaResult::Unsupported:
+		this->giveUpOnDmabuf(QStringLiteral("the compositor offers no usable dmabuf format"));
+		this->mCancelled++;
+		this->dropFrame(frame);
+		this->mTimer.start(10);
+		return;
+	case DmaResult::AllocFailed:
+		this->mAllocFailures++;
+		if (++this->mConsecutiveAllocFailures >= 4) this->giveUpOnDmabuf(QStringLiteral("allocation keeps failing"));
+		this->frameFailed(frame);
+		return;
+	}
 }
 
 void GlassCapture::frameFailed(GlassFrame* frame) {
@@ -738,6 +985,7 @@ void GlassCapture::publish(QSize size, QRectF cropUv) {
 	this->mCropUv = cropUv;
 	this->mTextureDirty = true;
 	this->mSerial++;
+	this->mLastPublish.start();
 	this->update();
 	emit this->serialChanged();
 	emit this->statsChanged();
@@ -751,6 +999,8 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 	this->mLatency = double(frame->started.nsecsElapsed()) / 1e6;
 	this->mLastWholeOutput = frame->wholeOutput;
 	this->mReceived++;
+	this->mDamageEvents += frame->damageRects;
+	this->mDamageFull += frame->damageFull;
 	if (this->mLastReady.isValid()) this->mCycle = double(this->mLastReady.nsecsElapsed()) / 1e6;
 	this->mLastReady.start();
 
@@ -762,8 +1012,12 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 		return;
 	}
 
+	const bool warm = this->warming();
+	const bool forced = this->mForcePublish && !warm;
+
 	if (frame->dma) {
 		auto* dma = frame->dma;
+		frame->dma = nullptr;
 		const QSize buffer(int(dma->width), int(dma->height));
 		const QRect crop = this->cropFor(buffer, frame->wholeOutput);
 		bool same = false;
@@ -771,35 +1025,40 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 			dma_buf_sync sync {};
 			sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
 			ioctl(dma->fd, DMA_BUF_IOCTL_SYNC, &sync);
-			same = this->sameAsBefore(dma->map, qsizetype(dma->mapLength), QSize(int(dma->width), int(dma->height)), true, int(dma->stride), crop);
+			same = this->sameAsBefore(dma->map, qsizetype(dma->mapLength), buffer, true, int(dma->stride), crop);
 			sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
 			ioctl(dma->fd, DMA_BUF_IOCTL_SYNC, &sync);
 		} else {
 			this->mNewSample.clear();
 		}
+		this->dropFrame(frame);
 
-		if (same && !this->warming()) {
-			// Nothing new: the buffer can be used again at once.
-			frame->dma = nullptr;
-			dma->busy = false;
-			this->dropFrame(frame);
-			this->mSkipped++;
+		if (same && !forced) {
+			// The compositor is done with it and the GPU never saw it: free at once.
+			dma->state = GlassDmaBuffer::State::Free;
+			this->mDuplicates++;
 			emit this->statsChanged();
 			this->pump();
 			return;
 		}
 
-		// Shown from now on; the one shown before is let go once nothing can still be reading it.
-		frame->dma = nullptr;
-		this->dropFrame(frame);
-		if (this->mCurrentDma) {
-			this->mCurrentDma->busy = false;
-			this->mCurrentDma->freeAtSync = this->mSyncs.load() + 4;
-			this->mCurrentDma->freeAtMs = nowMs() + 250;
+		if (warm && this->mSerial > 0 && this->mLastPublish.isValid() && this->mLastPublish.elapsed() < 100) {
+			// During the warm-up at most ten captures a second are published.
+			dma->state = GlassDmaBuffer::State::Free;
+			this->mWarmupDropped++;
+			emit this->statsChanged();
+			this->pump();
+			return;
 		}
-		this->mCurrentDma = dma;
+
+		// Published. A capture that was published but not yet imported is replaced by this one:
+		// the GPU never saw it either.
+		if (this->mPendingDma) this->mPendingDma->state = GlassDmaBuffer::State::Free;
+		this->mPendingDma = dma;
+		dma->state = GlassDmaBuffer::State::Pending;
 		this->mImage = QImage();
 		this->mUsingDmabuf = true;
+		if (!warm) this->mForcePublish = false;
 		this->publish(crop.size(), QRectF(double(crop.x()) / buffer.width(), double(crop.y()) / buffer.height(), double(crop.width()) / buffer.width(), double(crop.height()) / buffer.height()));
 		this->pump();
 		return;
@@ -813,21 +1072,28 @@ void GlassCapture::frameReady(GlassFrame* frame) {
 	this->dropFrame(frame);
 
 	const bool same = this->sameAsBefore(image.constBits(), image.sizeInBytes(), image.size(), false, int(image.bytesPerLine()), QRect(QPoint(0, 0), image.size()));
-	if (same && !this->warming()) {
-		this->mSkipped++;
+	if (same && !forced) {
+		this->mDuplicates++;
+		emit this->statsChanged();
+		this->pump();
+		return;
+	}
+	if (warm && this->mSerial > 0 && this->mLastPublish.isValid() && this->mLastPublish.elapsed() < 100) {
+		this->mWarmupDropped++;
 		emit this->statsChanged();
 		this->pump();
 		return;
 	}
 
-	if (this->mCurrentDma) {
-		this->mCurrentDma->busy = false;
-		this->mCurrentDma->freeAtSync = this->mSyncs.load() + 4;
-		this->mCurrentDma->freeAtMs = nowMs() + 250;
-		this->mCurrentDma = nullptr;
+	if (this->mPendingDma) {
+		this->mPendingDma->state = GlassDmaBuffer::State::Free;
+		this->mPendingDma = nullptr;
 	}
+	// The dmabuf that was shown is retired by the render thread when the image replaces it.
+	this->mDropShownForImage = this->mCurrentDma != nullptr;
 	this->mImage = image;
 	this->mUsingDmabuf = false;
+	if (!warm) this->mForcePublish = false;
 	this->publish(image.size(), QRectF(0, 0, 1, 1));
 	this->pump();
 }
@@ -841,15 +1107,18 @@ QSGTextureProvider* GlassCapture::textureProvider() const {
 	return this->mProvider;
 }
 
+// Render thread, with the GUI thread blocked (the scene synchronisation).
 QSGNode* GlassCapture::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 	if (this->mTextureDirty && this->window()) {
 		if (!this->mProvider) this->mProvider = new GlassTextureProvider();
 
-		if (this->mCurrentDma) {
-			auto* dma = this->mCurrentDma;
-			bool ok = loadGlFunctions();
+		if (this->mPendingDma) {
+			auto* dma = this->mPendingDma;
+			auto dpy = eglGetCurrentDisplay();
+			this->mEglDisplay.store(dpy);
+			bool ok = loadGlFunctions(dpy);
+
 			if (ok && !dma->texture) {
-				auto dpy = eglGetCurrentDisplay();
 				const EGLint attrs[] = {
 				    EGL_WIDTH, EGLint(dma->width),
 				    EGL_HEIGHT, EGLint(dma->height),
@@ -878,21 +1147,49 @@ QSGNode* GlassCapture::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 				}
 			}
 
-			if (ok && dma->texture) {
+			if (ok && dma->texture && dma->eglImage) {
+				// The compositor wrote into this buffer since it was last used as a texture: bind the
+				// image again, so that the driver does not go on with what it saw before.
+				GLint previous = 0;
+				glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous);
+				glBindTexture(GL_TEXTURE_2D, dma->texture);
+				glImageTarget_(GL_TEXTURE_2D, dma->eglImage);
+				glBindTexture(GL_TEXTURE_2D, GLuint(previous));
+
 				auto flags = QQuickWindow::CreateTextureOptions();
 				if (dma->format == DRM_FORMAT_XRGB8888) flags |= QQuickWindow::TextureIsOpaque;
 				auto* texture = QNativeInterface::QSGOpenGLTexture::fromNative(dma->texture, this->window(), QSize(int(dma->width), int(dma->height)), flags);
 				this->mProvider->setTexture(texture);
+				// The one shown until now can go once the GPU is done with the frames that used it.
+				if (this->mCurrentDma && this->mCurrentDma != dma) this->retireOnRenderThread(this->mCurrentDma);
+				this->mCurrentDma = dma;
+				dma->state = GlassDmaBuffer::State::Shown;
+				this->mConsecutiveImportFailures = 0;
 			} else {
-				// Cannot be imported: from now on the pixels come through shared memory.
-				this->mDmaBroken.store(true);
+				// The previous texture stays: the glass keeps what it had. The buffer was never
+				// sampled, so it is free again.
+				this->mImportFailures++;
+				dma->state = GlassDmaBuffer::State::Free;
+				if (++this->mConsecutiveImportFailures >= 3) {
+					QMetaObject::invokeMethod(this, [this]() {
+						this->giveUpOnDmabuf(QStringLiteral("importing the buffer into Qt keeps failing"));
+					}, Qt::QueuedConnection);
+				}
 			}
+			this->mPendingDma = nullptr;
 			this->mTextureDirty = false;
 		} else if (!this->mImage.isNull()) {
+			if (this->mDropShownForImage && this->mCurrentDma) {
+				this->retireOnRenderThread(this->mCurrentDma);
+				this->mCurrentDma = nullptr;
+			}
+			this->mDropShownForImage = false;
 			auto flags = QQuickWindow::CreateTextureOptions();
 			if (!this->mImage.hasAlphaChannel()) flags |= QQuickWindow::TextureIsOpaque;
 			auto* texture = this->window()->createTextureFromImage(this->mImage, flags);
 			this->mProvider->setTexture(texture);
+			this->mTextureDirty = false;
+		} else {
 			this->mTextureDirty = false;
 		}
 	}

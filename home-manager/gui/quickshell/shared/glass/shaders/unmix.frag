@@ -8,8 +8,12 @@
 //
 // mode 0: the background. rgb = background, a = 1 where it could be recovered,
 //         vec4(0) where it cannot (under opaque pixels, or when the numbers are impossible).
-// mode 1: a flag, 1.0 where capture and own cannot belong to the same frame, else 0.0. Its
-//         mip chain's top level is the fraction of wrong pixels (see settle.frag).
+// mode 1: statistics, one texel per pixel, to be averaged by the mip chain:
+//         r = 1 where capture and own cannot belong to the same frame,
+//         g = 1 where the background is unknown in this draft (alpha 0),
+//         b = 1 where the numbers were impossible (the capture is not of our frame),
+//         a = 1.
+//         The top level of the mip chain holds the fractions (see settle.frag, verdict.frag).
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 
@@ -20,6 +24,7 @@ layout(std140, binding = 0) uniform buf {
     float coverOpacity; // opacity the compositor applies to the surface (1.0 for a layer)
     vec2 capOrigin;     // where our region is inside the capture (uv): the capture may be of the
     vec2 capScale;      // whole output, and is cropped here
+    float forceBad;     // for tests: treat every capture as the wrong frame
 };
 
 layout(binding = 1) uniform sampler2D capture;
@@ -34,6 +39,7 @@ void main() {
 
     vec4 background = vec4(0.0);
     bool wrong = false;
+    bool impossible = false;
 
     if (remaining < 0.03) {
         // Opaque: the capture is only what we drew. Nothing of the background can be known,
@@ -46,14 +52,18 @@ void main() {
         if (any(lessThan(bg, vec3(-margin))) || any(greaterThan(bg, vec3(1.0 + margin)))) {
             // Not a possible colour: this capture and our frame are not the same frame.
             wrong = true;
+            impossible = true;
             background = texture(previous, uv);
         } else {
             background = vec4(clamp(bg, 0.0, 1.0), 1.0);
         }
     }
 
+    if (forceBad > 0.5)
+        wrong = true;
+
     if (mode > 0.5)
-        fragColor = vec4(wrong ? 1.0 : 0.0, 0.0, 0.0, 1.0);
+        fragColor = vec4(wrong ? 1.0 : 0.0, background.a < 0.5 ? 1.0 : 0.0, impossible ? 1.0 : 0.0, 1.0);
     else
         fragColor = background;
 }
