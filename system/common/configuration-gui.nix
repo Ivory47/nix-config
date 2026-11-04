@@ -24,8 +24,8 @@
         enable = true;
         # potentially deprecated
         drivers = with pkgs; [
-            cups-filters
-            cups-browsed
+            # cups-filters
+            # cups-browsed
         ];
     };
 
