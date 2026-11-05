@@ -951,12 +951,23 @@ bool GlassCapture::sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, 
 	bool same = !this->mCaptureSize.isEmpty() && sample.size() == this->mSample.size()
 	         && this->mRegion == this->mSampleRegion && crop.size() == this->mCaptureSize;
 	if (same) {
+		// Not the same if one sample moved by more than a few levels, or if a few of them moved
+		// at all. The second catches slow, faint changes: our surface covers most of what is
+		// behind it (alpha 0.92: 8% of the background shows in the capture), so a wallpaper that
+		// fades by two levels a frame moves a sample by a fraction of a level a frame, and no
+		// single sample passes the first test until the background has changed by about 40
+		// levels. Many samples crossing one level each is how a slow change shows first. An
+		// idle desktop repeats exactly, so it stays quiet.
+		size_t moved = 0;
 		for (size_t i = 0; i < sample.size(); i++) {
-			if (std::abs(int(sample[i]) - int(this->mSample[i])) > 3) {
+			const int delta = std::abs(int(sample[i]) - int(this->mSample[i]));
+			if (delta > 3) {
 				same = false;
 				break;
 			}
+			if (delta >= 1) moved++;
 		}
+		if (same && moved >= std::max<size_t>(10, sample.size() / 100)) same = false;
 	}
 	this->mNewSample = std::move(sample);
 	return same;
