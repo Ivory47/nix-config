@@ -110,6 +110,11 @@ PanelWindow {
             style: GlassStyle {}
         }
 
+        // One opaque pixel at the top left: says which version of the bar a capture holds.
+        GlassTag {
+            backdrop: glassBackdrop
+        }
+
         Rectangle {
             anchors.fill: parent
 

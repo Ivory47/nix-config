@@ -35,6 +35,9 @@ QtObject {
 
     // Pleamar's LENS_ALPHA: what the glass is drawn with. Below 1 so that the background can be
     // recovered from the next capture; the part that shows through is cancelled in the shader.
-    property real alpha: 0.88
+    // Raised from 0.88 (Pleamar's value) to show less of the background through the glass. The
+    // cost: capture errors are amplified by 1 / (1 - alpha), 8.3x at 0.88, 12.5x at 0.92, and the
+    // background cannot be recovered at all from 0.97 up.
+    property real alpha: 0.92
     property real opacity: 1.0
 }

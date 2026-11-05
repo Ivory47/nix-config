@@ -143,11 +143,17 @@ def main():
     if args and args[0].replace(".", "").isdigit():
         seconds = float(args.pop(0))
     names = args or ["glass-off", "normal"]
-    for n in names:
-        run(n, seconds)
-    for fn, arg in NORMAL:
-        ipc(fn, arg)
-    ipc("setDiagnostics", "false")  # the read-back costs a frame twice a second
+    try:
+        for n in names:
+            run(n, seconds)
+    finally:
+        # Always put the pipeline back, also after an error or Ctrl+C. Each call is guarded so
+        # one failing call does not stop the others.
+        for fn, arg in NORMAL + [("setDiagnostics", "false")]:  # the read-back costs a frame twice a second
+            try:
+                ipc(fn, arg)
+            except Exception as e:
+                print(f"warning: restoring {fn} failed: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":

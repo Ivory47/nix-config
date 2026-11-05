@@ -64,17 +64,21 @@ Item {
     width: composite.width
     height: composite.height
 
-    // Three backgrounds take turns. One is shown (readIdx); updates go to one that is not,
-    // and what was updated is shown once the frame that rendered it has been presented.
-    // So nothing that is being rebuilt is ever read by what is drawn in the same frame, and an
-    // update does not have to wait for the one before it.
+    // Three backgrounds take turns. An update is built into one that is not on screen, and is
+    // shown by the very frame that builds it: Qt renders what a texture needs before the item
+    // that samples it, so no frame is spent on showing it afterwards. readIdx is the one on
+    // screen, prevIdx the one shown before it: what is kept when a capture is rejected.
     property int readIdx: 0
-    property var pending: []
-    property bool again: false
+    property int prevIdx: 1
+    // The scene graph synchronisation count when the last update was scheduled: that update
+    // has not been synchronised, and so not rendered, while the count has not gone past it.
+    property int scheduledAt: -1
+    readonly property Item last: bundleAt(prevIdx).bg
     property int flips: 0
     // Off: captures are received and thrown away (see GlassCapture.publishing).
     property bool processing: true
-    // Updates of the pipeline: scheduled, and put off because no background was free to take them.
+    // Updates of the pipeline: scheduled, and folded into the one before it (captures that arrived
+    // before that one was rendered).
     property int updatesScheduled: 0
     property int updatesDeferred: 0
     // What the GPU counted (see verdict.frag), as of the last read.
@@ -83,6 +87,20 @@ Item {
 
     function bundleAt(i) {
         return i === 0 ? bundle0 : (i === 1 ? bundle1 : bundle2);
+    }
+
+    // The surface's own history. Every time the glass is updated (flip) the surface changes, and
+    // that version is kept in the next slot of a ring (r0..r7) and tagged by one pixel
+    // (GlassTag.qml, colour `tagColor`); unmix.frag finds the version of a capture from the tag.
+    // So captures may overlap the changes of the glass, and no capture has to be held back.
+    // (Rotated into the unmix: see `own` below.)
+    readonly property int ringSize: 8
+    property int version: 0
+    // Bit i: slot i holds a version that was presented.
+    property int ringMask: 0
+    readonly property color tagColor: Qt.rgba(30 / 255, 30 / 255, (46 + 4 * (version % 8)) / 255, 1)
+    function ringAt(i) {
+        return [r0, r1, r2, r3, r4, r5, r6, r7][i];
     }
 
     GlassCapture {
@@ -95,24 +113,25 @@ Item {
         onSwapped: syncSerial => root.handleSwapped(syncSerial)
     }
 
-    // A capture arrived: unmix and blur it into a bundle that is not on screen.
+    // A capture arrived: unmix and blur it into a bundle that is not on screen, and show that
+    // bundle (the frame that renders it draws the glass with it).
     function process() {
-        let target = -1;
-        for (let i = 0; i < 3; i++) {
-            if (i !== readIdx && !pending.some(p => p.idx === i)) {
-                target = i;
-                break;
-            }
-        }
-        if (target < 0) {
-            // Both free ones are waiting to be shown: do this capture when one is free.
-            again = true;
+        if (cap.syncCount() <= scheduledAt) {
+            // The update before this one has not been synchronised yet, so it is rendered
+            // with the newest capture anyway (that is the one the texture holds then): nothing
+            // to schedule, and one update per frame at most (one version of the surface per
+            // frame, see `version`).
             updatesDeferred++;
             return;
         }
+        // Not the one on screen, which becomes `prev`; of the other two, the one that is not prev.
+        let target = (readIdx + 1) % 3;
+        if (target === prevIdx)
+            target = (readIdx + 2) % 3;
         draftSource.scheduleUpdate();
         flagSource.scheduleUpdate();
-        if (!accScheduled) {
+        if (diagnostics && !accScheduled) {
+            // (Only while the counters are being read: they are of no other use.)
             // One counting pass per round: the one that is not holding the counters reads them.
             accTarget = 1 - accRead;
             (accTarget === 0 ? accSourceA : accSourceB).scheduleUpdate();
@@ -121,39 +140,90 @@ Item {
         }
         bundleAt(target).update();
         updatesScheduled++;
+        prevIdx = readIdx;
+        readIdx = target;
+        ready = true;
+        flips++;
+        // The surface changes in the next synchronised frame, which also draws the new glass:
+        // keep that version, tagged.
+        version++;
+        const slot = version % ringSize;
+        ringMask |= 1 << slot;
+        ringAt(slot).scheduleUpdate();
         // What the scene graph synchronises from now on includes this update.
-        pending.push({ idx: target, after: cap.syncCount() });
+        scheduledAt = cap.syncCount();
     }
 
-    // A frame was presented. If it was synchronised after an update was scheduled, that
-    // update was rendered by it: show the newest of those.
+    // A frame was presented.
     function handleSwapped(syncSerial) {
-        let best = -1;
-        for (let i = 0; i < pending.length; i++) {
-            if (syncSerial > pending[i].after)
-                best = i;
-        }
-        if (best < 0)
-            return;
         if (accScheduled && syncSerial > accAfter) {
             accRead = accTarget;
             accScheduled = false;
         }
-        readIdx = pending[best].idx;
-        pending = pending.slice(best + 1);
-        ready = true;
-        flips++;
-        if (again) {
-            again = false;
-            process();
-        }
     }
 
-    // What we presented: the surface's content as the scene graph renders it.
+    // What we presented: one version of the surface's content per slot, as the scene graph
+    // rendered it (see `version`). Not live: a slot is rendered when the glass is flipped.
     ShaderEffectSource {
-        id: ownSource
+        id: r0
         sourceItem: root.composite
-        live: root.glassEnabled
+        live: false
+        visible: false
+        textureSize: root.sizePx
+    }
+
+    ShaderEffectSource {
+        id: r1
+        sourceItem: root.composite
+        live: false
+        visible: false
+        textureSize: root.sizePx
+    }
+
+    ShaderEffectSource {
+        id: r2
+        sourceItem: root.composite
+        live: false
+        visible: false
+        textureSize: root.sizePx
+    }
+
+    ShaderEffectSource {
+        id: r3
+        sourceItem: root.composite
+        live: false
+        visible: false
+        textureSize: root.sizePx
+    }
+
+    ShaderEffectSource {
+        id: r4
+        sourceItem: root.composite
+        live: false
+        visible: false
+        textureSize: root.sizePx
+    }
+
+    ShaderEffectSource {
+        id: r5
+        sourceItem: root.composite
+        live: false
+        visible: false
+        textureSize: root.sizePx
+    }
+
+    ShaderEffectSource {
+        id: r6
+        sourceItem: root.composite
+        live: false
+        visible: false
+        textureSize: root.sizePx
+    }
+
+    ShaderEffectSource {
+        id: r7
+        sourceItem: root.composite
+        live: false
         visible: false
         textureSize: root.sizePx
     }
@@ -171,8 +241,20 @@ Item {
         property vector2d capScale: Qt.vector2d(cap.cropUv.width, cap.cropUv.height)
         property real forceBad: root.forceReject ? 1 : 0
         property variant capture: cap
-        property variant own: ownSource
-        property variant previous: root.sharp
+        // The slot that is being rendered in this very frame (the version being presented) is
+        // not read: a capture cannot hold a frame that has not been presented, and reading it
+        // would make the unmix wait for a snapshot that waits for the unmix.
+        property variant own0: root.version % 8 === 0 ? r1 : r0
+        property variant own1: root.version % 8 === 1 ? r2 : r1
+        property variant own2: root.version % 8 === 2 ? r3 : r2
+        property variant own3: root.version % 8 === 3 ? r4 : r3
+        property variant own4: root.version % 8 === 4 ? r5 : r4
+        property variant own5: root.version % 8 === 5 ? r6 : r5
+        property variant own6: root.version % 8 === 6 ? r7 : r6
+        property variant own7: root.version % 8 === 7 ? r0 : r7
+        property vector2d texPx: Qt.vector2d(root.texPx.width, root.texPx.height)
+        property real tagMask: root.ringMask
+        property variant previous: root.last
 
         fragmentShader: Qt.resolvedUrl("shaders/unmix.frag.qsb")
     }
@@ -198,8 +280,17 @@ Item {
         property vector2d capScale: Qt.vector2d(cap.cropUv.width, cap.cropUv.height)
         property real forceBad: root.forceReject ? 1 : 0
         property variant capture: cap
-        property variant own: ownSource
-        property variant previous: root.sharp
+        property variant own0: root.version % 8 === 0 ? r1 : r0
+        property variant own1: root.version % 8 === 1 ? r2 : r1
+        property variant own2: root.version % 8 === 2 ? r3 : r2
+        property variant own3: root.version % 8 === 3 ? r4 : r3
+        property variant own4: root.version % 8 === 4 ? r5 : r4
+        property variant own5: root.version % 8 === 5 ? r6 : r5
+        property variant own6: root.version % 8 === 6 ? r7 : r6
+        property variant own7: root.version % 8 === 7 ? r0 : r7
+        property vector2d texPx: Qt.vector2d(root.texPx.width, root.texPx.height)
+        property real tagMask: root.ringMask
+        property variant previous: root.last
 
         fragmentShader: Qt.resolvedUrl("shaders/unmix.frag.qsb")
     }
@@ -339,7 +430,10 @@ Item {
         id: bundle0
         draft: draftSource
         flag: flagSource
-        kept: root.sharp
+        // What a bundle keeps when a capture is rejected: the background that was on screen
+        // before it (`last`). Never its own output (a cycle in the texture graph): the previous
+        // one is not rebuilt, so what it keeps then does not matter.
+        kept: root.prevIdx === 0 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
     }
@@ -348,7 +442,7 @@ Item {
         id: bundle1
         draft: draftSource
         flag: flagSource
-        kept: root.sharp
+        kept: root.prevIdx === 1 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
     }
@@ -357,9 +451,44 @@ Item {
         id: bundle2
         draft: draftSource
         flag: flagSource
-        kept: root.sharp
+        kept: root.prevIdx === 2 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+    }
+
+    // Keep-alive consumer. Qt appears to render a hidden, non-live ShaderEffectSource only when
+    // something visible samples it, and the glass samples only the shown bundle: so an update of
+    // a bundle that is not shown waited until it was shown, and was then rebuilt while shown (its
+    // `kept` was itself). One tiny item outside the window that samples every texture of the
+    // pipeline that is scheduled by hand (the three bundles and the ring) makes Qt render them
+    // when scheduled. What it draws is never seen. (One item and one draw call for all of them:
+    // fourteen separate ones were a measurable part of the cost.)
+    ShaderEffect {
+        x: -64
+        width: 1 / root.ratio
+        height: 1 / root.ratio
+        blending: false
+        property variant k0: bundle0.bg
+        property variant k1: bundle0.frosted
+        property variant k2: bundle1.bg
+        property variant k3: bundle1.frosted
+        property variant k4: bundle2.bg
+        property variant k5: bundle2.frosted
+        property variant k6: r0
+        property variant k7: r1
+        property variant k8: r2
+        property variant k9: r3
+        property variant k10: r4
+        property variant k11: r5
+        property variant k12: r6
+        property variant k13: r7
+        fragmentShader: Qt.resolvedUrl("shaders/keepalive.frag.qsb")
+    }
+
+    Component.onCompleted: {
+        // Version 0 is the surface as it starts.
+        ringMask = 1;
+        r0.scheduleUpdate();
     }
 
     IpcHandler {
@@ -394,6 +523,7 @@ Item {
                     updatesDeferred: root.updatesDeferred,
                     ready: root.ready,
                     forceReject: root.forceReject,
+                    version: root.version,
                     diagnostics: root.diagnostics
                 },
                 settings: {
