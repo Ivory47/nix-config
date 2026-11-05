@@ -20,16 +20,10 @@ Item {
 
         radius: Theme.radiusMedium
 
-        // Transparent when idle so the glass behind the list shows.
-        color: root.selected || root.hovered
-            ? Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.7)
-            : "transparent"
+        // Always transparent: the highlight is drawn by the glass (see Launcher.qml). A translucent
+        // item over the glass would cost the blur under it.
+        color: "transparent"
 
-        Behavior on color {
-            ColorAnimation {
-                duration: 100
-            }
-        }
     }
 
     Image {

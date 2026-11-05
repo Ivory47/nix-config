@@ -28,8 +28,27 @@ PanelWindow {
     // QQuickWindow::maybeUpdate). So only `shown` changes: no input, no focus and no content
     // while hidden, and the glass capture is off.
     property bool shown: false
+    // The list row under the mouse, if any (highlighted by the glass).
+    property Item hoveredItem: null
 
-    focusable: shown
+    // Take the keyboard exclusively while shown. (`focusable` only asks for it on demand, which
+    // the compositor does not always grant when the window was already mapped, so typing
+    // sometimes went elsewhere.)
+    WlrLayershell.keyboardFocus: shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+    onShownChanged: {
+        if (shown) {
+            searchField.forceActiveFocus()
+            // Again once the compositor has handed over the keyboard.
+            focusTimer.restart()
+        }
+    }
+
+    Timer {
+        id: focusTimer
+        interval: 60
+        onTriggered: if (root.shown) searchField.forceActiveFocus()
+    }
     mask: shown ? null : emptyMask
 
     Region {
@@ -79,21 +98,13 @@ PanelWindow {
         anchors.fill: parent
         visible: root.shown
 
-        RectangularShadow {
-            anchors.fill: launcher
-
-            radius: launcher.radius
-
-            blur: 14
-            spread: 2
-
-            color: Theme.shadowColor
-
-            offset.x: 0
-            offset.y: 4
-        }
+        // No drop shadow behind the panel: a shadow under the glass lowers how much of the
+        // background shows through it (the shader cancels exactly that part), and the sharp
+        // background then shows faintly through the glass.
 
         GlassPanel {
+            id: glass
+
             // Placed in the backdrop's coordinates (whole pixels, as the glass needs).
             x: Math.round(launcher.x)
             y: Math.round(launcher.y)
@@ -101,6 +112,41 @@ PanelWindow {
             height: launcher.height
 
             backdrop: glassBackdrop
+
+            // Highlights are part of the glass (see GlassPanel.hlRect0): the search field, the
+            // selected row and the hovered row. Rows are clipped to the visible list.
+            hlRadius: Theme.radiusMedium
+            hlRect0: {
+                launcher.x; launcher.y; glass.x; glass.y
+                return glass.rectOf(searchField, false)
+            }
+            hlColor0: Qt.vector4d(Theme.surfaceAlt.r, Theme.surfaceAlt.g, Theme.surfaceAlt.b, 0.55)
+            hlRect1: {
+                appList.contentY; appList.currentIndex; launcher.x; launcher.y; glass.x; glass.y
+                return glass.rectOf(appList.currentItem, true)
+            }
+            hlColor1: Qt.vector4d(Theme.surfaceAlt.r, Theme.surfaceAlt.g, Theme.surfaceAlt.b, 0.7)
+            hlRect2: {
+                appList.contentY; launcher.x; launcher.y; glass.x; glass.y
+                return glass.rectOf(root.hoveredItem, true)
+            }
+            hlColor2: Qt.vector4d(Theme.surfaceAlt.r, Theme.surfaceAlt.g, Theme.surfaceAlt.b, 0.5)
+
+            // `item` in this panel's coordinates; the list's rows are cut at the list's edges.
+            function rectOf(item, inList) {
+                if (!item) return Qt.vector4d(0, 0, 0, 0)
+                const p = item.mapToItem(glass, 0, 0)
+                let top = p.y
+                let bottom = p.y + item.height
+                if (inList) {
+                    const l = appList.mapToItem(glass, 0, 0)
+                    top = Math.max(top, l.y)
+                    bottom = Math.min(bottom, l.y + appList.height)
+                    if (bottom <= top) return Qt.vector4d(0, 0, 0, 0)
+                }
+                return Qt.vector4d(p.x, top, item.width, bottom - top)
+            }
+
             style: GlassStyle {
                 cornerRadius: Theme.radiusLarge
                 edges: Qt.vector4d(1, 1, 1, 1)
@@ -109,6 +155,8 @@ PanelWindow {
                 // taskbar, only more translucent. Raise tintStrength for more colour.
                 tint: Theme.background
                 tintStrength: 0.65
+                // Fully frosted: any sharp background mixed into the glass shows as faint text.
+                frost: 1.0
             }
         }
 
@@ -155,7 +203,7 @@ PanelWindow {
 
                     background: Rectangle {
                         radius: Theme.radiusMedium
-                        color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.6)
+                        color: "transparent" // drawn by the glass (hlRect0)
                     }
 
                     Component.onCompleted: {
@@ -258,6 +306,8 @@ PanelWindow {
                     currentIndex: count > 0 ? 0 : -1
 
                     delegate: LauncherItem {
+                        id: row
+
                         required property var modelData
                         required property int index
 
@@ -265,6 +315,14 @@ PanelWindow {
                         selected: index === appList.currentIndex
 
                         width: appList.width
+
+                        // The glass highlights the row under the mouse (hlRect2).
+                        onHoveredChanged: {
+                            if (hovered)
+                                root.hoveredItem = row
+                            else if (root.hoveredItem === row)
+                                root.hoveredItem = null
+                        }
 
                         onLaunched: {
                             root.closeLauncher()

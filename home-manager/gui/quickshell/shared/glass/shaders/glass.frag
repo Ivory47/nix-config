@@ -36,6 +36,13 @@ layout(std140, binding = 0) uniform buf {
     float alpha;
     float glassOpacity;
     float debugView;    // 0 off, 1 sharp backdrop, 2 frosted backdrop
+    vec4 hlRect0;       // highlights: x, y, width, height in logical pixels of this panel
+    vec4 hlRect1;
+    vec4 hlRect2;
+    vec4 hlColor0;      // rgb + strength
+    vec4 hlColor1;
+    vec4 hlColor2;
+    float hlRadius;     // corner radius of the highlights, logical
 };
 
 layout(binding = 1) uniform sampler2D sharp;
@@ -63,6 +70,18 @@ vec3 seenAt(vec2 px, vec3 fallback) {
     vec3 fr = frostedAt(px);
     if (fr.r < 0.0) fr = fallback;
     return mix(trueAt(px, fallback), fr, frost);
+}
+
+// Mixes a rounded rectangle of colour into the glass (strength 0 = none). Drawn here, as part of
+// the glass, and not as a translucent item over it: such an item would lower what the stack lets
+// through of the background, which then cannot be recovered under it (see GlassPanel).
+vec3 highlight(vec3 col, vec2 pl, vec4 rect, vec4 c) {
+    if (c.a <= 0.0 || rect.z <= 0.0 || rect.w <= 0.0) return col;
+    vec2 hs = rect.zw * 0.5;
+    vec2 q = abs(pl - rect.xy - hs) - (hs - vec2(hlRadius));
+    float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - hlRadius;
+    float cov = clamp(0.5 - d * pxRatio, 0.0, 1.0);
+    return mix(col, c.rgb, c.a * cov);
 }
 
 // Where the ray that reaches this pixel came from, relative to the pixel, for one index.
@@ -123,6 +142,10 @@ void main() {
         float luma = dot(col, vec3(0.299, 0.587, 0.114));
         col = mix(vec3(luma), col, saturation);
         col = mix(col, tint.rgb, tint.a);
+        vec2 pl = p / pxRatio;
+        col = highlight(col, pl, hlRect0, hlColor0);
+        col = highlight(col, pl, hlRect1, hlColor1);
+        col = highlight(col, pl, hlRect2, hlColor2);
 
         // Light on the rim.
         float rim = 1.0 - smoothstep(0.3 * pxRatio, 3.0 * pxRatio, inside);
