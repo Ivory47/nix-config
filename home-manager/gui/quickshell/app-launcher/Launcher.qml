@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 import QtQuick.Effects
 import qs.shared
+import qs.shared.glass
 
 PanelWindow {
     id: root
@@ -19,21 +20,33 @@ PanelWindow {
     }
 
     WlrLayershell.layer: WlrLayer.Overlay
+    // Cover the whole output, over the bar: the glass needs the surface at the output's top left.
+    exclusionMode: ExclusionMode.Ignore
 
-    visible: false
-    focusable: true
+    // The window stays mapped: Quickshell destroys and re-creates the Qt window when `visible`
+    // goes false and true again, and the glass items crash that re-creation (segfault in
+    // QQuickWindow::maybeUpdate). So only `shown` changes: no input, no focus and no content
+    // while hidden, and the glass capture is off.
+    property bool shown: false
+
+    focusable: shown
+    mask: shown ? null : emptyMask
+
+    Region {
+        id: emptyMask
+    }
 
     color: "transparent"
 
     function closeLauncher() {
-        root.visible = false
+        root.shown = false
     }
 
     Connections {
         target: Hyprland
 
         function onFocusedWorkspaceChanged() {
-            root.visible = false
+            root.shown = false
         }
     }
 
@@ -41,19 +54,19 @@ PanelWindow {
         target: "launcher"
 
         function toggle() {
-            root.visible = !root.visible
+            root.shown = !root.shown
 
-            if (root.visible)
+            if (root.shown)
             searchField.forceActiveFocus()
         }
 
         function show() {
-            root.visible = true
+            root.shown = true
             searchField.forceActiveFocus()
         }
 
         function hide() {
-            root.visible = false
+            root.shown = false
         }
     }
 
@@ -61,180 +74,219 @@ PanelWindow {
         id: launcherModel
     }
 
-    RectangularShadow {
-        anchors.fill: launcher
+    Item {
+        id: content
+        anchors.fill: parent
+        visible: root.shown
 
-        radius: launcher.radius
+        RectangularShadow {
+            anchors.fill: launcher
 
-        blur: 14
-        spread: 2
+            radius: launcher.radius
 
-        color: Theme.shadowColor
+            blur: 14
+            spread: 2
 
-        offset.x: 0
-        offset.y: 4
-    }
+            color: Theme.shadowColor
 
-    Rectangle {
-        id: launcher
+            offset.x: 0
+            offset.y: 4
+        }
 
-        anchors.centerIn: parent
+        GlassPanel {
+            // Placed in the backdrop's coordinates (whole pixels, as the glass needs).
+            x: Math.round(launcher.x)
+            y: Math.round(launcher.y)
+            width: launcher.width
+            height: launcher.height
 
-        width: 600
-        height: 400
+            backdrop: glassBackdrop
+            style: GlassStyle {
+                cornerRadius: Theme.radiusLarge
+                edges: Qt.vector4d(1, 1, 1, 1)
 
-        radius: Theme.radiusLarge
-        color: Theme.background
+                // The launcher's old background colour, over the blur: like an acrylic
+                // taskbar, only more translucent. Raise tintStrength for more colour.
+                tint: Theme.background
+                tintStrength: 0.65
+            }
+        }
 
-        border.width: 1
-        border.color: Theme.surfaceAlt
+        Rectangle {
+            id: launcher
 
-        Column {
-            anchors.fill: parent
-            anchors.margins: Theme.spacingLarge
+            anchors.centerIn: parent
 
-            spacing: Theme.spacingMedium
+            width: 600
+            height: 400
 
-            TextField {
-                id: searchField
+            radius: Theme.radiusLarge
+            color: "transparent"
 
-                width: parent.width
-                height: 50
+            border.width: 1
+            border.color: Theme.surfaceAlt
 
-                leftPadding: Theme.spacingMedium 
-                rightPadding: Theme.spacingMedium
+            Column {
+                anchors.fill: parent
+                anchors.margins: Theme.spacingLarge
 
-                placeholderText: "Search applications..."
-                font.pixelSize: Theme.textMedium
+                spacing: Theme.spacingMedium
 
-                color: Theme.text
-                placeholderTextColor: Theme.textMuted
+                TextField {
+                    id: searchField
 
-                text: launcherModel.searchText
+                    width: parent.width
+                    height: 50
 
-                onTextChanged: {
-                    launcherModel.searchText = text
-                }
+                    leftPadding: Theme.spacingMedium 
+                    rightPadding: Theme.spacingMedium
 
-                background: Rectangle {
-                    radius: Theme.radiusMedium
-                    color: Theme.surface
-                }
+                    placeholderText: "Search applications..."
+                    font.pixelSize: Theme.textMedium
 
-                Component.onCompleted: {
-                    forceActiveFocus()
-                }
+                    color: Theme.text
+                    placeholderTextColor: Theme.textMuted
 
-                Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Escape) {
-                        root.closeLauncher()
-                        event.accepted = true
+                    text: launcherModel.searchText
+
+                    onTextChanged: {
+                        launcherModel.searchText = text
                     }
 
-                    else if (event.key === Qt.Key_C &&
-                    (event.modifiers & Qt.ControlModifier)) {
-                        root.closeLauncher()
-                        event.accepted = true
+                    background: Rectangle {
+                        radius: Theme.radiusMedium
+                        color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.6)
                     }
 
-                    else if (event.key === Qt.Key_Down) {
-                        if (appList.count > 0) {
-                            appList.currentIndex =
-                            Math.min(
-                                appList.currentIndex + 1,
-                                appList.count - 1
-                            )
-                        }
-
-                        event.accepted = true
+                    Component.onCompleted: {
+                        forceActiveFocus()
                     }
 
-                    else if (event.key === Qt.Key_Up) {
-                        if (appList.count > 0) {
-                            appList.currentIndex =
-                            Math.max(
-                                appList.currentIndex - 1,
-                                0
-                            )
-                        }
-
-                        event.accepted = true
-                    }
-
-                    else if (event.key === Qt.Key_Return ||
-                    event.key === Qt.Key_Enter) {
-                        if (appList.currentIndex >= 0 &&
-                        appList.currentIndex < appList.count) {
-
-                            launcherModel.launch(
-                                launcherModel.filteredApplications[
-                                    appList.currentIndex
-                                ]
-                            )
-
+                    Keys.onPressed: event => {
+                        if (event.key === Qt.Key_Escape) {
                             root.closeLauncher()
+                            event.accepted = true
                         }
 
-                        event.accepted = true
-                    }
+                        else if (event.key === Qt.Key_C &&
+                        (event.modifiers & Qt.ControlModifier)) {
+                            root.closeLauncher()
+                            event.accepted = true
+                        }
 
-                    else if (event.key === Qt.Key_Down) {
-                        if (appList.count > 0) {
-                            appList.currentIndex =
+                        else if (event.key === Qt.Key_Down) {
+                            if (appList.count > 0) {
+                                appList.currentIndex =
                                 Math.min(
                                     appList.currentIndex + 1,
                                     appList.count - 1
                                 )
+                            }
+
+                            event.accepted = true
                         }
 
-                        event.accepted = true
-                    }
-
-                    else if (event.key === Qt.Key_Up) {
-                        if (appList.count > 0) {
-                            appList.currentIndex =
+                        else if (event.key === Qt.Key_Up) {
+                            if (appList.count > 0) {
+                                appList.currentIndex =
                                 Math.max(
                                     appList.currentIndex - 1,
                                     0
                                 )
+                            }
+
+                            event.accepted = true
                         }
 
-                        event.accepted = true
+                        else if (event.key === Qt.Key_Return ||
+                        event.key === Qt.Key_Enter) {
+                            if (appList.currentIndex >= 0 &&
+                            appList.currentIndex < appList.count) {
+
+                                launcherModel.launch(
+                                    launcherModel.filteredApplications[
+                                        appList.currentIndex
+                                    ]
+                                )
+
+                                root.closeLauncher()
+                            }
+
+                            event.accepted = true
+                        }
+
+                        else if (event.key === Qt.Key_Down) {
+                            if (appList.count > 0) {
+                                appList.currentIndex =
+                                    Math.min(
+                                        appList.currentIndex + 1,
+                                        appList.count - 1
+                                    )
+                            }
+
+                            event.accepted = true
+                        }
+
+                        else if (event.key === Qt.Key_Up) {
+                            if (appList.count > 0) {
+                                appList.currentIndex =
+                                    Math.max(
+                                        appList.currentIndex - 1,
+                                        0
+                                    )
+                            }
+
+                            event.accepted = true
+                        }
                     }
                 }
-            }
 
-            ListView {
-                id: appList
+                ListView {
+                    id: appList
 
-                width: parent.width
-                height: parent.height
-                    - searchField.height
-                    - Theme.spacingMedium
+                    width: parent.width
+                    height: parent.height
+                        - searchField.height
+                        - Theme.spacingMedium
 
-                spacing: Theme.spacingSmall
+                    spacing: Theme.spacingSmall
 
-                clip: true
+                    clip: true
 
-                model: launcherModel.filteredApplications
+                    model: launcherModel.filteredApplications
 
-                currentIndex: count > 0 ? 0 : -1
+                    currentIndex: count > 0 ? 0 : -1
 
-                delegate: LauncherItem {
-                    required property var modelData
-                    required property int index
+                    delegate: LauncherItem {
+                        required property var modelData
+                        required property int index
 
-                    app: modelData
-                    selected: index === appList.currentIndex
+                        app: modelData
+                        selected: index === appList.currentIndex
 
-                    width: appList.width
+                        width: appList.width
 
-                    onLaunched: {
-                        root.closeLauncher()
+                        onLaunched: {
+                            root.closeLauncher()
+                        }
                     }
                 }
             }
         }
+
+        // One opaque pixel at the top left: says which version of the surface a capture holds.
+        GlassTag {
+            backdrop: glassBackdrop
+        }
+    }
+
+    // Live glass (shared/glass): captures and unmixes what is behind this surface. Only while shown.
+    GlassBackdrop {
+        id: glassBackdrop
+        composite: content
+        blurRadius: 14
+        ipcTarget: "glass"
+        active: root.shown
     }
 
     Connections {

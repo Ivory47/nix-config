@@ -20,9 +20,10 @@ Item {
 
         radius: Theme.radiusMedium
 
+        // Transparent when idle so the glass behind the list shows.
         color: root.selected || root.hovered
-            ? Theme.surface
-            : Theme.background
+            ? Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.7)
+            : "transparent"
 
         Behavior on color {
             ColorAnimation {
