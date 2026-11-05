@@ -100,7 +100,9 @@ void main() {
     vec3 N = normalize(vec3(n * slope, 1.0));
     float depthPx = thickness * b * z * refraction;
 
-    vec3 mid = vec3(0.5);
+    // Where nothing is known about the backdrop (before the first good capture, or in a hole)
+    // the glass shows its tint, never a grey.
+    vec3 mid = tint.rgb;
     vec3 col = vec3(0.0);
 
     if (debugView > 0.5) {

@@ -38,6 +38,12 @@ Item {
     // Name of an IPC target (`qs ipc call <target> ...`) to switch parts of the pipeline on and
     // off and read counters while it runs, for measuring. Empty: none.
     property string ipcTarget: ""
+    // Read the validation counters back from the GPU twice a second (asynchronously; one small
+    // read, and a frame for it). Off by default, and switched on through IPC when measuring.
+    property bool diagnostics: false
+    // For tests: treat every capture as the wrong frame, as a transient failure would. The glass
+    // must then keep the last valid background.
+    property bool forceReject: false
 
     // What GlassPanel reads.
     readonly property Item sharp: bundleAt(readIdx).bg
@@ -68,6 +74,12 @@ Item {
     property int flips: 0
     // Off: captures are received and thrown away (see GlassCapture.publishing).
     property bool processing: true
+    // Updates of the pipeline: scheduled, and put off because no background was free to take them.
+    property int updatesScheduled: 0
+    property int updatesDeferred: 0
+    // What the GPU counted (see verdict.frag), as of the last read.
+    property var validation: ({})
+    property bool grabbing: false
 
     function bundleAt(i) {
         return i === 0 ? bundle0 : (i === 1 ? bundle1 : bundle2);
@@ -95,11 +107,20 @@ Item {
         if (target < 0) {
             // Both free ones are waiting to be shown: do this capture when one is free.
             again = true;
+            updatesDeferred++;
             return;
         }
         draftSource.scheduleUpdate();
         flagSource.scheduleUpdate();
+        if (!accScheduled) {
+            // One counting pass per round: the one that is not holding the counters reads them.
+            accTarget = 1 - accRead;
+            (accTarget === 0 ? accSourceA : accSourceB).scheduleUpdate();
+            accAfter = cap.syncCount();
+            accScheduled = true;
+        }
         bundleAt(target).update();
+        updatesScheduled++;
         // What the scene graph synchronises from now on includes this update.
         pending.push({ idx: target, after: cap.syncCount() });
     }
@@ -114,6 +135,10 @@ Item {
         }
         if (best < 0)
             return;
+        if (accScheduled && syncSerial > accAfter) {
+            accRead = accTarget;
+            accScheduled = false;
+        }
         readIdx = pending[best].idx;
         pending = pending.slice(best + 1);
         ready = true;
@@ -144,6 +169,7 @@ Item {
         property real coverOpacity: 1
         property vector2d capOrigin: Qt.vector2d(cap.cropUv.x, cap.cropUv.y)
         property vector2d capScale: Qt.vector2d(cap.cropUv.width, cap.cropUv.height)
+        property real forceBad: root.forceReject ? 1 : 0
         property variant capture: cap
         property variant own: ownSource
         property variant previous: root.sharp
@@ -170,6 +196,7 @@ Item {
         property real coverOpacity: 1
         property vector2d capOrigin: Qt.vector2d(cap.cropUv.x, cap.cropUv.y)
         property vector2d capScale: Qt.vector2d(cap.cropUv.width, cap.cropUv.height)
+        property real forceBad: root.forceReject ? 1 : 0
         property variant capture: cap
         property variant own: ownSource
         property variant previous: root.sharp
@@ -186,6 +213,126 @@ Item {
         mipmap: true
         format: ShaderEffectSource.RGBA16F
         textureSize: root.texPx
+    }
+
+    // What settle.frag decides, counted on the GPU (verdict.frag): a 3x1 float texture, rewritten
+    // by one pass per update of the pipeline from its previous contents. Two take turns (A reads
+    // B and is written, then B reads A), because a texture cannot be read and written in the same
+    // pass (Qt's `recursive` gave garbage here). At most one pass per frame; nothing is read back
+    // per capture.
+    ShaderEffect {
+        id: accFxA
+        width: 3
+        height: 1
+        visible: false
+        blending: false
+
+        property real areaPx: root.texPx.width * root.texPx.height
+        property variant flag: flagSource
+        property variant acc: accSourceB
+
+        fragmentShader: Qt.resolvedUrl("shaders/verdict.frag.qsb")
+    }
+
+    ShaderEffectSource {
+        id: accSourceA
+        sourceItem: accFxA
+        live: false
+        smooth: false
+        visible: false
+        format: ShaderEffectSource.RGBA32F
+        textureSize: Qt.size(3, 1)
+    }
+
+    ShaderEffect {
+        id: accFxB
+        width: 3
+        height: 1
+        visible: false
+        blending: false
+
+        property real areaPx: root.texPx.width * root.texPx.height
+        property variant flag: flagSource
+        property variant acc: accSourceA
+
+        fragmentShader: Qt.resolvedUrl("shaders/verdict.frag.qsb")
+    }
+
+    ShaderEffectSource {
+        id: accSourceB
+        sourceItem: accFxB
+        live: false
+        smooth: false
+        visible: false
+        format: ShaderEffectSource.RGBA32F
+        textureSize: Qt.size(3, 1)
+    }
+
+    // Which one holds the latest counters, and the update that is on its way.
+    property int accRead: 0
+    property int accTarget: 0
+    property int accAfter: 0
+    property bool accScheduled: false
+
+    // The counters as bytes, outside the window, for the occasional grabToImage().
+    ShaderEffect {
+        id: readoutFx
+        x: -64
+        y: 0
+        // Exactly 12 x 1 real pixels, so that the grab is not resampled (which would mix the bytes
+        // of neighbouring numbers).
+        width: 12 / root.ratio
+        height: 1 / root.ratio
+        visible: root.diagnostics && root.glassEnabled
+        blending: false
+
+        property variant acc: root.accRead === 0 ? accSourceA : accSourceB
+
+        fragmentShader: Qt.resolvedUrl("shaders/readout.frag.qsb")
+    }
+
+    Timer {
+        interval: 500
+        running: root.diagnostics && root.glassEnabled
+        repeat: true
+        onTriggered: {
+            if (root.grabbing)
+                return;
+            root.grabbing = true;
+            readoutFx.grabToImage(result => {
+                root.grabbing = false;
+                root.decode(result.image);
+            }, Qt.size(12, 1));
+        }
+    }
+
+    function decode(image) {
+        const scale = [1, 1, 1, 1, 1000, 1000, 10000, 10000, 1, 1, 1000, 10000];
+        const v = [];
+        for (let i = 0; i < 12; i++) {
+            const c = cap.readPixel(image, i, 0);
+            const n = Math.round(c.r * 255) + Math.round(c.g * 255) * 256 + Math.round(c.b * 255) * 65536;
+            v.push(n / scale[i]);
+        }
+        const processed = v[0] + v[1] + v[2];
+        const avg = x => processed > 0 ? 100 * x / processed : 0;
+        validation = {
+            processed: processed,
+            accepted: v[0],
+            rejectedWrongFrame: v[1],
+            rejectedUnusable: v[2],
+            validBackdropSeen: v[3] > 0.5,
+            unknownPctAvg: avg(v[4]),
+            wrongPctAvg: avg(v[5]),
+            unknownPctLast: 100 * v[6],
+            wrongPctLast: 100 * v[7],
+            impossiblePctAvg: avg(v[10]),
+            impossiblePctLast: 100 * v[11],
+            // The glass was on its plain tint, there being no valid background yet.
+            greyFallbackNoBackdrop: v[8],
+            // A capture was rejected and the last valid background kept instead.
+            heldLastGood: v[9]
+        };
     }
 
     GlassBundle {
@@ -230,36 +377,48 @@ Item {
         // On: capture the whole output and crop here. Off: ask the compositor for the region.
         function setWholeOutput(on: bool): void { cap.wholeOutput = on; }
         function setInterval(ms: int): void { cap.minInterval = ms; }
+        // For tests: at most this many dmabufs in the pool (0 = default), to force exhaustion.
+        function setPoolLimit(n: int): void { cap.poolLimit = n; }
+        // For tests: every capture is treated as the wrong frame.
+        function setForceReject(on: bool): void { root.forceReject = on; }
+        // Read the GPU validation counters back twice a second.
+        function setDiagnostics(on: bool): void { root.diagnostics = on; }
         // Cumulative counters; take two readings and subtract.
         function stats(): string {
             return JSON.stringify({
-                requests: cap.requests,
-                copies: cap.copiesAsked,
-                received: cap.received,
-                published: cap.serial,
-                skipped: cap.skipped,
-                cancelled: cap.cancelled,
-                failed: cap.failed,
-                flips: root.flips,
-                frames: cap.frames,
-                glass: root.glassEnabled,
-                inFlight: cap.inFlight,
-                dmabuf: cap.usingDmabuf,
-                wholeOutput: cap.wholeOutput,
-                lastWholeOutput: cap.lastWholeOutput,
-                dmabufBroken: cap.dmabufBroken,
-                depth: cap.depth,
-                active: root.active,
-                processing: root.processing,
-                latency: cap.latency,
-                setup: cap.setupLatency,
-                capture: cap.captureSize.width + "x" + cap.captureSize.height,
-                region: cap.region.x + "," + cap.region.y + " " + cap.region.width + "x" + cap.region.height
+                capture: cap.diagnostics(),
+                validation: root.validation,
+                pipeline: {
+                    flips: root.flips,
+                    updatesScheduled: root.updatesScheduled,
+                    updatesDeferred: root.updatesDeferred,
+                    ready: root.ready,
+                    forceReject: root.forceReject,
+                    diagnostics: root.diagnostics
+                },
+                settings: {
+                    glass: root.glassEnabled,
+                    active: root.active,
+                    processing: root.processing,
+                    depth: cap.depth,
+                    wholeOutput: cap.wholeOutput,
+                    allowDmabuf: cap.allowDmabuf,
+                    poolLimit: cap.poolLimit,
+                    interval: cap.minInterval,
+                    status: cap.status
+                },
+                size: {
+                    capture: cap.captureSize.width + "x" + cap.captureSize.height,
+                    region: cap.region.x + "," + cap.region.y + " " + cap.region.width + "x" + cap.region.height
+                }
             });
         }
     }
 
     property int lastReceived: 0
+    property int lastRequests: 0
+    property int lastCompletions: 0
+    property int lastDuplicates: 0
     property int lastFlips: 0
 
     Timer {
@@ -267,23 +426,25 @@ Item {
         running: root.debug
         repeat: true
         onTriggered: {
+            const d = cap.diagnostics();
+            const v = root.validation;
             console.log(
                 "glass: ready", root.ready,
-                "| captures/s", (cap.serial - root.lastReceived) * 2,
-                "flips/s", (root.flips - root.lastFlips) * 2,
-                "| dmabuf", cap.usingDmabuf,
-                "received", cap.received,
-                "published", cap.serial,
-                "skipped", cap.skipped,
-                "failed", cap.failed,
-                "| interval", cap.effectiveInterval.toFixed(1) + "ms",
-                "latency", cap.latency.toFixed(1) + "ms",
-                "setup", cap.setupLatency.toFixed(1) + "ms",
-                "cycle", cap.cycle.toFixed(1) + "ms",
-                "ratio", root.ratio,
-                "px", root.sizePx.width + "x" + root.sizePx.height,
-                "capture", cap.captureSize.width + "x" + cap.captureSize.height,
+                "| requests/s", (d.requests - root.lastRequests) * 2,
+                "completions/s", (d.completions - root.lastCompletions) * 2,
+                "published/s", (d.published - root.lastReceived) * 2,
+                "duplicates/s", (d.duplicates - root.lastDuplicates) * 2,
+                "damage events", d.damageEvents, "(full", d.damageFull + ")",
+                "| pool", d.poolSize, "free", d.poolFree, "retiring", d.poolRetiring,
+                "exhausted", d.poolExhausted, "allocFail", d.allocFailures, "importFail", d.importFailures,
+                "broken", d.dmabufBroken,
+                "| validation accepted", v.accepted, "rejected", (v.rejectedWrongFrame + v.rejectedUnusable),
+                "unknown%", v.unknownPctLast !== undefined ? v.unknownPctLast.toFixed(1) : "-",
+                "| latency", cap.latency.toFixed(1) + "ms",
                 "status", cap.status);
+            root.lastRequests = d.requests;
+            root.lastCompletions = d.completions;
+            root.lastDuplicates = d.duplicates;
             root.lastReceived = cap.serial;
             root.lastFlips = root.flips;
         }
