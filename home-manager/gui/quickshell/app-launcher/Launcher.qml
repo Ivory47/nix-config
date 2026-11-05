@@ -36,8 +36,65 @@ PanelWindow {
     // sometimes went elsewhere.)
     WlrLayershell.keyboardFocus: shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+    // The glass is drawn from the background it saved the last time the launcher was open, and
+    // it subtracts that old picture of what leaks through it: when the screen behind has changed,
+    // the old text shows up inverted until the first new capture. So until the pipeline has
+    // taken fresh captures (a few frames) the glass does not subtract anything (cancelLeak):
+    // only a faint trace of the real background shows through, and the launcher is shown at once.
+    property bool revealed: false
+    property int flipsAtOpen: 0
+
+    // How much of the leak the glass cancels: 0 until the pipeline is fresh, then up to 1 over
+    // a short ramp, so that no single frame can jump (a refused capture would show the old
+    // picture for one frame).
+    property real cancelAmount: 0
+
+    NumberAnimation {
+        id: cancelRamp
+        target: root
+        property: "cancelAmount"
+        from: 0
+        to: 1
+        duration: 150
+    }
+
+    function reveal() {
+        revealTimer.stop()
+        revealed = true
+        cancelRamp.restart()
+    }
+
+    Timer {
+        // In case no capture comes (nothing changed behind, so the old picture is right).
+        id: revealTimer
+        interval: 400
+        onTriggered: root.reveal()
+    }
+
+    Connections {
+        target: glassBackdrop
+
+        function onFlipsChanged() {
+            // Two updates: the first capture may predate the surface (no tag in it) and be refused.
+            if (root.shown && !root.revealed && glassBackdrop.flips >= root.flipsAtOpen + 2)
+                root.reveal()
+        }
+    }
+
     onShownChanged: {
+        revealTimer.stop()
+        cancelRamp.stop()
+        cancelAmount = 0
+        revealed = false
+        if (!shown) {
+            // A fresh start the next time: no search text, first app selected, list at the top.
+            searchField.text = ""
+            appList.currentIndex = appList.count > 0 ? 0 : -1
+            appList.positionViewAtBeginning()
+        }
         if (shown) {
+            flipsAtOpen = glassBackdrop.flips
+            revealTimer.start()
             searchField.forceActiveFocus()
             // Again once the compositor has handed over the keyboard.
             focusTimer.restart()
@@ -116,6 +173,7 @@ PanelWindow {
             // Highlights are part of the glass (see GlassPanel.hlRect0): the search field, the
             // selected row and the hovered row. Rows are clipped to the visible list.
             hlRadius: Theme.radiusMedium
+            cancelLeak: root.cancelAmount
             hlRect0: {
                 launcher.x; launcher.y; glass.x; glass.y
                 return glass.rectOf(searchField, false)

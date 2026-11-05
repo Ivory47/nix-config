@@ -56,5 +56,11 @@ ShaderEffect {
     property vector4d hlColor2: Qt.vector4d(0, 0, 0, 0)
     property real hlRadius: 6
 
+    // 1: the part of the background that leaks through the glass is cancelled with the recovered
+    // background (normal). 0: it is not. Use 0 while the recovered background may be out of date
+    // (just after a surface was shown again): cancelling an old picture draws it inverted, while
+    // not cancelling only lets a faint trace of the real background through.
+    property real cancelLeak: 1
+
     fragmentShader: Qt.resolvedUrl("shaders/glass.frag.qsb")
 }

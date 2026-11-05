@@ -43,6 +43,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 hlColor1;
     vec4 hlColor2;
     float hlRadius;     // corner radius of the highlights, logical
+    float cancelLeak;   // 1 = subtract the background that leaks through (normal), 0 = do not
 };
 
 layout(binding = 1) uniform sampler2D sharp;
@@ -170,6 +171,6 @@ void main() {
     }
 
     vec3 underneath = trueAt(base, mid);
-    vec3 rgb = clamp(seen * (col - (1.0 - alpha) * underneath), vec3(0.0), vec3(a));
+    vec3 rgb = clamp(seen * (col - cancelLeak * (1.0 - alpha) * underneath), vec3(0.0), vec3(a));
     fragColor = vec4(rgb, a) * qt_Opacity;
 }
