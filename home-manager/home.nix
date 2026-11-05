@@ -20,6 +20,8 @@
         nodejs
         grim
         slurp
+
+        claude-code
     ];
 
     systemd.user.timers."gtrash-prune" = {
