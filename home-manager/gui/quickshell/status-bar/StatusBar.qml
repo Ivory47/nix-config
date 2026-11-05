@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.UPower
 import qs.shared
+import qs.shared.glass
 
 PanelWindow {
     id: statusBar
@@ -15,7 +16,9 @@ PanelWindow {
         right: true
     }
 
-    implicitHeight: Theme.statusBarHeight
+    // The glass needs the surface to be a whole number of real pixels (see GlassGeometry),
+    // which at a fractional scale can mean a pixel or two more than Theme.statusBarHeight.
+    implicitHeight: GlassGeometry.alignedSize(Theme.statusBarHeight, statusBar.devicePixelRatio)
 
     color: "transparent"
 
@@ -91,16 +94,29 @@ PanelWindow {
             }
         ]
 
-        // Shared backdrop blur (strength: Theme.backdropBlur)
-        BackdropBlur {
-            id: backdropBlur
+        // Live liquid glass (shared/glass): the real background behind the bar, blurred and
+        // refracted on the GPU. Its look is this GlassStyle; the blur radius is on the backdrop.
+        // Only for measuring (glassBackdrop.glassEnabled): the bar without glass.
+        Rectangle {
             anchors.fill: parent
-            screen: statusBar.screen
+            visible: !glassBackdrop.glassEnabled
+            color: Qt.rgba(0.12, 0.12, 0.18, 0.55)
+        }
+
+        GlassPanel {
+            anchors.fill: parent
+            visible: glassBackdrop.glassEnabled
+            backdrop: glassBackdrop
+            style: GlassStyle {}
+        }
+
+        // One opaque pixel at the top left: says which version of the bar a capture holds.
+        GlassTag {
+            backdrop: glassBackdrop
         }
 
         Rectangle {
             anchors.fill: parent
-            visible: !backdropBlur.capturing
 
             color: "transparent"
 
@@ -167,5 +183,14 @@ PanelWindow {
                 color: Qt.alpha("#494965", 0.85)
             }
         }
+    }
+
+    // Captures and unmixes what is behind the bar. Outside of barContent, whose rendering it
+    // keeps as "what was presented".
+    GlassBackdrop {
+        id: glassBackdrop
+        composite: barContent
+        blurRadius: 14
+        ipcTarget: "glass"
     }
 }

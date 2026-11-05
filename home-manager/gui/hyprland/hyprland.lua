@@ -323,6 +323,8 @@ hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", actio
 
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("qs -c app-launcher ipc call launcher toggle"))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("qs -c clipboard ipc call clipboard toggle"))
+hl.bind("Print", hl.dsp.exec_cmd([[mkdir -p ~/Pictures/Screenshots && (grim -g "$(slurp)" - | tee ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png | wl-copy) || (grim - - | tee ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png | wl-copy)]]))
+
 
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]
