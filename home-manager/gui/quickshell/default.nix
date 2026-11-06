@@ -17,7 +17,8 @@ let
                 if [ -e "$out/bin/$bin" ]; then
                     wrapProgram "$out/bin/$bin" \
                         --prefix QML_IMPORT_PATH : ${glassNative}/lib/qt-6/qml \
-                        --prefix QML2_IMPORT_PATH : ${glassNative}/lib/qt-6/qml
+                        --prefix QML2_IMPORT_PATH : ${glassNative}/lib/qt-6/qml \
+                        --set QSG_NO_VSYNC 1
                 fi
             done
         '';
