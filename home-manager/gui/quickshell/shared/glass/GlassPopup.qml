@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import qs.shared
 
 // A full-screen overlay window for a popup panel with live glass (the app launcher, the
 // clipboard history): everything that is the same for them lives here.
@@ -173,8 +174,12 @@ PanelWindow {
 
         if (shown) {
             flipsAtOpen = glassBackdrop.flips
-            // The content appears with the first update, or when this runs out.
-            presentTimer.start()
+            if (glassBackdrop.glassEnabled)
+                // The content appears with the first update, or when this runs out.
+                presentTimer.start()
+            else
+                // Glass off (Theme.glass): no capture is coming, nothing to wait for.
+                present(true)
             popupOpened()
         } else {
             popupClosed()
@@ -207,6 +212,7 @@ PanelWindow {
         blurRadius: root.blurRadius
         ipcTarget: "glass"
         active: root.shown
+        glassEnabled: Theme.glass
         tagRed: root.tagRed
         absentTagRed: 30
     }

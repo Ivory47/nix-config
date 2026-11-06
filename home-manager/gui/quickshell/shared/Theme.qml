@@ -23,6 +23,13 @@ QtObject {
 
     readonly property color shadowColor: "#80000000"
 
+    // Live glass for the status bar, app launcher and clipboard: the blurred, refracting backdrop
+    // the shell computes itself (shared/glass/). One switch for all three.
+    // false: no screen capture and none of the glass pipeline runs (no GPU or compositor cost);
+    // the bar is a plain translucent rectangle and the popups a plain tinted panel (the row
+    // highlights stay). Applies after `hms` and `qsr`.
+    readonly property bool glass: true
+
     // Backdrop blur, used by shared/BackdropBlur.qml (independent of the compositor's blur).
     // 0.0 = off, 1.0 = strongest. Every config that uses BackdropBlur inherits this value.
     readonly property real backdropBlur: 0.8

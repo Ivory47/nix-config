@@ -166,6 +166,11 @@ void main() {
         // No backdrop yet: a plain tinted surface that already lets the background through,
         // so that the first capture can be unmixed.
         vec3 plain = mix(mid, tint.rgb, max(tint.a, 0.6));
+        // (The highlights are drawn here too: with Theme.glass off this is all there is.)
+        vec2 plp = p / pxRatio;
+        plain = highlight(plain, plp, hlRect0, hlColor0);
+        plain = highlight(plain, plp, hlRect1, hlColor1);
+        plain = highlight(plain, plp, hlRect2, hlColor2);
         fragColor = vec4(plain * a, a) * qt_Opacity;
         return;
     }

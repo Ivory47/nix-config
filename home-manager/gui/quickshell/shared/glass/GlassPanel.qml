@@ -39,7 +39,9 @@ ShaderEffect {
     property real contrast: style.contrast
     property real saturation: style.saturation
     property real shine: style.shine
-    property real alpha: style.alpha
+    // Below 1 only so that the background can be recovered from the capture; with the glass off
+    // (Theme.glass) there is no capture, and 8% of the sharp background showing is just noise.
+    property real alpha: backdrop.glassEnabled ? style.alpha : 1.0
     property real glassOpacity: style.opacity
     property real debugView: debugMode
 

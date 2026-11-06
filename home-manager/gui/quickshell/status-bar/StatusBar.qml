@@ -192,5 +192,6 @@ PanelWindow {
         composite: barContent
         blurRadius: 14
         ipcTarget: "glass"
+        glassEnabled: Theme.glass
     }
 }
