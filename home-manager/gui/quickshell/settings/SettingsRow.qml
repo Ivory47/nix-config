@@ -14,6 +14,30 @@ Item {
 
     readonly property bool overridden: ThemeStore.isSet(spec.key)
 
+    // Outlines the row for a moment, so that it can be found (after "show in page"). An outline
+    // that is on or off, not faded: nothing translucent over the glass.
+    property bool flashing: false
+    function flash() {
+        flashing = true
+        flashTimer.restart()
+    }
+    Timer {
+        id: flashTimer
+        interval: 1400
+        onTriggered: root.flashing = false
+    }
+    Rectangle {
+        visible: root.flashing
+        x: -6
+        y: 2
+        width: root.width + 12
+        height: root.height - 4
+        radius: Theme.radiusMedium
+        color: "transparent"
+        border.width: 2
+        border.color: Theme.accent
+    }
+
     width: parent ? parent.width : 0
     height: 44 + belowHeight
 
