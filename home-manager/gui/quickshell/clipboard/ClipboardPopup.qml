@@ -11,6 +11,8 @@ import qs.shared.glass
 GlassPopup {
     id: root
     WlrLayershell.namespace: "clipboard"
+    // Own tag colour (bar 30, launcher 34 by default), see GlassBackdrop.tagRed.
+    tagRed: 38
 
     focusItem: searchField
 

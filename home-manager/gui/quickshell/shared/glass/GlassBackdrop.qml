@@ -98,7 +98,14 @@ Item {
     property int version: 0
     // Bit i: slot i holds a version that was presented.
     property int ringMask: 0
-    readonly property color tagColor: Qt.rgba(30 / 255, 30 / 255, (46 + 4 * (version % 8)) / 255, 1)
+    // Red channel of the tag: one value per instance (bar 30, launcher 34, clipboard 38), so that
+    // one instance's tag is never taken for a version of another's.
+    property int tagRed: 30
+    // Red of the tag that means "my surface is not in this frame", or 0. A popup sets it to the
+    // bar's (30): while the popup is closed or still opening that is what shows at the tag's
+    // place, and such a capture is the background as it is (see unmix.frag).
+    property int absentTagRed: 0
+    readonly property color tagColor: Qt.rgba(tagRed / 255, 30 / 255, (46 + 4 * (version % 8)) / 255, 1)
     function ringAt(i) {
         return [r0, r1, r2, r3, r4, r5, r6, r7][i];
     }
@@ -146,6 +153,13 @@ Item {
         flips++;
         // The surface changes in the next synchronised frame, which also draws the new glass:
         // keep that version, tagged.
+        bumpVersion();
+    }
+
+    // Start a new version of the surface: it is kept (and tagged) as the next synchronised frame
+    // renders it. Called for every update, and by a popup that makes its content visible without
+    // an update (GlassPopup), so that the version its tag shows holds that content.
+    function bumpVersion() {
         version++;
         const slot = version % ringSize;
         ringMask |= 1 << slot;
@@ -254,6 +268,8 @@ Item {
         property variant own7: root.version % 8 === 7 ? r0 : r7
         property vector2d texPx: Qt.vector2d(root.texPx.width, root.texPx.height)
         property real tagMask: root.ringMask
+        property real tagRed: root.tagRed
+        property real absentRed: root.absentTagRed
         property variant previous: root.last
 
         fragmentShader: Qt.resolvedUrl("shaders/unmix.frag.qsb")
@@ -290,6 +306,8 @@ Item {
         property variant own7: root.version % 8 === 7 ? r0 : r7
         property vector2d texPx: Qt.vector2d(root.texPx.width, root.texPx.height)
         property real tagMask: root.ringMask
+        property real tagRed: root.tagRed
+        property real absentRed: root.absentTagRed
         property variant previous: root.last
 
         fragmentShader: Qt.resolvedUrl("shaders/unmix.frag.qsb")

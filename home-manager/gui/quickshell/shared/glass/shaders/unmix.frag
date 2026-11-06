@@ -13,6 +13,10 @@
 // says which: its blue channel is 46 + 4 * (version % 8), red and green 30. The compositor
 // copies opaque pixels exactly, so the capture holds the version of the frame it was made from.
 // If the pixel is not one of ours, or its version was never kept, the capture is the wrong frame.
+// Every instance has its own red (tagRed), so that the bar's tag, which shows through where a
+// popup is not on screen, is not taken for a version of the popup's. A popup sets absentRed to the
+// bar's red: that tag means its surface was not in the frame, and the capture is the background
+// as it is (a rejected capture would keep a stale background).
 //
 // mode 0: the background. rgb = background, a = 1 where it could be recovered,
 //         vec4(0) where it cannot (under opaque pixels, or when the numbers are impossible).
@@ -35,6 +39,10 @@ layout(std140, binding = 0) uniform buf {
     float forceBad;     // for tests: treat every capture as the wrong frame
     vec2 texPx;         // size of the cropped capture in pixels
     float tagMask;      // bit i set: ring slot i holds a version that was presented
+    float tagRed;       // red channel of this instance's tag (the bar 30, the popups 34 / 38)
+    float absentRed;    // red channel of a tag that means "our surface is not in this frame" (the
+                        // bar's, for the popups): the capture is then the background as it is.
+                        // 0: off (the bar: a frame that does not hold our tag is rejected)
 };
 
 layout(binding = 1) uniform sampler2D capture;
@@ -67,20 +75,28 @@ void main() {
     vec2 tagUv = vec2(0.5) / texPx;
     vec3 tag = texture(capture, capOrigin + tagUv * capScale).rgb * 255.0;
     int version = int(floor((tag.b - 46.0) / 4.0 + 0.5));
-    bool tagOk = version >= 0 && version < 8
+    bool shape = version >= 0 && version < 8
               && abs(tag.b - (46.0 + 4.0 * float(version))) < 1.5
-              && abs(tag.r - 30.0) < 1.5 && abs(tag.g - 30.0) < 1.5
+              && abs(tag.g - 30.0) < 1.5;
+    bool tagOk = shape && abs(tag.r - tagRed) < 1.5
               && ((int(tagMask + 0.5) >> version) & 1) == 1;
+    // Another instance's tag (the bar's) shows where our surface would be: it is opaque there
+    // whenever it is in the frame, so it was not. Nothing of ours to remove.
+    bool absent = absentRed > 0.5 && shape && abs(tag.r - absentRed) < 1.5;
 
     vec3 f = texture(capture, capOrigin + uv * capScale).rgb;
     vec4 s = tagOk ? ownAt(version, uv) * coverOpacity : vec4(0.0);
     float remaining = 1.0 - s.a;
 
     vec4 background = vec4(0.0);
-    bool wrong = !tagOk;
+    bool wrong = !tagOk && !absent;
     bool impossible = false;
 
-    if (!tagOk) {
+    if (absent) {
+        // The capture is the background: this is how a popup that is closed or just opening
+        // gets a fresh one without being on screen.
+        background = vec4(f, 1.0);
+    } else if (!tagOk) {
         // Not a frame we know: nothing to unmix against. The whole capture is rejected.
         background = texture(previous, uv);
     } else if (remaining < 0.03) {

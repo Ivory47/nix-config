@@ -19,10 +19,16 @@ import Quickshell.Wayland
 //    which the compositor often does not grant to a window that was already mapped.)
 //  - The glass is drawn from the background it saved the last time the popup was open, and it
 //    subtracts that old picture of what leaks through it: when the screen behind has changed,
-//    the old content shows up inverted until the first new capture. So until the pipeline has
-//    taken fresh captures (a few frames) the glass does not subtract anything (cancelAmount,
-//    GlassPanel.cancelLeak); then it is ramped in, so that no single frame can jump. For about
-//    150 ms after opening a faint trace of the real, sharp background shows through.
+//    the old content shows up inverted until the first new capture. So opening is in two steps:
+//    `shown` starts the capture with the content still hidden (nothing of ours is in the frame,
+//    so the capture is the background as it is: unmix.frag, absentTagRed), and the content is
+//    made visible by the first update (`presented`), with the fresh background and the leak
+//    cancelled at once. That costs a capture round trip (about two frames) before the popup
+//    appears. If no update comes within `presentTimeout` (nothing changed behind, or no bar tag to
+//    tell an empty frame by), the content is shown anyway and the old way is used: the glass does
+//    not subtract anything (cancelAmount, GlassPanel.cancelLeak) until two fresh updates have
+//    arrived, then it is ramped in, so that no single frame can jump (a faint trace of the real,
+//    sharp background shows through for about 150 ms).
 PanelWindow {
     id: root
 
@@ -46,14 +52,24 @@ PanelWindow {
     property Item focusItem: null
     // Blur strength: gaussian sigma in logical pixels.
     property real blurRadius: 14
-    // How long after opening to wait for fresh captures at most, ms.
+    // How long after `shown` to wait for the first fresh background before showing the content
+    // anyway, ms.
+    property int presentTimeout: 80
+    // How long after the content appeared to wait for fresh captures at most (only when it
+    // appeared without one), ms.
     property int revealTimeout: 400
+    // Red channel of the tag pixel: every GlassBackdrop has its own, so that the bar's is not
+    // taken for this popup's (bar 30, launcher 34, clipboard 38).
+    property int tagRed: 34
     // Ramp of the leak cancelling, ms. Shorter than this (80) flashed, longer (250) left the sharp
     // background showing for too long.
     property int rampDuration: 150
 
     // 0 while the recovered background may be out of date, then up to 1.
     property real cancelAmount: 0
+    // The content is on screen. Follows `shown` after the first fresh background (or a timeout)
+    // when opening, at once when closing.
+    property bool presented: false
     readonly property alias backdrop: glassBackdrop
     // The root of everything that is drawn.
     readonly property alias content: surface
@@ -73,10 +89,33 @@ PanelWindow {
     property bool revealed: false
     property int flipsAtOpen: 0
 
+    // Fallback ramp: the background may be out of date (see the header).
     function reveal() {
         revealTimer.stop()
         revealed = true
         cancelRamp.restart()
+    }
+
+    // Make the content visible. `fresh`: a new background was taken just now with nothing of ours
+    // in the frame, so nothing is stale and the leak can be cancelled in full at once.
+    function present(fresh) {
+        if (!shown || presented)
+            return
+        presentTimer.stop()
+        presented = true
+        if (fresh) {
+            revealed = true
+            cancelAmount = 1
+        } else {
+            // No update came: the content has not been in any version of the surface that was
+            // kept, and the tag would name a version without it. Start a new one.
+            flipsAtOpen = glassBackdrop.flips
+            glassBackdrop.bumpVersion()
+            revealTimer.start()
+        }
+        if (focusItem)
+            focusItem.forceActiveFocus()
+        focusTimer.restart()
     }
 
     NumberAnimation {
@@ -95,12 +134,29 @@ PanelWindow {
         onTriggered: root.reveal()
     }
 
+    Timer {
+        // In case no update comes to open on.
+        id: presentTimer
+        interval: root.presentTimeout
+        onTriggered: root.present(false)
+    }
+
     Connections {
         target: glassBackdrop
 
         function onFlipsChanged() {
-            // Two updates: the first capture may predate the surface (no tag in it) and be refused.
-            if (root.shown && !root.revealed && glassBackdrop.flips >= root.flipsAtOpen + 2)
+            if (!root.shown)
+                return
+            // Opening: the first update was made from a frame without the content in it. (This
+            // runs inside the update, before the frame that shows it: that frame also keeps the
+            // version of the surface that the tag will name, content included.)
+            if (!root.presented) {
+                root.present(true)
+                return
+            }
+            // Opened by the timeout: two updates, since the first capture may predate the surface
+            // (no tag in it) and be refused.
+            if (!root.revealed && glassBackdrop.flips >= root.flipsAtOpen + 2)
                 root.reveal()
         }
     }
@@ -109,17 +165,16 @@ PanelWindow {
 
     onShownChanged: {
         revealTimer.stop()
+        presentTimer.stop()
         cancelRamp.stop()
         cancelAmount = 0
         revealed = false
+        presented = false
 
         if (shown) {
             flipsAtOpen = glassBackdrop.flips
-            revealTimer.start()
-            if (focusItem)
-                focusItem.forceActiveFocus()
-            // Again once the compositor has handed over the keyboard.
-            focusTimer.restart()
+            // The content appears with the first update, or when this runs out.
+            presentTimer.start()
             popupOpened()
         } else {
             popupClosed()
@@ -135,7 +190,7 @@ PanelWindow {
     Item {
         id: surface
         anchors.fill: parent
-        visible: root.shown
+        visible: root.presented
 
         // One opaque pixel at the top left: says which version of the surface a capture holds.
         GlassTag {
@@ -143,12 +198,16 @@ PanelWindow {
         }
     }
 
-    // Captures and unmixes what is behind this surface. Only while shown.
+    // Captures and unmixes what is behind this surface. Only while shown (including the moment
+    // before the content appears). The bar's tag (red 30) at the tag's place means that the
+    // content is not in the frame.
     GlassBackdrop {
         id: glassBackdrop
         composite: surface
         blurRadius: root.blurRadius
         ipcTarget: "glass"
         active: root.shown
+        tagRed: root.tagRed
+        absentTagRed: 30
     }
 }
