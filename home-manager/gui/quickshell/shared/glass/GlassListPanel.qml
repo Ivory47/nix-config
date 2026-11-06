@@ -26,6 +26,8 @@ GlassPanel {
     property real fieldStrength: 0.55
     property real selectedStrength: 0.7
     property real hoveredStrength: 0.5
+    // How much of the tint colour is mixed into the glass (more hides more of what is behind).
+    property real tintStrength: 0.65
 
     backdrop: popup.backdrop
     cancelLeak: popup.cancelAmount
@@ -69,7 +71,7 @@ GlassPanel {
 
         // The old panel colour over the blur, translucent (raise tintStrength for more colour).
         tint: Theme.background
-        tintStrength: 0.65
+        tintStrength: root.tintStrength
         // Fully frosted: any sharp background mixed into the glass shows as faint text.
         frost: 1.0
     }

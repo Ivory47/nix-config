@@ -44,6 +44,9 @@ layout(std140, binding = 0) uniform buf {
     vec4 hlColor2;
     float hlRadius;     // corner radius of the highlights, logical
     float cancelLeak;   // 1 = subtract the background that leaks through (normal), 0 = do not
+    vec4 holeRect;      // a rounded rectangle cut out of the glass: x, y, width, height in logical
+                        // pixels of this panel (zero size = none)
+    float holeRadius;   // its corner radius, logical
 };
 
 layout(binding = 1) uniform sampler2D sharp;
@@ -111,6 +114,15 @@ void main() {
     vec2 q = abs(p - halfSize) - (halfSize - vec2(r));
     float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
     float coverage = clamp(0.5 - d, 0.0, 1.0);
+
+    // The hole (a veil over a whole surface leaves the popup's own panel out): no glass inside it.
+    if (holeRect.z > 0.0 && holeRect.w > 0.0) {
+        vec2 hp = p / pxRatio;
+        vec2 hs = holeRect.zw * 0.5;
+        vec2 hq = abs(hp - holeRect.xy - hs) - (hs - vec2(holeRadius));
+        float hd = length(max(hq, 0.0)) + min(max(hq.x, hq.y), 0.0) - holeRadius;
+        coverage *= clamp(0.5 + hd * pxRatio, 0.0, 1.0);
+    }
 
     // The rim: a quarter circle from the edge (t = 0) to the flat middle (t = 1).
     float t = clamp(inside / b, 0.0, 1.0);

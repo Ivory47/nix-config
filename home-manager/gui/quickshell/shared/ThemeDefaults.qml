@@ -40,6 +40,10 @@ QtObject {
     // Blur strength of the glass on the bar and on the popups: gaussian sigma in logical pixels.
     readonly property real glassBlurRadius: 14
 
+    // Blur strength of the settings app, which blurs the whole desktop while it is open (the
+    // blurred picture is shared by that veil and the settings panel). Sigma in logical pixels.
+    readonly property real scrimBlurRadius: 10.5
+
     // Backdrop blur, used by shared/BackdropBlur.qml (independent of the compositor's blur).
     // 0.0 = off, 1.0 = strongest. Every config that uses BackdropBlur inherits this value.
     readonly property real backdropBlur: 0.8

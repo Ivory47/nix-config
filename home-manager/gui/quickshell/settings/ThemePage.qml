@@ -32,6 +32,7 @@ Item {
         { title: "Glass", items: [
             { key: "glass", label: "Live glass", type: "bool", note: "Off: no screen capture. May need a restart of the shells" },
             { key: "glassBlurRadius", label: "Blur radius", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "Bar and popups" },
+            { key: "scrimBlurRadius", label: "Settings desktop blur", type: "number", kind: "real", min: 0, max: 40, step: 0.5, note: "Blur of the desktop behind the settings" },
             { key: "backdropBlur", label: "Legacy blur", type: "number", kind: "real", min: 0, max: 1, note: "Unused" }
         ]},
         { title: "Shape", items: [
@@ -51,7 +52,7 @@ Item {
         ]}
     ]
 
-    Flickable {
+    KineticFlickable {
         id: flick
         anchors.fill: parent
         contentWidth: width

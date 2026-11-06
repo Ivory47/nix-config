@@ -65,5 +65,11 @@ ShaderEffect {
     // not cancelling only lets a faint trace of the real background through.
     property real cancelLeak: 1
 
+    // A rounded rectangle cut out of the glass (x, y, width, height in logical pixels of this
+    // panel, and its corner radius; zero size = none). For a veil over a whole surface that
+    // leaves out the popup's own panel (GlassScrim).
+    property vector4d holeRect: Qt.vector4d(0, 0, 0, 0)
+    property real holeRadius: 0
+
     fragmentShader: Qt.resolvedUrl("shaders/glass.frag.qsb")
 }

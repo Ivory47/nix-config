@@ -16,6 +16,10 @@ GlassPopup {
 
     focusItem: keys
 
+    // The whole desktop is blurred while this is open; its strength is its own setting. (The one
+    // blurred picture is shared by the veil and the panel.)
+    blurRadius: Math.max(0.1, Theme.scrimBlurRadius)
+
     function close() {
         root.shown = false
     }
@@ -56,13 +60,23 @@ GlassPopup {
         onClicked: root.close()
     }
 
+    // The desktop behind is blurred too, so that it is clear that only the settings can be used
+    // now, and that a click anywhere else closes them.
+    GlassScrim {
+        popup: root
+        hole: Qt.rect(panel.x, panel.y, panel.width, panel.height)
+    }
+
     GlassListPanel {
-        x: Math.round(panel.x)
-        y: Math.round(panel.y)
+        x: panel.x
+        y: panel.y
         width: panel.width
         height: panel.height
 
         popup: root
+        // The less the desktop behind is blurred, the more tint: sharp text behind the panel
+        // would show through it (from about 8 px of blur up, the usual 0.65 is enough).
+        tintStrength: 0.65 + 0.3 * (1 - Math.min(1, root.blurRadius / 8))
         // No search field: a zero-size item draws no highlight.
         field: noField
         fieldStrength: 0
@@ -78,9 +92,17 @@ GlassPopup {
     Rectangle {
         id: panel
 
-        anchors.centerIn: parent
-        width: 900
-        height: 620
+        // Centred, with the edges on whole pixels of the output (not only of the logical
+        // grid): the veil's pieces (GlassScrim) meet the panel there, and an edge that falls
+        // inside a pixel shows as a lighter line.
+        readonly property real ratio: root.backdrop.ratio
+        function snap(v) {
+            return Math.round(v * ratio) / ratio
+        }
+        width: GlassGeometry.alignedSize(900, ratio)
+        height: GlassGeometry.alignedSize(620, ratio)
+        x: snap((root.width - width) / 2)
+        y: snap((root.height - height) / 2)
 
         radius: Theme.radiusLarge
         color: "transparent"

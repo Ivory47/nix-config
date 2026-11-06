@@ -52,11 +52,13 @@ in
     xdg.configFile."quickshell/settings".source = mkConfig "settings" ./settings;
 
     # The icon of that entry: Quickshell's icon lookup does not find the generic theme icons
-    # (preferences-system and the like), only app icons, so the app brings its own.
+    # (preferences-system and the like), only app icons, so the app brings its own: an outlined eight-tooth gear.
     xdg.dataFile."icons/hicolor/scalable/apps/quickshell-settings.svg".text = ''
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-          <circle cx="32" cy="32" r="26" fill="none" stroke="#cdd6f4" stroke-width="8" stroke-dasharray="8.5 8.5"/>
-          <circle cx="32" cy="32" r="20" fill="none" stroke="#cdd6f4" stroke-width="10"/>
+                  <g fill="none" stroke="#cdd6f4" stroke-width="4" stroke-linejoin="round">
+                    <path d="M26.21,11.81 L27.13,2.90 L36.87,2.90 L37.79,11.81 A21.0,21.0 0 0,1 42.18,13.63 L49.13,7.98 L56.02,14.87 L50.37,21.82 A21.0,21.0 0 0,1 52.19,26.21 L61.10,27.13 L61.10,36.87 L52.19,37.79 A21.0,21.0 0 0,1 50.37,42.18 L56.02,49.13 L49.13,56.02 L42.18,50.37 A21.0,21.0 0 0,1 37.79,52.19 L36.87,61.10 L27.13,61.10 L26.21,52.19 A21.0,21.0 0 0,1 21.82,50.37 L14.87,56.02 L7.98,49.13 L13.63,42.18 A21.0,21.0 0 0,1 11.81,37.79 L2.90,36.87 L2.90,27.13 L11.81,26.21 A21.0,21.0 0 0,1 13.63,21.82 L7.98,14.87 L14.87,7.98 L21.82,13.63 A21.0,21.0 0 0,1 26.21,11.81 Z"/>
+                    <circle cx="32" cy="32" r="12"/>
+                  </g>
         </svg>
     '';
 

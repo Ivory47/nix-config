@@ -198,7 +198,9 @@ PanelWindow {
         visible: root.presented
 
         // One opaque pixel at the top left: says which version of the surface a capture holds.
+        // (Above everything: a veil over the whole surface, GlassScrim, must not cover it.)
         GlassTag {
+            z: 1000
             backdrop: glassBackdrop
         }
     }
