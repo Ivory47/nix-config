@@ -1,7 +1,7 @@
 { pkgs, ... }:
 
 let
-    # Live liquid glass (shared/glass), used by the status bar only.
+    # Live liquid glass (shared/glass), used by the status bar, the app launcher and the clipboard popup.
     #  - glassNative: the QML module `Glass.Native` (wlr-screencopy region capture), C++.
     #  - glassShaders: the GLSL shaders compiled to .qsb, which is what QML's ShaderEffect loads.
     glassNative = pkgs.callPackage ./shared/glass/native/package.nix { };

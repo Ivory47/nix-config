@@ -6,7 +6,7 @@ Facts below were verified from the repo unless marked **UNKNOWN**.
 
 ## 1. Project overview
 Three Quickshell (QML/Qt6) shells for Hyprland, deployed through Home Manager:
-`status-bar` (main focus, includes a self-rendered live glass/blur effect), `app-launcher`, `clipboard`.
+`status-bar` (includes a self-rendered live glass/blur effect), `app-launcher` and `clipboard` (both use the same glass, see section 9).
 Goal of current work: a live background blur behind the status bar that is **independent of compositor blur**.
 
 ## 2. Repository structure
@@ -14,7 +14,7 @@ Goal of current work: a live background blur behind the status bar that is **ind
 - `shared/` — `Theme.qml` plus `glass/` (the blur/glass implementation) and the legacy `BackdropBlur.qml` (unused).
 - `default.nix` — Home Manager module that builds and installs all three configs.
 - `reload.sh` — script that restarts all three quickshell instances; the zsh alias `qsr` runs it (see section 4).
-- `app-launcher/`, `clipboard/` — out of scope for status-bar work unless a concrete dependency requires it.
+- `app-launcher/` (`Launcher.qml`, `LauncherItem.qml`, `LauncherModel.qml`) and `clipboard/` (`ClipboardPopup.qml`, `ClipboardItem.qml`, model, watcher) — full-screen overlay popups with the glass; out of scope for status-bar work unless a concrete dependency requires it. `Test.qml` and the empty `LauncherSearch.qml` in the launcher are unused.
 
 ## 3. Architecture and technologies
 - QML on Quickshell; layer-shell via `PanelWindow` (`WlrLayershell.namespace: "statusbar"`).
@@ -40,6 +40,7 @@ Goal of current work: a live background blur behind the status bar that is **ind
   `~/.config/home-manager` is a symlink into this repo, so `qsr` executes the **repo's** `reload.sh` directly, not a nix-store copy. `default.nix` does not reference `reload.sh`, so it is never deployed by `hms`, and edits to it take effect immediately without `hms`.
   `qsr` is the alias and `reload.sh` is the file it runs; they do the same thing, but the alias exists only in interactive zsh. What `reload.sh` does: `pkill -f "quickshell -c <name>"` then `qs -c <name> >/dev/null 2>&1 & disown` for `status-bar` and `app-launcher`; for `clipboard` it kills the instance and any `wl-paste --type image --watch` watchers, then relaunches. So `qsr` restarts **all three** shells and discards their in-memory state. Output is silenced, so QML errors are not shown.
   Claude Code's non-interactive shell does not have the alias: if a reload is approved, run the script path (`~/.config/home-manager/gui/quickshell/reload.sh`), after confirming its content is unchanged.
+- To restart only the launcher or the clipboard, see section 9 (do not use `pkill -f` with the config name from Claude Code's shell).
 - To restart only the bar: `pkill -f "quickshell -c status-bar"; qs -c status-bar >/dev/null 2>&1 & disown` (equivalent to the status-bar lines in `reload.sh`).
 - **New files and flakes:** the flake lives in a git repo, so Nix only sees files tracked by git (staged or committed). A new untracked file is invisible to the build (standard Nix git-flake behaviour; not yet tested here). Stage only the specific new files needed (`git add <path>`).
 
@@ -76,7 +77,7 @@ Goal of current work: a live background blur behind the status bar that is **ind
 - Write tests where appropriate; run the relevant build/lint/test checks; review your own diff critically.
 - Explain important architectural decisions.
 - Never claim something works without verification. Compiling/building is not the same as correct runtime behaviour.
-- Status-bar tasks: work in `status-bar/`; read `shared/` or Nix files only when relevant. Do not explore `app-launcher/` or `clipboard/`.
+- Status-bar tasks: work in `status-bar/`; read `shared/` or Nix files only when relevant. Do not explore `app-launcher/` or `clipboard/` unless the task is about them (then read section 9 first).
 
 ## 8. Status bar and background blur architecture
 Wiring: `status-bar/StatusBar.qml` contains `GlassPanel` and a one-pixel `GlassTag` (both inside `barContent`) and a sibling `GlassBackdrop { composite: barContent; blurRadius: 14; ipcTarget: "glass" }`.
@@ -112,3 +113,25 @@ Constraints / known limitations:
 - Hardcoded: `origin` (0,0) (top bar only), `blurRadius` 14; no output-transform handling seen; relies on Qt private APIs.
 - Dead code: `shared/BackdropBlur.qml` (+ `Theme.backdropBlur`), `status-bar/glass-test/`, commented-out fade in `StatusBar.qml`.
 - Still **UNKNOWN**: GPU use, memory, power, multi-monitor behaviour, and behaviour at other scales. A rare colourful-noise frame was seen once while dragging, before the tag; not seen since, but unconfirmed.
+
+## 9. Glass on the app launcher and the clipboard popup
+Both are built from two shared components in `shared/glass/`; read their header comments before changing either popup:
+- `GlassPopup.qml` — the full-screen overlay `PanelWindow` (Overlay layer, anchored on all sides, `exclusionMode: ExclusionMode.Ignore`, so the surface is at the output's top left, which the tag needs; with the bar's exclusive zone the surface started at y=51 and nothing worked). Everything the popup declares becomes a child of its `content` item (the surface the glass is computed for; it also holds the `GlassTag`), and a `GlassBackdrop` (`blurRadius: 14`, `ipcTarget: "glass"`, `active: shown`) is built in. It owns `shown`, `hoveredItem`, `focusItem` (gets the keyboard), `cancelAmount`, the reveal/ramp logic and the keyboard-focus / input-mask handling. Signals `popupOpened()` / `popupClosed()` (not `closed`: Quickshell windows have one already). The instance sets `WlrLayershell.namespace`.
+- `GlassListPanel.qml` — a `GlassPanel` with the popup look (`tint: Theme.background`, `tintStrength: 0.65`, `frost: 1.0`, all four edges bevelled) and the highlights of the search field, the selected row and the hovered row (`fieldStrength` 0.55, `selectedStrength` 0.7, `hoveredStrength` 0.5). Properties `popup`, `field`, `listView` (+ x, y, width, height of the panel in whole pixels). It must be a direct child of the popup's items, below the widgets.
+`app-launcher/Launcher.qml` and `clipboard/ClipboardPopup.qml` are then only: the model, the panel `Rectangle` (transparent, with border) with the search `TextField` and `ListView`, the delegates setting `root.hoveredItem` in `onHoveredChanged`, `onPopupClosed` (clear search / reset selection) and the IPC handler.
+
+Things learned the hard way (all verified, by screenshots with `grim` and logs):
+- **Never toggle `visible` on these windows** (GlassPopup does not; use `shown`). Quickshell destroys and re-creates the Qt window, and with the glass items that segfaults (`QQuickWindow::maybeUpdate`, second show). The window stays mapped; a `shown` property drives `mask: shown ? null : emptyMask` (a `Region {}`), `WlrLayershell.keyboardFocus` (`Exclusive` while shown, `None` otherwise: `focusable` is only on-demand and often did not get the keyboard), `content.visible` and the backdrop's `active`. Focus is requested on show and again 60 ms later.
+- **No translucent items over the glass, no shadow under it.** The background can only be recovered where the stack lets at least about 3% of it through; the glass is alpha 0.92 (8%). A translucent highlight on top (or a `RectangularShadow` under it) lowers that, and the sharp background then shows through there (or, with the shadow, because the shader cancels 8% where only 4% leaks). So the highlights (search field, selected row, hovered row) are drawn by the glass shader: `GlassPanel.hlRect0..2` / `hlColor0..2` / `hlRadius` (x, y, w, h in the panel's logical pixels, rgb + strength), set by GlassListPanel from the widgets' geometry with `mapToItem` (rows clipped to the list; the bindings list other values so they re-evaluate, since `mapToItem` is not tracked). Row and field backgrounds are `"transparent"`. `frost: 1.0` because the default 0.9 mixes 10% sharp background into the glass, which shows as faint text. (The status bar still uses 0.9.) Lowering the glass alpha is no cure: the shader's cancelling clamps at 0 over bright text.
+- **Stale background on reopening.** The glass subtracts the leak of the background it saved last time; if the screen changed meanwhile, the old picture shows inverted until a fresh capture. `GlassPanel.cancelLeak` (uniform in `glass.frag`, default 1, so the bar is unchanged) is kept at 0 by GlassPopup until two updates of the backdrop (`flips`) have arrived (`revealTimeout` 400 ms), then ramped to 1 (`rampDuration` 150 ms). Shorter ramps (80 ms) flashed, longer ones (250 ms) left the sharp background showing too long. The cost: for about 150 ms after opening, a faint trace of the real, sharp background shows through. Tried and rejected: fade-in of the glass, hiding the popup until captures arrive (felt like a delay). Not tried: keeping the backdrop fresh while hidden (needs an "empty surface" mode in `unmix.frag`; costs background capture while closed), or capturing first and showing after (about 2-3 frames of delay).
+- Closing clears the search text, selection and scroll (so reopening starts clean).
+- New files under `shared/glass/` must be `git add`ed before `hms`, like any new file. Both tags sit at the output's top left, over the bar's: while a popup is open the bar rejects its captures and keeps its last blur.
+
+Testing without touching the real config (no `hms` needed): copy the deployed config with `cp -rL ~/.config/quickshell/<name> <scratch>/dev`, edit it, run `qs -p <scratch>/dev` (kill the real instance first), and use `qs -p <scratch>/dev ipc call launcher toggle`. Shaders can be compiled by hand with `nix shell nixpkgs#qt6.qtshadertools -c qsb --qt6 -o out.frag.qsb in.frag`. `GlassPanel.debugMode: 1` shows the recovered background (magenta = unknown). Screenshots: `grim -g "x,y wxh" file.png` (logical coordinates; it takes about 100 ms per shot); `nix shell nixpkgs#imagemagick -c magick ...` to crop and stack them. Move the pointer with `hyprctl dispatch 'hl.dsp.cursor.move({ x = 720, y = 400 })'` (`hyprctl dispatch movecursor ...` does nothing here; this Hyprland uses a Lua config) and type with `wtype`. Caveat: a synthetic pointer move does not send motion to a surface that is already mapped, so the hover highlight only shows the row under the pointer at the moment the popup opened; move the pointer first, then open, to test hover (dynamic hover with a real mouse is untested).
+
+IPC and restarting:
+- `qs -c app-launcher ipc call launcher toggle` (same form for `clipboard ipc call clipboard toggle`, `... call glass stats`). `launcher show` only prints the IPC listing here: use `toggle`/`hide`.
+- Restart one instance: find its PID with `hyprctl layers | grep "namespace: app-launcher"` (the window stays mapped, so it is always listed; after a crash it is not) and `kill` it, then `(setsid qs -c app-launcher >/tmp/x.log 2>&1 &)`. A process can show up as `.quickshell-wrapped` and then `pkill -f "quickshell -c ..."` misses it. Beware that `pkill -f`/`pgrep -f` with a config name matches Claude Code's own shell command line and kills it (exit 144); use PIDs, or `pgrep -x quickshell` and read `/proc/<pid>/cmdline`.
+- Clipboard: the instance also starts two `wl-paste --watch` processes (text and image). When replacing an instance, kill the old one and its children (`pkill -P <pid>`), or the watchers stack up.
+- Crash reports: `~/.cache/quickshell/crashes/<id>/report.txt`.
+

@@ -18,15 +18,9 @@ Item {
 
         radius: Theme.radiusMedium
 
-        color: root.selected || root.hovered
-            ? Theme.surface
-            : Theme.background
-
-        Behavior on color {
-            ColorAnimation {
-                duration: 100
-            }
-        }
+        // Always transparent: the highlight is drawn by the glass (see ClipboardPopup.qml). A
+        // translucent item over the glass would cost the blur under it.
+        color: "transparent"
     }
 
     Column {

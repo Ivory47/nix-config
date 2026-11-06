@@ -43,5 +43,24 @@ ShaderEffect {
     property real glassOpacity: style.opacity
     property real debugView: debugMode
 
+    // Up to three rounded rectangles of colour drawn into the glass (x, y, width, height in
+    // logical pixels of this panel; colour rgb and strength 0..1). Use these for highlights on
+    // glass instead of translucent items over it: an item over the glass lowers how much of the
+    // background shows through the stack, and below about 3% the background cannot be recovered
+    // under it, so the blur is lost there (the sharp background shows).
+    property vector4d hlRect0: Qt.vector4d(0, 0, 0, 0)
+    property vector4d hlRect1: Qt.vector4d(0, 0, 0, 0)
+    property vector4d hlRect2: Qt.vector4d(0, 0, 0, 0)
+    property vector4d hlColor0: Qt.vector4d(0, 0, 0, 0)
+    property vector4d hlColor1: Qt.vector4d(0, 0, 0, 0)
+    property vector4d hlColor2: Qt.vector4d(0, 0, 0, 0)
+    property real hlRadius: 6
+
+    // 1: the part of the background that leaks through the glass is cancelled with the recovered
+    // background (normal). 0: it is not. Use 0 while the recovered background may be out of date
+    // (just after a surface was shown again): cancelling an old picture draws it inverted, while
+    // not cancelling only lets a faint trace of the real background through.
+    property real cancelLeak: 1
+
     fragmentShader: Qt.resolvedUrl("shaders/glass.frag.qsb")
 }

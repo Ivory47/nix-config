@@ -4,36 +4,32 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
-import QtQuick.Effects
 import qs.shared
+import qs.shared.glass
 
-PanelWindow {
+// The window, the glass and the opening and closing are GlassPopup's; see there.
+GlassPopup {
     id: root
     WlrLayershell.namespace: "app-launcher"
 
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
+    focusItem: searchField
+
+    onPopupClosed: {
+        // A fresh start the next time: no search text, first app selected, list at the top.
+        searchField.text = ""
+        appList.currentIndex = appList.count > 0 ? 0 : -1
+        appList.positionViewAtBeginning()
     }
 
-    WlrLayershell.layer: WlrLayer.Overlay
-
-    visible: false
-    focusable: true
-
-    color: "transparent"
-
     function closeLauncher() {
-        root.visible = false
+        root.shown = false
     }
 
     Connections {
         target: Hyprland
 
         function onFocusedWorkspaceChanged() {
-            root.visible = false
+            root.shown = false
         }
     }
 
@@ -41,19 +37,15 @@ PanelWindow {
         target: "launcher"
 
         function toggle() {
-            root.visible = !root.visible
-
-            if (root.visible)
-            searchField.forceActiveFocus()
+            root.shown = !root.shown
         }
 
         function show() {
-            root.visible = true
-            searchField.forceActiveFocus()
+            root.shown = true
         }
 
         function hide() {
-            root.visible = false
+            root.shown = false
         }
     }
 
@@ -61,18 +53,16 @@ PanelWindow {
         id: launcherModel
     }
 
-    RectangularShadow {
-        anchors.fill: launcher
+    GlassListPanel {
+        // Placed in the surface's coordinates (whole pixels, as the glass needs).
+        x: Math.round(launcher.x)
+        y: Math.round(launcher.y)
+        width: launcher.width
+        height: launcher.height
 
-        radius: launcher.radius
-
-        blur: 14
-        spread: 2
-
-        color: Theme.shadowColor
-
-        offset.x: 0
-        offset.y: 4
+        popup: root
+        field: searchField
+        listView: appList
     }
 
     Rectangle {
@@ -84,7 +74,7 @@ PanelWindow {
         height: 400
 
         radius: Theme.radiusLarge
-        color: Theme.background
+        color: "transparent"
 
         border.width: 1
         border.color: Theme.surfaceAlt
@@ -118,7 +108,7 @@ PanelWindow {
 
                 background: Rectangle {
                     radius: Theme.radiusMedium
-                    color: Theme.surface
+                    color: "transparent" // drawn by the glass (hlRect0)
                 }
 
                 Component.onCompleted: {
@@ -221,6 +211,8 @@ PanelWindow {
                 currentIndex: count > 0 ? 0 : -1
 
                 delegate: LauncherItem {
+                    id: row
+
                     required property var modelData
                     required property int index
 
@@ -228,6 +220,14 @@ PanelWindow {
                     selected: index === appList.currentIndex
 
                     width: appList.width
+
+                    // The glass highlights the row under the mouse (hlRect2).
+                    onHoveredChanged: {
+                        if (hovered)
+                            root.hoveredItem = row
+                        else if (root.hoveredItem === row)
+                            root.hoveredItem = null
+                    }
 
                     onLaunched: {
                         root.closeLauncher()

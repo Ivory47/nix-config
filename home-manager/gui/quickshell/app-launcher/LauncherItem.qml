@@ -20,15 +20,10 @@ Item {
 
         radius: Theme.radiusMedium
 
-        color: root.selected || root.hovered
-            ? Theme.surface
-            : Theme.background
+        // Always transparent: the highlight is drawn by the glass (see Launcher.qml). A translucent
+        // item over the glass would cost the blur under it.
+        color: "transparent"
 
-        Behavior on color {
-            ColorAnimation {
-                duration: 100
-            }
-        }
     }
 
     Image {

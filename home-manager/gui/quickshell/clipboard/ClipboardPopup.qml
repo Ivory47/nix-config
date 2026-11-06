@@ -1,30 +1,21 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import qs.shared
+import qs.shared.glass
 
-PanelWindow {
+// The window, the glass and the opening and closing are GlassPopup's; see there.
+GlassPopup {
     id: root
     WlrLayershell.namespace: "clipboard"
 
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-    }
+    focusItem: searchField
 
-    WlrLayershell.layer: WlrLayer.Overlay
-    exclusionMode: ExclusionMode.Ignore
-
-    visible: false
-    focusable: true
-
-    color: "transparent"
+    // A fresh start the next time.
+    onPopupClosed: searchField.text = ""
 
     // When true, Ctrl+V is also sent to the window you were in after picking an entry (needs wtype).
     // Off by default because terminals use Ctrl+Shift+V.
@@ -36,20 +27,15 @@ PanelWindow {
     function open() {
         searchField.text = ""
         clipboardModel.refresh()
-        root.visible = true
-
-        Qt.callLater(() => {
-            if (root.visible)
-            searchField.forceActiveFocus()
-        })
+        root.shown = true
     }
 
     function close() {
-        root.visible = false
+        root.shown = false
     }
 
     function toggle() {
-        if (root.visible)
+        if (root.shown)
             close()
         else
             open()
@@ -133,18 +119,16 @@ PanelWindow {
         onClicked: root.close()
     }
 
-    RectangularShadow {
-        anchors.fill: panel
+    GlassListPanel {
+        // Placed in the surface's coordinates (whole pixels, as the glass needs).
+        x: Math.round(panel.x)
+        y: Math.round(panel.y)
+        width: panel.width
+        height: panel.height
 
-        radius: panel.radius
-
-        blur: 14
-        spread: 2
-
-        color: Theme.shadowColor
-
-        offset.x: 0
-        offset.y: 4
+        popup: root
+        field: searchField
+        listView: list
     }
 
     Rectangle {
@@ -156,7 +140,7 @@ PanelWindow {
         height: Math.min(560, root.height - 80)
 
         radius: Theme.radiusLarge
-        color: Theme.background
+        color: "transparent"
 
         border.width: 1
         border.color: Theme.surfaceAlt
@@ -189,7 +173,7 @@ PanelWindow {
 
                 background: Rectangle {
                     radius: Theme.radiusMedium
-                    color: Theme.surface
+                    color: "transparent" // drawn by the glass (hlRect0)
                 }
 
                 Keys.onPressed: event => {
@@ -249,6 +233,8 @@ PanelWindow {
                 }
 
                 delegate: ClipboardItem {
+                    id: row
+
                     required property var modelData
                     required property int index
 
@@ -256,6 +242,14 @@ PanelWindow {
                     selected: index === list.currentIndex
 
                     width: list.width
+
+                    // The glass highlights the row under the mouse (hlRect2).
+                    onHoveredChanged: {
+                        if (hovered)
+                            root.hoveredItem = row
+                        else if (root.hoveredItem === row)
+                            root.hoveredItem = null
+                    }
 
                     onPicked: root.pick(index)
                 }
