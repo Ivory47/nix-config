@@ -62,6 +62,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("qs -c status-bar")
     hl.exec_cmd("qs -c app-launcher")
     hl.exec_cmd("qs -c clipboard")
+    hl.exec_cmd("qs -c settings")
     hl.exec_cmd("rm -f /tmp/kitty-socket && kitty --class HeadlessKitty --single-instance --listen-on unix:/tmp/kitty-socket --start-as=hidden tail -f /dev/null")
 end)
 
@@ -287,7 +288,9 @@ local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("ghostty"))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
-local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close())
+-- The settings app is a layer surface, not a window: while it is open Super+C closes it,
+-- otherwise the focused window as before.
+local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.exec_cmd([[sh -c 'if [ "$(qs -c settings ipc call settings isOpen 2>/dev/null)" = true ]; then qs -c settings ipc call settings hide; else hyprctl dispatch "hl.dsp.window.close()"; fi']]))
 -- closeWindowBind:set_enabled(false)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))

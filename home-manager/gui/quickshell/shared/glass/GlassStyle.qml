@@ -1,4 +1,5 @@
 import QtQuick
+import qs.shared
 
 // The look of one piece of glass. Every GlassPanel has its own, so different elements can have
 // different glass over the same backdrop. (The blur *radius* belongs to the GlassBackdrop, since
@@ -23,7 +24,7 @@ QtObject {
     property real dispersion: 0.05
 
     // Tone.
-    property color tint: "#1e1e2e"
+    property color tint: Theme.background
     property real tintStrength: 0.35
     property real brightness: 0.02
     property real contrast: 1.04

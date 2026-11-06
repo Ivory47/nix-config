@@ -49,4 +49,26 @@ in
     xdg.configFile."quickshell/status-bar".source = mkConfig "status-bar" ./status-bar;
     xdg.configFile."quickshell/app-launcher".source = mkConfig "app-launcher" ./app-launcher;
     xdg.configFile."quickshell/clipboard".source = mkConfig "clipboard" ./clipboard;
+    xdg.configFile."quickshell/settings".source = mkConfig "settings" ./settings;
+
+    # The icon of that entry: Quickshell's icon lookup does not find the generic theme icons
+    # (preferences-system and the like), only app icons, so the app brings its own.
+    xdg.dataFile."icons/hicolor/scalable/apps/quickshell-settings.svg".text = ''
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="#cdd6f4" stroke-width="8" stroke-dasharray="8.5 8.5"/>
+          <circle cx="32" cy="32" r="20" fill="none" stroke="#cdd6f4" stroke-width="10"/>
+        </svg>
+    '';
+
+    # Lets the app launcher (and any other launcher) open the settings app: it toggles the
+    # running `qs -c settings` instance over IPC.
+    xdg.desktopEntries.quickshell-settings = {
+        name = "Shell Settings";
+        genericName = "Settings";
+        comment = "Theme settings for the status bar, launcher and clipboard";
+        exec = "qs -c settings ipc call settings toggle";
+        icon = "quickshell-settings";
+        terminal = false;
+        categories = [ "Settings" ];
+    };
 }

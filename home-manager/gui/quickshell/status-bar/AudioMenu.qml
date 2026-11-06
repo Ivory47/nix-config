@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Services.Pipewire
+import qs.shared
 
 PopupWindow {
     id: popup
@@ -22,13 +23,13 @@ PopupWindow {
             fill: parent
             margins: 6
         }
-        color: "#1e1e2e"
+        color: Theme.background
         radius: 6
 
         layer.enabled: true
         layer.effect: MultiEffect {
             shadowEnabled: true
-            shadowColor: "#80000000"
+            shadowColor: Theme.shadowColor
             shadowBlur: 0.5
             shadowHorizontalOffset: 0
             shadowVerticalOffset: 3
@@ -57,7 +58,7 @@ PopupWindow {
 
                     width: 6
                     radius: 3
-                    color: "#45475a"
+                    color: Theme.surfaceAlt
                 }
 
                 Rectangle {
@@ -68,7 +69,7 @@ PopupWindow {
                     height: track.height * (Pipewire.defaultAudioSink?.audio.volume ?? 0)
 
                     radius: 3
-                    color: "#cdd6f4"
+                    color: Theme.textSecondary
                 }
 
                 MouseArea {
@@ -114,7 +115,7 @@ PopupWindow {
                     return " "
                 }
 
-                color: "#ffffff"
+                color: Theme.text
                 font.pixelSize: 20
 
                 MouseArea {

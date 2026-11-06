@@ -27,7 +27,8 @@ ShaderEffect {
     property vector4d tint: Qt.vector4d(style.tint.r, style.tint.g, style.tint.b, style.tintStrength)
     property vector2d lightDir: style.lightDir
     property real pxRatio: ratio
-    property real known: backdrop.ready ? 1 : 0
+    // With the glass off the saved blur is not used any more (it would only be the last picture).
+    property real known: backdrop.ready && backdrop.glassEnabled ? 1 : 0
     property real cornerRadius: style.cornerRadius
     property real bevel: style.bevel
     property real thickness: style.thickness

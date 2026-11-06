@@ -52,7 +52,7 @@ PanelWindow {
     // The item that gets the keyboard when the popup is shown (the search field).
     property Item focusItem: null
     // Blur strength: gaussian sigma in logical pixels.
-    property real blurRadius: 14
+    property real blurRadius: Theme.glassBlurRadius
     // How long after `shown` to wait for the first fresh background before showing the content
     // anyway, ms.
     property int presentTimeout: 80

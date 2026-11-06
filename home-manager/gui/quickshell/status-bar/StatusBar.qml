@@ -100,7 +100,7 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent
             visible: !glassBackdrop.glassEnabled
-            color: Qt.rgba(0.12, 0.12, 0.18, 0.55)
+            color: Qt.alpha(Theme.background, Theme.barFillOpacity)
         }
 
         GlassPanel {
@@ -158,6 +158,8 @@ PanelWindow {
 
                 spacing: 15
 
+                SettingsButton {}
+
                 Wifi {}
 
                 Audio {}
@@ -180,7 +182,7 @@ PanelWindow {
                 }
 
                 height: 1
-                color: Qt.alpha("#494965", 0.85)
+                color: Qt.alpha(Theme.barBorderColor, Theme.barBorderOpacity)
             }
         }
     }
@@ -190,7 +192,7 @@ PanelWindow {
     GlassBackdrop {
         id: glassBackdrop
         composite: barContent
-        blurRadius: 14
+        blurRadius: Theme.glassBlurRadius
         ipcTarget: "glass"
         glassEnabled: Theme.glass
     }

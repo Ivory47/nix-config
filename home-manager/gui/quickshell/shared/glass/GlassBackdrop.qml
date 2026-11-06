@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Glass.Native
+import qs.shared
 
 // The live backdrop of a layer-shell surface: what is really behind it, kept up to date.
 //
@@ -27,7 +28,7 @@ Item {
     // Top left of the surface, in logical pixels of the output.
     property point origin: Qt.point(0, 0)
     // Blur strength: gaussian sigma in logical pixels.
-    property real blurRadius: 14
+    property real blurRadius: Theme.glassBlurRadius
     // Minimum time between captures in ms. 0 = one refresh period of the monitor.
     property int minInterval: 0
     property bool active: true
@@ -59,6 +60,9 @@ Item {
     readonly property size texPx: cap.captureSize.width > 0 ? cap.captureSize : sizePx
     // True once a background has been settled; before that panels draw a plain tint.
     property bool ready: false
+    // Turning the glass off drops the saved background: turning it on again starts from "no
+    // backdrop yet" (a plain tint) until the first fresh capture, never from an old picture.
+    onGlassEnabledChanged: if (!glassEnabled) ready = false
     readonly property alias capture: cap
 
     width: composite.width
