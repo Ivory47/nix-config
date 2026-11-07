@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import Quickshell.Io
 import qs.shared
 
 // Every value of Theme.qml, in groups. Changing one writes it to the settings app's file (see
@@ -9,6 +10,36 @@ Item {
     id: root
 
     readonly property var sections: ThemeSchema.sections
+
+    // The actions of the section buttons (ThemeSchema: `button`): id -> { label, run() }.
+    readonly property var actions: ({
+        restartBar: { label: "Restart bar", run: () => root.restartBar() }
+    })
+    property bool restarting: false
+
+    // Restarts the status bar (some values only apply when it starts). Its process is found by
+    // the layer it owns (`pkill -f` would also match this command) and started again detached,
+    // so that it outlives this one. If the bar is not running, this just starts it.
+    function restartBar() {
+        if (restarting)
+            return
+        restarting = true
+        restartTimer.restart()
+        restartProc.running = true
+    }
+
+    Process {
+        id: restartProc
+        command: ["sh", "-c",
+            "kill $(hyprctl layers | grep 'namespace: statusbar' | sed 's/.*pid: //' | sort -u) 2>/dev/null;"
+            + " sleep 0.6; setsid -f qs -c status-bar >/dev/null 2>&1"]
+    }
+
+    Timer {
+        id: restartTimer
+        interval: 3000
+        onTriggered: root.restarting = false
+    }
 
     // key -> the field of that setting, to scroll to it.
     property var fields: ({})
@@ -59,13 +90,53 @@ Item {
                     required property int index
                     width: column.width
 
-                    Text {
-                        topPadding: section.index === 0 ? 0 : Theme.spacingLarge
-                        bottomPadding: 2
-                        text: section.modelData.title
-                        color: Theme.accent
-                        font.pixelSize: Theme.textLarge - 2
-                        font.bold: true
+                    // The title, and the section's button at the right end if it has one.
+                    Item {
+                        width: parent.width
+                        height: sectionTitle.implicitHeight
+
+                        Text {
+                            id: sectionTitle
+                            topPadding: section.index === 0 ? 0 : Theme.spacingLarge
+                            bottomPadding: 2
+                            text: section.modelData.title
+                            color: Theme.accent
+                            font.pixelSize: Theme.textLarge - 2
+                            font.bold: true
+                        }
+
+                        Rectangle {
+                            id: sectionButton
+                            readonly property var action: root.actions[section.modelData.button]
+                            visible: !!action
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 3
+                            width: buttonText.implicitWidth + 22
+                            height: 26
+                            radius: Theme.radiusSmall
+                            color: "transparent"
+                            border.width: 1
+                            border.color: !root.restarting && buttonArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
+                            opacity: root.restarting ? 0.6 : 1
+
+                            Text {
+                                id: buttonText
+                                anchors.centerIn: parent
+                                text: root.restarting ? "Restarting\u2026" : "\u21BB " + (sectionButton.action?.label ?? "")
+                                color: Theme.textSecondary
+                                font.pixelSize: Theme.textSmall
+                            }
+
+                            MouseArea {
+                                id: buttonArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                enabled: !root.restarting
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: sectionButton.action.run()
+                            }
+                        }
                     }
 
                     Rectangle {

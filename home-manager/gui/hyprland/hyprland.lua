@@ -326,7 +326,10 @@ hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", actio
 
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("qs -c app-launcher ipc call launcher toggle"))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("qs -c clipboard ipc call clipboard toggle"))
-hl.bind("Print", hl.dsp.exec_cmd([[mkdir -p ~/Pictures/Screenshots && (grim -g "$(slurp)" - | tee ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png | wl-copy) || (grim - - | tee ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png | wl-copy)]]))
+hl.bind("print", hl.dsp.exec_cmd([[
+    mkdir -p ~/Pictures/Screenshots &&
+    grimblast --freeze --cursor copysave area ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png
+]]))
 
 
 -- Switch workspaces with mainMod + [0-9]
@@ -450,6 +453,15 @@ hl.window_rule({
     match   = { class = "HeadlessKitty" },
     -- active inactive fullscreen
     opacity = "1.0 override 0.9 override 1.0 override",
+})
+
+hl.window_rule({
+    name   = "video-editor",
+    match  = { class = "^video-editor$" },
+
+    float  = true,
+    size   = "1096 674",
+    center = true,
 })
 
 -- Layer rules also return a handle.

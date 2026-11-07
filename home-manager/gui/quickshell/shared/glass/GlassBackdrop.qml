@@ -124,6 +124,16 @@ Item {
         onSwapped: syncSerial => root.handleSwapped(syncSerial)
     }
 
+    // A new blur radius applies at once: the blur is only rendered when scheduled, which happens
+    // when a capture arrives, and an idle screen sends none (the status bar sits still behind
+    // nothing that changes). So blur the background on screen again. (Later, so that the sigma of
+    // the bundle, which follows the radius, has been updated first.)
+    onBlurRadiusChanged: Qt.callLater(reblurShown)
+    function reblurShown() {
+        if (ready)
+            bundleAt(readIdx).reblur();
+    }
+
     // A capture arrived: unmix and blur it into a bundle that is not on screen, and show that
     // bundle (the frame that renders it draws the glass with it).
     function process() {

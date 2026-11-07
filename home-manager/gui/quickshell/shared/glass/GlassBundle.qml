@@ -28,6 +28,15 @@ Item {
         blurV.scheduleUpdate();
     }
 
+    // Blur the background it holds again, with the current sigma (the radius was changed): the
+    // blur passes only, from the settled background, which stays as it is. (Without this the
+    // textures are only rendered when a capture arrives, so a new radius would show only when
+    // the screen behind changes.)
+    function reblur() {
+        blurH.scheduleUpdate();
+        blurV.scheduleUpdate();
+    }
+
     // draft, or the previous background if the check says the capture was the wrong frame
     ShaderEffect {
         id: settleFx

@@ -6,6 +6,7 @@ import QtQuick
 // and what the search finds. One entry per value (`key` is the Theme property):
 //   key, label, type ("color" | "number" | "bool"), kind ("int" | "real", numbers), min, max, step,
 //   alpha (colours with transparency), note (small grey text), keywords (synonyms for the search).
+// A section can have a `button` (an action of ThemePage, shown next to its title).
 QtObject {
     readonly property var sections: [
         { title: "Colors", items: [
@@ -21,7 +22,7 @@ QtObject {
             { key: "red", keywords: ["colour", "error", "danger", "critical", "low battery"], label: "Red", type: "color" },
             { key: "shadowColor", keywords: ["colour", "drop shadow", "menu shadow"], label: "Shadow", type: "color", alpha: true }
         ]},
-        { title: "Status bar", items: [
+        { title: "Status bar", button: "restartBar", items: [
             { key: "statusBarHeight", keywords: ["bar", "panel height", "size", "taskbar", "top bar"], label: "Height", type: "number", kind: "int", min: 24, max: 120, note: "Needs a restart of the bar's glass to be exact" },
             { key: "barBorderColor", keywords: ["bar", "line", "outline", "edge", "colour"], label: "Border color", type: "color" },
             { key: "barBorderOpacity", keywords: ["bar", "line", "transparency", "alpha"], label: "Border opacity", type: "number", kind: "real", min: 0, max: 1 },

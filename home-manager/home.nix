@@ -20,6 +20,7 @@
         nodejs
         grim
         slurp
+        grimblast
 
         claude-code
     ];
