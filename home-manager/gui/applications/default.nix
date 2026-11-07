@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 
 {
 
@@ -15,6 +15,9 @@
         nautilus    # file explorer
         signal-desktop
         mpv
+
+        # own video editor 
+        inputs.video-editor.packages.${pkgs.stdenv.hostPlatform.system}.default
 
         (texlive.combine {
              inherit (texlive) scheme-full;

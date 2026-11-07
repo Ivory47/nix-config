@@ -18,6 +18,11 @@
             inputs.nixpkgs.follows = "nixpkgs";
         };
 
+        video-editor = {
+            url = "git+ssh://git@github.com/Ivory47/Video-Editor";
+            inputs.nixpkgs.follows = "nixpkgs";
+        };
+
         nur.url = "github:nix-community/NUR";
     };
 
