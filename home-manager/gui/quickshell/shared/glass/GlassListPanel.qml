@@ -44,6 +44,7 @@ GlassPanel {
 
     backdrop: popup.backdrop
     cancelLeak: popup.cancelAmount
+    motionGate: 1
     hlRadius: Theme.radiusMedium
 
     // `item` in this panel's coordinates; the list's rows are cut at the list's edges.

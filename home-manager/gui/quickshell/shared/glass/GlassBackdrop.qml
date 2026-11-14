@@ -39,6 +39,15 @@ Item {
     property bool active: true
     // Off: no capture, nothing kept up to date (for comparing against the bar without glass).
     property bool glassEnabled: true
+    // Clean mode: the compositor leaves our own surfaces out of the captures we make (the Pane
+    // Hyprland plugin, see PaneStatus), so a capture is the background as it is. No unmixing, no
+    // tag pixel, no history of what we presented, and the glass is drawn opaque (GlassPanel).
+    // Otherwise the background is estimated by subtracting our own surface (unmix.frag).
+    // There is no setting for it: with the plugin loaded EVERY capture of ours is clean, and the
+    // unmix cannot work on one. To go back to estimating, unload the plugin (hyprland.lua).
+    // Whole-output captures only: the plugin does not handle region captures, which GlassCapture
+    // asks for when it has to fall back to shared memory (dmabufBroken).
+    readonly property bool clean: PaneStatus.active && cap.wholeOutput && !cap.dmabufBroken
     // Log what the pipeline does (twice a second).
     property bool debug: false
     // Name of an IPC target (`qs ipc call <target> ...`) to switch parts of the pipeline on and
@@ -183,7 +192,9 @@ Item {
         version++;
         const slot = version % ringSize;
         ringMask |= 1 << slot;
-        ringAt(slot).scheduleUpdate();
+        // (The snapshots are only read by the unmix.)
+        if (!clean)
+            ringAt(slot).scheduleUpdate();
         // What the scene graph synchronises from now on includes this update.
         scheduledAt = cap.syncCount();
     }
@@ -292,7 +303,7 @@ Item {
         property real absentRed: root.absentTagRed
         property variant previous: root.last
 
-        fragmentShader: Qt.resolvedUrl("shaders/unmix.frag.qsb")
+        fragmentShader: root.clean ? Qt.resolvedUrl("shaders/clean.frag.qsb") : Qt.resolvedUrl("shaders/unmix.frag.qsb")
     }
 
     ShaderEffectSource {
@@ -305,8 +316,9 @@ Item {
 
     ShaderEffect {
         id: flagFx
-        width: root.texPx.width
-        height: root.texPx.height
+        // One texel in clean mode (flag0.frag): nothing to measure.
+        width: root.clean ? 1 : root.texPx.width
+        height: root.clean ? 1 : root.texPx.height
         visible: false
         blending: false
 
@@ -330,7 +342,7 @@ Item {
         property real absentRed: root.absentTagRed
         property variant previous: root.last
 
-        fragmentShader: Qt.resolvedUrl("shaders/unmix.frag.qsb")
+        fragmentShader: root.clean ? Qt.resolvedUrl("shaders/flag0.frag.qsb") : Qt.resolvedUrl("shaders/unmix.frag.qsb")
     }
 
     // Float, with mip levels: the top level is the fraction of wrong pixels.
@@ -341,7 +353,7 @@ Item {
         visible: false
         mipmap: true
         format: ShaderEffectSource.RGBA16F
-        textureSize: root.texPx
+        textureSize: root.clean ? Qt.size(1, 1) : root.texPx
     }
 
     // What settle.frag decides, counted on the GPU (verdict.frag): a 3x1 float texture, rewritten
@@ -564,6 +576,7 @@ Item {
                     updatesDeferred: root.updatesDeferred,
                     ready: root.ready,
                     forceReject: root.forceReject,
+                    clean: root.clean,
                     version: root.version,
                     diagnostics: root.diagnostics
                 },
