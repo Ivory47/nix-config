@@ -95,7 +95,6 @@ GlassPopup {
     // now, and that a click anywhere else closes them.
     GlassScrim {
         popup: root
-        shadow: true
         hole: Qt.rect(panel.x, panel.y, panel.width, panel.height)
     }
 
@@ -106,6 +105,7 @@ GlassPopup {
         height: panel.height
 
         popup: root
+        shadow: true
         // The less the desktop behind is blurred, the more tint: sharp text behind the panel
         // would show through it (from about 8 px of blur up, the usual 0.65 is enough).
         tintStrength: 0.65 + 0.3 * (1 - Math.min(1, root.blurRadius / 8))
