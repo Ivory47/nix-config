@@ -12,6 +12,13 @@
 // `noScreenShare` set, for the duration of the draw, on the layers that belong to the capturing
 // process. `shouldRenderContent` skips such layers while a capture is rendered.
 //
+// Second job: a late-armed capture request must not wait for the next change. Quickshell asks for a
+// new capture after every answer, and the compositor can only take the request when it is not busy
+// rendering. If the request lands just after a commit that Quickshell has not seen, nothing else may
+// change for a long time, and the glass would show the old picture until it does (100-200 ms seen).
+// So when a Quickshell monitor capture is armed after a commit that happened since its last answer,
+// one frame is scheduled, and the capture is answered at the next vblank.
+//
 // This relies on Hyprland internals (private members, an exported but unstable function), so the
 // plugin is built against the exact Hyprland package and refuses to load on a version mismatch.
 // Quickshell checks the marker file below and falls back to its own estimate when it is missing.
@@ -86,8 +93,18 @@ inline HANDLE PHANDLE = nullptr;
 namespace {
     using RenderMonitorFn = void (*)(void*, Render::CRenderContext&);
 
-    CFunctionHook* g_hook = nullptr;
+    using OutputCommitFn = void (*)(void*, PHLMONITOR, bool);
+    using ShareFn        = Screenshare::eScreenshareError (*)(void*, SP<IHLBuffer>, const CRegion&, Screenshare::FScreenshareCallback);
+
+    CFunctionHook* g_hook       = nullptr;
+    CFunctionHook* g_hookCommit = nullptr;
+    CFunctionHook* g_hookShare  = nullptr;
     std::string    g_marker;
+
+    // Output commits seen per monitor, and the commit count at which each Quickshell session was
+    // last answered. (Only touched from the compositor's main thread.)
+    std::unordered_map<const void*, uint64_t> g_commits;
+    std::unordered_map<const void*, uint64_t> g_answered;
 
     // The file Quickshell looks for. It lives in this Hyprland instance's runtime directory, so a
     // stale one from an earlier instance can never be mistaken for a live plugin.
@@ -167,6 +184,10 @@ namespace {
         g_pHyprRenderer->startRenderPass(ctx);
         Render::CMonitorScene(monitor).draw(ctx, Time::steadyNow());
         ctx.m_renderingCapture = wasCapture;
+
+        if (g_answered.size() > 64)
+            g_answered.clear();
+        g_answered[session] = g_commits[monitor.get()];
         return true;
     }
 
@@ -180,6 +201,64 @@ namespace {
         }
         if (!done)
             reinterpret_cast<RenderMonitorFn>(g_hook->m_original)(self, ctx);
+    }
+
+    // Counts the commits per monitor, then lets Hyprland answer the pending captures as usual.
+    void hkOnOutputCommit(void* self, PHLMONITOR monitor, bool copyFBPrepared) {
+        if (monitor)
+            g_commits[monitor.get()]++;
+        reinterpret_cast<OutputCommitFn>(g_hookCommit->m_original)(self, monitor, copyFBPrepared);
+    }
+
+    // A frame was armed for a capture. If the monitor committed since this session was last answered,
+    // the client missed it: schedule a frame so that the capture is answered at the next vblank.
+    void rescueLateRequest(Screenshare::CScreenshareFrame* frame) {
+        auto* session = frame->m_session.get();
+        if (!session || session->m_type != Screenshare::SHARE_MONITOR || !session->m_client)
+            return;
+
+        const auto answered = g_answered.find(session);
+        if (answered == g_answered.end())
+            return;
+
+        const auto monitor = session->monitor();
+        if (!monitor || g_commits[monitor.get()] <= answered->second)
+            return;
+
+        pid_t pid = 0;
+        uid_t uid = 0;
+        gid_t gid = 0;
+        wl_client_get_credentials(session->m_client, &pid, &uid, &gid);
+        if (!isQuickshell(pid))
+            return;
+
+        // Answered by the frame that is scheduled; the next request is then armed after it.
+        answered->second = g_commits[monitor.get()];
+        monitor->scheduleFrame(Aquamarine::IOutput::AQ_SCHEDULE_NEEDS_FRAME);
+        g_pHyprRenderer->damageMonitor(monitor);
+    }
+
+    Screenshare::eScreenshareError hkShare(void* self, SP<IHLBuffer> buffer, const CRegion& damage, Screenshare::FScreenshareCallback callback) {
+        const auto result = reinterpret_cast<ShareFn>(g_hookShare->m_original)(self, buffer, damage, std::move(callback));
+        if (result == Screenshare::ERROR_NONE) {
+            try {
+                rescueLateRequest(static_cast<Screenshare::CScreenshareFrame*>(self));
+            } catch (const std::exception&) {
+                // The request itself went through; only the extra frame is lost.
+            }
+        }
+        return result;
+    }
+
+    // Finds an exported Hyprland function by its mangled-name fragment and hooks it.
+    CFunctionHook* hookFunction(const std::string& name, const std::string& signatureFragment, void* replacement) {
+        for (auto& match : HyprlandAPI::findFunctionsByName(PHANDLE, name)) {
+            if (match.signature.find(signatureFragment) == std::string::npos)
+                continue;
+            auto* hook = HyprlandAPI::createFunctionHook(PHANDLE, match.address, replacement);
+            return (hook && hook->hook()) ? hook : nullptr;
+        }
+        return nullptr;
     }
 
     void fail(const std::string& why) {
@@ -198,19 +277,22 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     if (std::string(__hyprland_api_get_hash()) != std::string(__hyprland_api_get_client_hash()))
         fail("built for a different Hyprland version (rebuild the plugin)");
 
-    void* target = nullptr;
-    for (auto& match : HyprlandAPI::findFunctionsByName(PHANDLE, "renderMonitor")) {
-        if (match.signature.find("CScreenshareFrame13renderMonitorERN6Render14CRenderContextE") != std::string::npos) {
-            target = match.address;
-            break;
-        }
-    }
-    if (!target)
-        fail("Screenshare::CScreenshareFrame::renderMonitor not found (Hyprland changed)");
+    g_hook = hookFunction("renderMonitor", "CScreenshareFrame13renderMonitorERN6Render14CRenderContextE", reinterpret_cast<void*>(&hkRenderMonitor));
+    if (!g_hook)
+        fail("could not hook Screenshare::CScreenshareFrame::renderMonitor (Hyprland changed)");
 
-    g_hook = HyprlandAPI::createFunctionHook(PHANDLE, target, reinterpret_cast<void*>(&hkRenderMonitor));
-    if (!g_hook || !g_hook->hook())
-        fail("could not hook renderMonitor");
+    // The late-request rescue is an extra: without it the captures are still clean.
+    g_hookCommit = hookFunction("onOutputCommit", "CScreenshareManager14onOutputCommit", reinterpret_cast<void*>(&hkOnOutputCommit));
+    g_hookShare  = hookFunction("share", "CScreenshareFrame5share", reinterpret_cast<void*>(&hkShare));
+    if (!g_hookCommit || !g_hookShare) {
+        if (g_hookCommit)
+            HyprlandAPI::removeFunctionHook(PHANDLE, g_hookCommit);
+        if (g_hookShare)
+            HyprlandAPI::removeFunctionHook(PHANDLE, g_hookShare);
+        g_hookCommit = nullptr;
+        g_hookShare  = nullptr;
+        HyprlandAPI::addNotification(PHANDLE, "[pane] late-request rescue not active (Hyprland changed); captures are still clean", CHyprColor{1.0, 0.5, 0.1, 1.0}, 6000);
+    }
 
     g_marker = markerPath();
     if (!g_marker.empty()) {
@@ -222,6 +304,10 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
+    if (g_hookShare)
+        HyprlandAPI::removeFunctionHook(PHANDLE, g_hookShare);
+    if (g_hookCommit)
+        HyprlandAPI::removeFunctionHook(PHANDLE, g_hookCommit);
     if (g_hook)
         HyprlandAPI::removeFunctionHook(PHANDLE, g_hook);
     if (!g_marker.empty())
