@@ -1,5 +1,25 @@
 {
   "nodes": {
+    "lucent": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794681833,
+        "narHash": "sha256-8/e7ew0FRf/0mabICO4K9CglKoOHlHCV+LYLracr6I8=",
+        "ref": "refs/heads/main",
+        "rev": "9dfb39a53fe67a5c6e97c692fd4cc430164ba6b7",
+        "revCount": 2,
+        "type": "git",
+        "url": "file:///home/user/Documents/Code/Lucent"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///home/user/Documents/Code/Lucent"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793540411,
@@ -34,6 +54,7 @@
     },
     "root": {
       "inputs": {
+        "lucent": "lucent",
         "nixpkgs": "nixpkgs",
         "nixpkgs-tailscale": "nixpkgs-tailscale",
         "silentSDDM": "silentSDDM"

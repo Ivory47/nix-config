@@ -3,7 +3,7 @@
 {
     imports = [
         inputs.silentSDDM.nixosModules.default
-        ../modules/pane.nix
+        inputs.lucent.nixosModules.default
     ];
 
     hardware.graphics.enable = true;

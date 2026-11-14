@@ -1,6 +1,6 @@
 #version 440
 // Clean mode (see GlassBackdrop.clean): the compositor left our own surfaces out of the capture
-// (the Pane Hyprland plugin), so the background IS the capture, cropped to our region. Replaces
+// (the Lucent Hyprland plugin), so the background IS the capture, cropped to our region. Replaces
 // unmix.frag mode 0: nothing to subtract, nothing to divide by.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;

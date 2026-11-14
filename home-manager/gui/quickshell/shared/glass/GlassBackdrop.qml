@@ -40,14 +40,14 @@ Item {
     // Off: no capture, nothing kept up to date (for comparing against the bar without glass).
     property bool glassEnabled: true
     // Clean mode: the compositor leaves our own surfaces out of the captures we make (the Pane
-    // Hyprland plugin, see PaneStatus), so a capture is the background as it is. No unmixing, no
+    // Hyprland plugin, see LucentStatus), so a capture is the background as it is. No unmixing, no
     // tag pixel, no history of what we presented, and the glass is drawn opaque (GlassPanel).
     // Otherwise the background is estimated by subtracting our own surface (unmix.frag).
     // There is no setting for it: with the plugin loaded EVERY capture of ours is clean, and the
     // unmix cannot work on one. To go back to estimating, unload the plugin (hyprland.lua).
     // Whole-output captures only: the plugin does not handle region captures, which GlassCapture
     // asks for when it has to fall back to shared memory (dmabufBroken).
-    readonly property bool clean: PaneStatus.active && cap.wholeOutput && !cap.dmabufBroken
+    readonly property bool clean: LucentStatus.active && cap.wholeOutput && !cap.dmabufBroken
     // Log what the pipeline does (twice a second).
     property bool debug: false
     // Name of an IPC target (`qs ipc call <target> ...`) to switch parts of the pipeline on and

@@ -7,6 +7,13 @@
         nixpkgs-tailscale.url = 
             "github:NixOS/nixpkgs/c59305bab2065cfecc4944690d9eedbb56f3a9fa";
 
+        # Lucent: the Hyprland plugin that gives Quickshell clean screen captures (its own repo, see
+        # ~/Documents/Code/Lucent). A local path for now; the same dir must exist on every GUI host.
+        lucent = {
+            url = "git+file:///home/user/Documents/Code/Lucent";
+            inputs.nixpkgs.follows = "nixpkgs";
+        };
+
         silentSDDM = {
             url = "github:uiriansan/SilentSDDM";
             inputs.nixpkgs.follows = "nixpkgs";

@@ -52,16 +52,18 @@ local browser    = "firefox"
 
 -- See https://wiki.hypr.land/Configuring/Basics/Autostart/
 
--- Pane: clean screen captures for Quickshell's live glass (system/modules/pane.nix builds and
--- installs it; its source is system/modules/pane/main.cpp). It is loaded only if the system config
--- has installed it, and Quickshell falls back to its own estimate when it is not loaded
--- (home-manager/gui/quickshell/shared/PaneStatus.qml). pcall: a failed or repeated load (config
--- reload) must never stop the rest of this file.
-local panePlugin = "/etc/hypr/plugins/libpane.so"
-local paneFile   = io.open(panePlugin, "r")
-if paneFile then
-    paneFile:close()
-    pcall(hl.plugin.load, panePlugin)
+-- Lucent: clean screen captures for Quickshell's live glass (the Lucent project,
+-- ~/Documents/Code/Lucent; the system flake takes it as the input `lucent` and installs it). It is
+-- loaded only if the system config has installed it, and Quickshell falls back to its own estimate
+-- when it is not loaded (home-manager/gui/quickshell/shared/LucentStatus.qml). pcall: a failed or
+-- repeated load (config reload) must never stop the rest of this file. (Renamed from "pane": a
+-- Hyprland that was started before the rename still has the old build loaded; the new one then
+-- refuses to load until Hyprland is restarted.)
+local lucentPlugin = "/etc/hypr/plugins/liblucent.so"
+local lucentFile   = io.open(lucentPlugin, "r")
+if lucentFile then
+    lucentFile:close()
+    pcall(hl.plugin.load, lucentPlugin)
 end
 
 -- Autostart necessary processes (like notifications daemons, status bars, etc.)
