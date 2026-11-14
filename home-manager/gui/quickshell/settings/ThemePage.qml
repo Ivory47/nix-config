@@ -13,7 +13,7 @@ Item {
 
     // The actions of the section buttons (ThemeSchema: `button`): id -> { label, run() }.
     readonly property var actions: ({
-        restartBar: { label: "Restart bar", run: () => root.restartBar() }
+        restartBar: { title: "Restart status bar", note: "Applies the height and glass changes", label: "Restart", run: () => root.restartBar() }
     })
     property bool restarting: false
 
@@ -77,7 +77,7 @@ Item {
 
         Column {
             id: column
-            x: 0
+            x: 6 // room for the outline of a row (a row is outlined 4 px outside its edges)
             width: flick.width - 16
             spacing: 0
 
@@ -90,7 +90,7 @@ Item {
                     required property int index
                     width: column.width
 
-                    // The title, and the section's button at the right end if it has one.
+                    // The section title.
                     Item {
                         width: parent.width
                         height: sectionTitle.implicitHeight
@@ -103,39 +103,6 @@ Item {
                             color: Theme.accent
                             font.pixelSize: Theme.textLarge - 2
                             font.bold: true
-                        }
-
-                        Rectangle {
-                            id: sectionButton
-                            readonly property var action: root.actions[section.modelData.button]
-                            visible: !!action
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 3
-                            width: buttonText.implicitWidth + 22
-                            height: 26
-                            radius: Theme.radiusSmall
-                            color: "transparent"
-                            border.width: 1
-                            border.color: !root.restarting && buttonArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
-                            opacity: root.restarting ? 0.6 : 1
-
-                            Text {
-                                id: buttonText
-                                anchors.centerIn: parent
-                                text: root.restarting ? "Restarting\u2026" : "\u21BB " + (sectionButton.action?.label ?? "")
-                                color: Theme.textSecondary
-                                font.pixelSize: Theme.textSmall
-                            }
-
-                            MouseArea {
-                                id: buttonArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                enabled: !root.restarting
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: sectionButton.action.run()
-                            }
                         }
                     }
 
@@ -155,6 +122,71 @@ Item {
                             spec: modelData
 
                             Component.onCompleted: root.fields[modelData.key] = field
+                        }
+                    }
+
+                    // The section's action (ThemeSchema `button`) as a row of its own, like a
+                    // setting: label and note on the left, the button where the controls are.
+                    Item {
+                        id: actionRow
+                        readonly property var action: root.actions[section.modelData.button]
+                        visible: !!action
+                        width: parent.width
+                        height: visible ? 44 : 0
+
+                        Column {
+                            anchors.left: parent.left
+                            anchors.right: actionButton.left
+                            anchors.rightMargin: Theme.spacingMedium
+                            y: 22 - height / 2
+                            spacing: 1
+
+                            Text {
+                                width: parent.width
+                                elide: Text.ElideRight
+                                text: actionRow.action?.title ?? ""
+                                color: Theme.text
+                                font.pixelSize: Theme.textMedium
+                            }
+                            Text {
+                                width: parent.width
+                                elide: Text.ElideRight
+                                text: actionRow.action?.note ?? ""
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.textSmall - 1
+                            }
+                        }
+
+                        // Right edge where the controls end (the reset arrow's column is to the right).
+                        Rectangle {
+                            id: actionButton
+                            anchors.right: parent.right
+                            anchors.rightMargin: 22 + Theme.spacingSmall
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: buttonText.implicitWidth + 24
+                            height: 28
+                            radius: Theme.radiusSmall
+                            color: "transparent"
+                            border.width: 1
+                            border.color: !root.restarting && buttonArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
+                            opacity: root.restarting ? 0.6 : 1
+
+                            Text {
+                                id: buttonText
+                                anchors.centerIn: parent
+                                text: root.restarting ? "Restarting\u2026" : "\u21BB " + (actionRow.action?.label ?? "")
+                                color: Theme.textSecondary
+                                font.pixelSize: Theme.textSmall
+                            }
+
+                            MouseArea {
+                                id: buttonArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                enabled: !root.restarting
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: actionRow.action.run()
+                            }
                         }
                     }
                 }

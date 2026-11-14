@@ -40,6 +40,22 @@ QtObject {
     // Blur strength of the glass on the bar and on the popups: gaussian sigma in logical pixels.
     readonly property real glassBlurRadius: 14
 
+    // Cost of the blur: the most samples each blur pass takes per side of a pixel (the GPU time
+    // grows with it). A wider blur than this many texels spreads the samples out instead of
+    // taking more, so the picture stays almost the same; very low values start to look grainy.
+    readonly property int blurMaxTaps: 48
+
+    // How much the sample count falls as the blur gets stronger than radius 14: 0 = not at all,
+    // 1 = inversely with the radius (twice the blur, half the samples). A wide blur hides the
+    // coarser sampling, so the cost stops growing, or even shrinks, with strength.
+    readonly property real blurTapsFalloff: 0.0
+
+    // Drop shadow around the app launcher and the clipboard popup (outside the panel only; under
+    // the glass it would break the background recovery). Opacity 0 turns it off.
+    readonly property real popupShadowOpacity: 0.3
+    readonly property real popupShadowBlur: 24      // how far it fades out, logical pixels
+    readonly property real popupShadowOffset: 8     // how far it falls downwards
+
     // Blur strength of the settings app, which blurs the whole desktop while it is open (the
     // blurred picture is shared by that veil and the settings panel). Sigma in logical pixels.
     readonly property real scrimBlurRadius: 10.5

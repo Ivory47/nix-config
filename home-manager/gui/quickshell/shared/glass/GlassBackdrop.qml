@@ -29,6 +29,11 @@ Item {
     property point origin: Qt.point(0, 0)
     // Blur strength: gaussian sigma in logical pixels.
     property real blurRadius: Theme.glassBlurRadius
+    // Blur cost: most samples per side of each blur pass (Theme.blurMaxTaps).
+    // Theme.blurTapsFalloff lowers it for a stronger blur than the reference radius (14): a wide
+    // blur hides the coarser sampling. Falloff 0: always the same count; 1: inversely with the
+    // radius. Never below 4, never above Theme.blurMaxTaps.
+    property real blurTaps: Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, blurRadius)), Theme.blurTapsFalloff))
     // Minimum time between captures in ms. 0 = one refresh period of the monitor.
     property int minInterval: 0
     property bool active: true
@@ -129,6 +134,7 @@ Item {
     // nothing that changes). So blur the background on screen again. (Later, so that the sigma of
     // the bundle, which follows the radius, has been updated first.)
     onBlurRadiusChanged: Qt.callLater(reblurShown)
+    onBlurTapsChanged: Qt.callLater(reblurShown)
     function reblurShown() {
         if (ready)
             bundleAt(readIdx).reblur();
@@ -468,6 +474,7 @@ Item {
         kept: root.prevIdx === 0 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+        taps: root.blurTaps
     }
 
     GlassBundle {
@@ -477,6 +484,7 @@ Item {
         kept: root.prevIdx === 1 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+        taps: root.blurTaps
     }
 
     GlassBundle {
@@ -486,6 +494,7 @@ Item {
         kept: root.prevIdx === 2 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+        taps: root.blurTaps
     }
 
     // Keep-alive consumer. Qt appears to render a hidden, non-live ShaderEffectSource only when

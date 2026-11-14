@@ -18,6 +18,8 @@ Item {
     required property size sizePx
     // Gaussian sigma of the blur, in real pixels.
     required property real sigma
+    // Most blur samples per side (the blur cost, see Theme.blurMaxTaps).
+    property real taps: 48
 
     readonly property Item bg: bgSource
     readonly property Item frosted: blurV
@@ -72,6 +74,7 @@ Item {
         property variant src: bgSource
         property vector2d stepUv: Qt.vector2d(1 / root.sizePx.width, 0)
         property real sigma: root.sigma
+        property real maxTaps: root.taps
 
         fragmentShader: Qt.resolvedUrl("shaders/blur.frag.qsb")
     }
@@ -96,6 +99,7 @@ Item {
         property variant src: blurH
         property vector2d stepUv: Qt.vector2d(0, 1 / blurHFx.height)
         property real sigma: root.sigma / 2
+        property real maxTaps: root.taps
 
         fragmentShader: Qt.resolvedUrl("shaders/blur.frag.qsb")
     }

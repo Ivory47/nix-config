@@ -95,6 +95,7 @@ GlassPopup {
     // now, and that a click anywhere else closes them.
     GlassScrim {
         popup: root
+        shadow: true
         hole: Qt.rect(panel.x, panel.y, panel.width, panel.height)
     }
 
@@ -307,6 +308,10 @@ GlassPopup {
                     // Room for the search icon.
                     leftPadding: Theme.spacingMedium + 30
                     rightPadding: Theme.spacingMedium
+                    // The text and cursor sat a little low next to the icon: the bottom padding
+                    // is larger than the top, which moves the line up by half the difference.
+                    topPadding: 0
+                    bottomPadding: 5
                     verticalAlignment: TextInput.AlignVCenter
                     font.pixelSize: Theme.textMedium
                     color: Theme.text

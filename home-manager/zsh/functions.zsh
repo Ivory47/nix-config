@@ -51,8 +51,8 @@ function f() {
 
 function icats() {
 	local file
-	# Find images in the current directory using fd and preview them with kitty icat
-	file=$(fd --max-depth 1 --type file --extension png --extension jpg --extension jpeg --extension gif --extension webp | \
+	# Find images, sort them newest-first with ls -t, and preview with kitty icat
+	file=$(fd --max-depth 1 --type file --extension png --extension jpg --extension jpeg --extension gif --extension webp -X ls -t | \
 		fzf --preview 'kitty +kitten icat --clear --transfer-mode=memory --stdin=no --place="${FZF_PREVIEW_COLUMNS}x${FZF_PREVIEW_LINES}@0x0" {}' \
 		--preview-window=right:60%)
 

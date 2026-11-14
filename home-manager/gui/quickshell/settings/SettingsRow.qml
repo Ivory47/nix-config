@@ -28,9 +28,9 @@ Item {
     }
     Rectangle {
         visible: root.flashing
-        x: -6
+        x: -4
         y: 2
-        width: root.width + 12
+        width: root.width + 8
         height: root.height - 4
         radius: Theme.radiusMedium
         color: "transparent"
@@ -43,10 +43,14 @@ Item {
 
     Column {
         anchors.left: parent.left
+        // Never under the control: the text is cut off with an ellipsis before it gets there.
+        width: Math.max(0, controlSlot.x - Theme.spacingMedium)
         y: 22 - height / 2
         spacing: 1
 
         Text {
+            width: parent.width
+            elide: Text.ElideRight
             text: root.spec.label
             color: Theme.text
             font.pixelSize: Theme.textMedium
@@ -54,6 +58,8 @@ Item {
 
         Text {
             visible: !!root.spec.note
+            width: parent.width
+            elide: Text.ElideRight
             text: root.spec.note || ""
             color: Theme.textMuted
             font.pixelSize: Theme.textSmall - 1

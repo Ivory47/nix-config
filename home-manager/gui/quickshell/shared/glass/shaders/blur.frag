@@ -10,6 +10,7 @@ layout(std140, binding = 0) uniform buf {
     float qt_Opacity;
     vec2 stepUv;  // distance between two source texels, in uv, along the blur axis
     float sigma;  // in source texels
+    float maxTaps; // most samples per side (cost); a wider blur spreads them out instead
 };
 
 layout(binding = 1) uniform sampler2D src;
@@ -18,14 +19,18 @@ const int MAX_RADIUS = 48;
 
 void main() {
     float s = max(sigma, 0.001);
-    int radius = min(int(ceil(s * 2.5)), MAX_RADIUS);
+    // The blur reaches 2.5 sigma. With more texels than `maxTaps` it takes every n-th one (the
+    // texture's linear filtering fills the gaps), so the cost is capped and the blur stays as wide.
+    float reach = ceil(s * 2.5);
+    int taps = int(clamp(maxTaps, 1.0, float(MAX_RADIUS)));
+    int n = int(min(reach, float(taps)));
+    float stride = reach / float(max(n, 1));
     vec4 sum = vec4(0.0);
     float weights = 0.0;
-    for (int k = -MAX_RADIUS; k <= MAX_RADIUS; ++k) {
-        if (abs(k) > radius)
-            continue;
-        float w = exp(-float(k * k) / (2.0 * s * s));
-        sum += texture(src, qt_TexCoord0 + stepUv * float(k)) * w;
+    for (int k = -n; k <= n; ++k) {
+        float off = float(k) * stride;
+        float w = exp(-off * off / (2.0 * s * s));
+        sum += texture(src, qt_TexCoord0 + stepUv * off) * w;
         weights += w;
     }
     fragColor = sum / weights;

@@ -37,6 +37,7 @@ KineticFlickable {
 
     Column {
         id: column
+        x: 6 // room for the outline of a row
         width: root.width - 16
         spacing: 0
 

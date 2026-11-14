@@ -9,7 +9,7 @@ import qs.shared
 // item over the glass lowers how much of the background shows through the stack, and where less
 // than about 3% shows through the background cannot be recovered, so the sharp background shows
 // there (see GlassPanel.hlRect0). The popup's own items must therefore be transparent over it
-// (field background, row backgrounds), and there is no drop shadow under it either.
+// (field background, row backgrounds), and a drop shadow must not go under it either (GlassShadow is drawn around it only).
 //
 // Put it in the popup's items, below the widgets, at the panel's position (x, y, width, height
 // in whole pixels), with `popup`, `field` and `listView` set. The rows set `popup.hoveredItem`.
@@ -28,6 +28,19 @@ GlassPanel {
     property real hoveredStrength: 0.5
     // How much of the tint colour is mixed into the glass (more hides more of what is behind).
     property real tintStrength: 0.65
+
+    // A soft drop shadow around the panel (Theme.popupShadow*), outside it only. Its opacity is
+    // capped (GlassShadow.maxOpacity) so that over the settings' veil the stack still lets about
+    // 3% of the background through.
+    property bool shadow: false
+
+    GlassShadow {
+        z: -1
+        visible: root.shadow && Theme.popupShadowOpacity > 0
+        panelWidth: root.width
+        panelHeight: root.height
+        cornerRadius: Theme.radiusLarge
+    }
 
     backdrop: popup.backdrop
     cancelLeak: popup.cancelAmount

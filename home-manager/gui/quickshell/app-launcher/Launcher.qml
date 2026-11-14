@@ -61,6 +61,7 @@ GlassPopup {
         height: launcher.height
 
         popup: root
+        shadow: true
         field: searchField
         listView: appList
     }

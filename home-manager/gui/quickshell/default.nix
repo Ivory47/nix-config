@@ -7,6 +7,23 @@ let
     glassNative = pkgs.callPackage ./shared/glass/native/package.nix { };
     glassShaders = pkgs.callPackage ./shared/glass/shaders/package.nix { };
 
+    # Keeps the long-running shells out of swap. Their popups sit idle for hours, the kernel pages
+    # them out, and the next open waits for the page-ins. Only these processes are affected: each
+    # one is started in its own systemd user scope with MemorySwapMax=0 (cgroup v2; the user
+    # manager delegates the memory controller). `ipc` calls are short-lived and run as they are.
+    # If a scope cannot be made, quickshell just starts normally. Sourced by the wrapper script.
+    noSwap = pkgs.writeText "quickshell-no-swap.sh" ''
+        case " $* " in
+            *" ipc "*) ;;
+            *)
+                if [ -z "$QS_NOSWAP" ] && ${pkgs.systemd}/bin/systemd-run --user --scope -q -p MemorySwapMax=0 true 2>/dev/null; then
+                    export QS_NOSWAP=1
+                    exec ${pkgs.systemd}/bin/systemd-run --user --scope -q -p MemorySwapMax=0 -- "$0" "$@"
+                fi
+                ;;
+        esac
+    '';
+
     # quickshell, able to find the Glass.Native module.
     quickshellWithGlass = pkgs.symlinkJoin {
         name = "quickshell-with-glass";
@@ -18,7 +35,8 @@ let
                     wrapProgram "$out/bin/$bin" \
                         --prefix QML_IMPORT_PATH : ${glassNative}/lib/qt-6/qml \
                         --prefix QML2_IMPORT_PATH : ${glassNative}/lib/qt-6/qml \
-                        --set QSG_NO_VSYNC 1
+                        --set QSG_NO_VSYNC 1 \
+                        --run ". ${noSwap}"
                 fi
             done
         '';

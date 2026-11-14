@@ -36,6 +36,11 @@ QtObject {
     // Glass (a changed `glass` may need a restart of the shells, see ThemeDefaults.qml)
     readonly property bool glass: ThemeFromSettingsApp.bool("glass", ThemeDefaults.glass)
     readonly property real glassBlurRadius: ThemeFromSettingsApp.real("glassBlurRadius", ThemeDefaults.glassBlurRadius)
+    readonly property int blurMaxTaps: ThemeFromSettingsApp.integer("blurMaxTaps", ThemeDefaults.blurMaxTaps)
+    readonly property real blurTapsFalloff: ThemeFromSettingsApp.real("blurTapsFalloff", ThemeDefaults.blurTapsFalloff)
+    readonly property real popupShadowOpacity: ThemeFromSettingsApp.real("popupShadowOpacity", ThemeDefaults.popupShadowOpacity)
+    readonly property real popupShadowBlur: ThemeFromSettingsApp.real("popupShadowBlur", ThemeDefaults.popupShadowBlur)
+    readonly property real popupShadowOffset: ThemeFromSettingsApp.real("popupShadowOffset", ThemeDefaults.popupShadowOffset)
     readonly property real scrimBlurRadius: ThemeFromSettingsApp.real("scrimBlurRadius", ThemeDefaults.scrimBlurRadius)
     readonly property real backdropBlur: ThemeFromSettingsApp.real("backdropBlur", ThemeDefaults.backdropBlur)
 

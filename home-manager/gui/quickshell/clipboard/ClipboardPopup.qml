@@ -129,6 +129,7 @@ GlassPopup {
         height: panel.height
 
         popup: root
+        shadow: true
         field: searchField
         listView: list
     }
