@@ -179,11 +179,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794033281,
-        "narHash": "sha256-GQQ0Jt0X+jq/eXGXGoQhbMeJwQqnyllMWAHssYgLAWU=",
+        "lastModified": 1794154248,
+        "narHash": "sha256-WKEjyu4qNNsdGdlDHN7+6lqephL3wRSlqXlGo8nhZwA=",
         "ref": "refs/heads/main",
-        "rev": "9df843501c7dc120898bd9bac83f68b3958cc42a",
-        "revCount": 44,
+        "rev": "a732ce675b9d15ed782b147c03b45baae2dd63c0",
+        "revCount": 87,
         "type": "git",
         "url": "ssh://git@github.com/Ivory47/Video-Editor"
       },

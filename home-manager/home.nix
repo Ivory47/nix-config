@@ -22,6 +22,8 @@
         slurp
         grimblast
 
+        btop
+
         claude-code
     ];
 

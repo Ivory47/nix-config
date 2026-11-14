@@ -40,6 +40,8 @@
                     ./configuration.nix
                     ./common/configuration-gui.nix
                     ./hosts/laptop/configuration.nix
+                    ./modules/intel.nix
+                    ./modules/docker.nix
                 ];
             };
 
