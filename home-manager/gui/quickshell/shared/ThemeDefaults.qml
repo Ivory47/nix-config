@@ -50,6 +50,11 @@ QtObject {
     // coarser sampling, so the cost stops growing, or even shrinks, with strength.
     readonly property real blurTapsFalloff: 0.0
 
+    // Opacity of the app launcher's and clipboard popup's glass: 1 = the glass as it is (the blurred
+    // background under the tint), lower lets the live desktop show through it. (The settings app is
+    // not affected.)
+    readonly property real popupOpacity: 1.0
+
     // Drop shadow around the app launcher and the clipboard popup (outside the panel only; under
     // the glass it would break the background recovery). Opacity 0 turns it off.
     readonly property real popupShadowOpacity: 0.3

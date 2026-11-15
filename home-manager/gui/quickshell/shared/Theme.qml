@@ -38,6 +38,7 @@ QtObject {
     readonly property real glassBlurRadius: ThemeFromSettingsApp.real("glassBlurRadius", ThemeDefaults.glassBlurRadius)
     readonly property int blurMaxTaps: ThemeFromSettingsApp.integer("blurMaxTaps", ThemeDefaults.blurMaxTaps)
     readonly property real blurTapsFalloff: ThemeFromSettingsApp.real("blurTapsFalloff", ThemeDefaults.blurTapsFalloff)
+    readonly property real popupOpacity: ThemeFromSettingsApp.real("popupOpacity", ThemeDefaults.popupOpacity)
     readonly property real popupShadowOpacity: ThemeFromSettingsApp.real("popupShadowOpacity", ThemeDefaults.popupShadowOpacity)
     readonly property real popupShadowBlur: ThemeFromSettingsApp.real("popupShadowBlur", ThemeDefaults.popupShadowBlur)
     readonly property real popupShadowOffset: ThemeFromSettingsApp.real("popupShadowOffset", ThemeDefaults.popupShadowOffset)

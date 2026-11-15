@@ -34,11 +34,14 @@ QtObject {
             { key: "glassBlurRadius", keywords: ["blur", "frosted", "strength", "sigma", "bar", "popup", "launcher"], label: "Blur radius", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "Bar and popups" },
             { key: "blurMaxTaps", keywords: ["blur", "quality", "performance", "cost", "samples", "taps", "gpu", "fast", "cheap", "expensive"], label: "Blur quality", type: "number", kind: "int", min: 4, max: 48, step: 2, note: "Samples per side: lower is cheaper" },
             { key: "blurTapsFalloff", keywords: ["blur", "quality", "performance", "cost", "samples", "taps", "gpu", "strength", "scaling", "adaptive"], label: "Fewer samples for stronger blur", type: "number", kind: "real", min: 0, max: 1, step: 0.1, note: "0: always the same. 1: fewer as the blur grows" },
-            { key: "popupShadowOpacity", keywords: ["shadow", "drop shadow", "depth", "elevation", "launcher", "clipboard", "popup"], label: "Popup shadow", type: "number", kind: "real", min: 0, max: 0.6, step: 0.05, note: "Launcher, clipboard, settings. 0 is off" },
-            { key: "popupShadowBlur", keywords: ["shadow", "soft", "spread", "size", "launcher", "clipboard"], label: "Shadow softness", type: "number", kind: "real", min: 4, max: 60, step: 1, note: "How far the shadow fades out" },
-            { key: "popupShadowOffset", keywords: ["shadow", "distance", "height", "elevation", "launcher", "clipboard"], label: "Shadow drop", type: "number", kind: "real", min: 0, max: 30, step: 1, note: "How far it falls below the popup" },
             { key: "scrimBlurRadius", keywords: ["blur", "dim", "veil", "background", "strength", "desktop"], label: "Settings desktop blur", type: "number", kind: "real", min: 0, max: 40, step: 0.5, note: "Blur of the desktop behind the settings" },
             { key: "backdropBlur", keywords: ["blur", "legacy", "strength"], label: "Legacy blur", type: "number", kind: "real", min: 0, max: 1, note: "Unused" }
+        ]},
+        { title: "Popups", items: [
+            { key: "popupOpacity", keywords: ["alpha", "transparency", "transparent", "translucent", "opacity", "see through", "glass", "launcher", "clipboard", "popup", "widget", "menu"], label: "Opacity", type: "number", kind: "real", min: 0.2, max: 1, step: 0.05, note: "Launcher and clipboard. Lower shows the desktop through" },
+            { key: "popupShadowOpacity", keywords: ["shadow", "drop shadow", "depth", "elevation", "launcher", "clipboard", "popup"], label: "Popup shadow", type: "number", kind: "real", min: 0, max: 0.6, step: 0.05, note: "Launcher, clipboard, settings. 0 is off" },
+            { key: "popupShadowBlur", keywords: ["shadow", "soft", "spread", "size", "launcher", "clipboard"], label: "Shadow softness", type: "number", kind: "real", min: 4, max: 60, step: 1, note: "How far the shadow fades out" },
+            { key: "popupShadowOffset", keywords: ["shadow", "distance", "height", "elevation", "launcher", "clipboard"], label: "Shadow drop", type: "number", kind: "real", min: 0, max: 30, step: 1, note: "How far it falls below the popup" }
         ]},
         { title: "Shape", items: [
             { key: "radiusSmall", keywords: ["rounding", "round", "corners", "border radius", "curve"], label: "Small radius", type: "number", kind: "int", min: 0, max: 30 },

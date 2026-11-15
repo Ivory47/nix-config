@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794681833,
-        "narHash": "sha256-8/e7ew0FRf/0mabICO4K9CglKoOHlHCV+LYLracr6I8=",
+        "lastModified": 1794684035,
+        "narHash": "sha256-I2akm6+pR5cajpYyOOjCslQrum6wpCVR745iBanRwvY=",
         "ref": "refs/heads/main",
-        "rev": "9dfb39a53fe67a5c6e97c692fd4cc430164ba6b7",
-        "revCount": 2,
+        "rev": "363d89c300bcce42287714bd0cbce9dc9dfdff1f",
+        "revCount": 3,
         "type": "git",
         "url": "file:///home/user/Documents/Code/Lucent"
       },

@@ -28,6 +28,8 @@ GlassPanel {
     property real hoveredStrength: 0.5
     // How much of the tint colour is mixed into the glass (more hides more of what is behind).
     property real tintStrength: 0.65
+    // Opacity of the whole panel (1 = opaque glass; lower lets the live desktop show through).
+    property real panelOpacity: 1.0
 
     // A soft drop shadow around the panel (Theme.popupShadow*), outside it only. Its opacity is
     // capped (GlassShadow.maxOpacity) so that over the settings' veil the stack still lets about
@@ -88,5 +90,6 @@ GlassPanel {
         tintStrength: root.tintStrength
         // Fully frosted: any sharp background mixed into the glass shows as faint text.
         frost: 1.0
+        opacity: root.panelOpacity
     }
 }

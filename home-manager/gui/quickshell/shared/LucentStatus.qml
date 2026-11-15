@@ -15,21 +15,15 @@ import Quickshell.Io
 // and removes it when it unloads. The directory is named after HYPRLAND_INSTANCE_SIGNATURE, which is
 // new for every Hyprland start, so a marker left by a crashed instance can never be mistaken for a
 // live one.
-//
-// The plugin used to be called "pane" (marker `pane-active`). A Hyprland that was started before the
-// rename still has that build loaded, so both markers count. Remove `legacyPath` once Hyprland has
-// been restarted with the renamed plugin.
 Singleton {
     id: root
 
     readonly property string signature: Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || ""
-    readonly property string dir:
-        signature === "" ? "" : (Quickshell.env("XDG_RUNTIME_DIR") || "") + "/hypr/" + signature + "/"
-    readonly property string path: dir === "" ? "" : dir + "lucent-active"
-    readonly property string legacyPath: dir === "" ? "" : dir + "pane-active"
+    readonly property string path:
+        signature === "" ? "" : (Quickshell.env("XDG_RUNTIME_DIR") || "") + "/hypr/" + signature + "/lucent-active"
 
-    // True while a marker exists.
-    readonly property bool active: (path !== "" && file.loaded) || (legacyPath !== "" && legacyFile.loaded)
+    // True while the marker exists.
+    readonly property bool active: path !== "" && file.loaded
 
     FileView {
         id: file
@@ -40,24 +34,12 @@ Singleton {
         onFileChanged: reload()
     }
 
-    FileView {
-        id: legacyFile
-        path: root.legacyPath
-        blockLoading: true
-        watchChanges: true
-        printErrors: false
-        onFileChanged: reload()
-    }
-
     // The marker may appear after this process started (the plugin loads with the config), and a
-    // missing file cannot be watched: look again every few seconds. Cheap: one failed open each.
+    // missing file cannot be watched: look again every few seconds. Cheap: one failed open.
     Timer {
         running: root.path !== ""
         interval: 3000
         repeat: true
-        onTriggered: {
-            file.reload()
-            legacyFile.reload()
-        }
+        onTriggered: file.reload()
     }
 }

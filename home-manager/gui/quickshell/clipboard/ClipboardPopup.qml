@@ -130,6 +130,7 @@ GlassPopup {
 
         popup: root
         shadow: true
+        panelOpacity: Theme.popupOpacity
         field: searchField
         listView: list
     }
