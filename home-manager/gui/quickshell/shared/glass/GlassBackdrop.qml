@@ -34,7 +34,7 @@ Item {
     // blur hides the coarser sampling. Falloff 0: always the same count; 1: inversely with the
     // radius. Never below 4, never above Theme.blurMaxTaps.
     property real blurTaps: Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, blurRadius)), Theme.blurTapsFalloff))
-    // Minimum time between captures in ms. 0 = one refresh period of the monitor.
+    // Minimum time between captures in ms. 0 = no limit of our own: the compositor answers at most once per frame.
     property int minInterval: 0
     property bool active: true
     // Off: no capture, nothing kept up to date (for comparing against the bar without glass).

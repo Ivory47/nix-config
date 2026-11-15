@@ -171,7 +171,8 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
 	// Region to capture, in logical pixels of the output (origin: the output's top left).
 	Q_PROPERTY(QRectF region READ region WRITE setRegion NOTIFY regionChanged)
-	// Minimum time between two requests, ms. 0 = one refresh period of the window's screen.
+	// Minimum time between the starts of two requests, ms. 0 = no limit of our own: the compositor
+	// answers at most once per output commit, which paces the requests.
 	Q_PROPERTY(int minInterval READ minInterval WRITE setMinInterval NOTIFY minIntervalChanged)
 	// How many captures may be on their way at once. One: Hyprland completes every pending capture
 	// at the same output commit, so more requests only bring the same pixels again.
@@ -208,7 +209,8 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(bool dmabufBroken READ dmabufBroken NOTIFY statsChanged)
 	// Frames the window presented (polled, not notified).
 	Q_PROPERTY(int frames READ frames NOTIFY statsChanged)
-	// The effective minimum interval in ms, and the pixel size of the last capture.
+	// The refresh period in ms when minInterval is 0, else minInterval. A single request is not
+	// paced by it any more; it only spaces the additional requests when depth is above one.
 	Q_PROPERTY(qreal effectiveInterval READ effectiveInterval NOTIFY statsChanged)
 	// How long the last capture took from the request to the pixels (ms), of which until the
 	// compositor told which buffer it wants, and the time between the last two captures arriving.
@@ -313,6 +315,7 @@ private slots:
 	void retryWaiting();
 	void warmupEnded();
 	void healDmabuf();
+	void deliverUpdateNow();
 
 private:
 	enum class DmaResult { Ok, Exhausted, Unsupported, AllocFailed };

@@ -29,6 +29,7 @@
 #include <QtWaylandClient/private/qwaylandscreen_p.h>
 #include <QtWaylandClient/private/qwaylandshm_p.h>
 #include <QtWaylandClient/private/qwaylandwindow_p.h>
+#include <qpa/qplatformwindow.h>
 
 Q_LOGGING_CATEGORY(logGlass, "glass.capture", QtWarningMsg)
 
@@ -42,6 +43,10 @@ constexpr qint64 kHoldMs = 250;
 constexpr qint64 kBufferWaitMs = 100;
 // After this long without success, dmabuf is tried again once it was given up on.
 constexpr int kHealMs = 30000;
+// The duplicate check samples every this-many-th pixel of a row (doubled for large crops).
+constexpr int kSampleStep = 8;
+// The most samples the duplicate check takes of one capture, which bounds its cost per capture.
+constexpr qint64 kMaxSamples = 65536;
 
 qint64 nowMs() {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -496,9 +501,13 @@ void GlassCapture::pump() {
 	// One capture is on its way at a time (a request that waits for a free buffer counts).
 	if (this->mFrames.size() >= this->mDepth) return;
 
-	// Not more than one per refresh period.
-	if (this->mHasStarted) {
-		auto left = this->effectiveInterval() - double(this->mSinceStart.nsecsElapsed()) / 1e6;
+	// Not more than one per minInterval, but only when a limit was asked for. By default there is
+	// none of our own: with copy_with_damage the compositor answers at most once per output commit,
+	// and only when something changed, so it already paces the requests. A start-to-start limit of
+	// one refresh period slid the requests past the compositor's commit, and that frame was then
+	// never captured.
+	if (this->mHasStarted && this->mMinInterval > 0) {
+		auto left = double(this->mMinInterval) - double(this->mSinceStart.nsecsElapsed()) / 1e6;
 		if (left > 0.5) {
 			this->mTimer.start(int(std::ceil(left)));
 			return;
@@ -931,17 +940,29 @@ void GlassCapture::frameFailed(GlassFrame* frame) {
 	this->mTimer.start(100);
 }
 
-// Has anything changed since the capture that is shown? A few thousand bytes are compared; a
-// small change that does not touch any of them is caught by the next one that does.
+// Has anything changed since the capture that is shown? Up to a few tens of thousands of bytes
+// are compared, laid out so that an edge that moves sideways cannot slip between them (see below).
 bool GlassCapture::sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, bool linear, int stride, QRect crop) {
 	std::vector<uchar> sample;
 	if (linear) {
-		// Inside the crop: every second row, every 61st pixel.
-		const int rowStep = 2;
-		const int pixelStep = 61;
-		for (int y = crop.top(); y <= crop.bottom(); y += rowStep) {
-			const uchar* row = bits + size_t(y) * stride;
-			for (int x = crop.left(); x <= crop.right(); x += pixelStep) sample.push_back(row[x * 4 + 1]);
+		// Inside the crop: every row, every `step`-th pixel, and the first column moves along by
+		// step / 2 + 1 from one row to the next. With a power of two for `step` that shift is odd,
+		// so any `step` consecutive rows hold every column once and any `step` consecutive columns
+		// hold every row once: a run of `step` pixels that changed, upright or lying, moves at
+		// least one sample. The old grid took the same columns on every row, 61 pixels apart, so a
+		// vertical edge that moved sideways went unseen until it crossed one of them, and the glass
+		// then trailed the background by up to that distance and caught up in jumps. `step` grows
+		// for large crops to keep the number of samples (the buffer is read through a mapping,
+		// which can be slow) bounded. The green byte stays: the tag pixel keeps it constant.
+		int step = kSampleStep;
+		while (qint64(crop.width()) * crop.height() / step > kMaxSamples) step *= 2;
+		if (crop.width() > 0 && crop.height() > 0) {
+			sample.reserve(size_t(crop.height()) * (size_t(crop.width()) / size_t(step) + 1));
+			for (int y = crop.top(); y <= crop.bottom(); y++) {
+				const uchar* row = bits + size_t(y) * stride;
+				const int shift = ((y - crop.top()) * (step / 2 + 1)) % step;
+				for (int x = crop.left() + shift; x <= crop.right(); x += step) sample.push_back(row[x * 4 + 1]);
+			}
 		}
 	} else {
 		sample.reserve(size_t(bytes / 13) + 1);
@@ -1001,6 +1022,30 @@ void GlassCapture::publish(QSize size, QRectF cropUv) {
 	emit this->serialChanged();
 	emit this->statsChanged();
 	emit this->captured(this->mSerial);
+	// Queued, like Qt's own delivery: the update that the handler of captured() asked for exists
+	// only after it has returned.
+	QMetaObject::invokeMethod(this, &GlassCapture::deliverUpdateNow, Qt::QueuedConnection);
+}
+
+// Qt Quick asks for a frame with QWindow::requestUpdate(). On Wayland that is not delivered while
+// the frame callback of an earlier commit is outstanding: it waits for the compositor's next frame.
+// The glass update that a capture just caused would then be rendered after the compositor frame it
+// belongs in, and show one frame later than it could. So when a capture was published, an update
+// request that is still waiting is delivered at once, which is what Qt does itself when the frame
+// callback arrives, only without waiting for it. The buffer swap does not block (the render loop
+// runs without vsync), and the callback that comes later finds nothing pending. Only updates caused
+// by a capture are affected, and those are paced by the compositor: at most one capture per output
+// commit, and none while nothing changes.
+void GlassCapture::deliverUpdateNow() {
+	auto* w = this->window();
+	// A window whose frame callbacks timed out is hidden: nothing is to be rendered for it.
+	if (!w || !w->isExposed()) return;
+	auto* platformWindow = w->handle();
+	if (!platformWindow) return;
+	// Qt delivered it already (no frame callback was outstanding). deliverUpdateRequest() asserts
+	// that one is pending.
+	if (!platformWindow->hasPendingUpdateRequest()) return;
+	platformWindow->deliverUpdateRequest();
 }
 
 void GlassCapture::frameReady(GlassFrame* frame) {
