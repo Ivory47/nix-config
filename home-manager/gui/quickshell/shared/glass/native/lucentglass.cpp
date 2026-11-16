@@ -9,7 +9,7 @@
 
 namespace {
 // The newest version of the protocol this code speaks.
-constexpr int kGlassVersion = 2;
+constexpr int kGlassVersion = 3;
 } // namespace
 
 LucentGlassManager::LucentGlassManager(): QWaylandClientExtensionTemplate(kGlassVersion) {
@@ -41,7 +41,8 @@ LucentGlass::~LucentGlass() {
 	this->drop(true);
 }
 
-// (An older plugin build offers version 1: a blurred rectangle without the look. Not used.)
+// (An older plugin build offers a lower version: without the look, or without regions that are not
+// on whole pixels. Not used.)
 bool LucentGlass::available() const {
 	auto* manager = LucentGlassManager::instance();
 	// (The version the two sides agreed on when the global was bound.)
@@ -143,13 +144,15 @@ void LucentGlass::updatePolish() {
 	}
 
 	if (shown) {
+		// With fractions: a panel placed on whole pixels of an output with a fractional scale is
+		// not on whole logical ones, and the glass must end exactly where the panel's border is.
 		const auto topLeft = this->mapToScene(QPointF(0, 0));
-		lucent_glass_v1_set_region(
+		lucent_glass_v1_set_region_precise(
 		    this->mGlass,
-		    qRound(topLeft.x()),
-		    qRound(topLeft.y()),
-		    qRound(this->width()),
-		    qRound(this->height())
+		    wl_fixed_from_double(topLeft.x()),
+		    wl_fixed_from_double(topLeft.y()),
+		    wl_fixed_from_double(this->width()),
+		    wl_fixed_from_double(this->height())
 		);
 		lucent_glass_v1_set_blur(
 		    this->mGlass,

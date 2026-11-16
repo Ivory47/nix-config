@@ -13,7 +13,7 @@ import qs.shared
 //
 // Put it in the popup's items, below the widgets, at the panel's position (x, y, width, height
 // in whole pixels), with `popup`, `field` and `listView` set. The rows set `popup.hoveredItem`.
-GlassPanel {
+Item {
     id: root
 
     required property var popup
@@ -44,11 +44,6 @@ GlassPanel {
         cornerRadius: Theme.radiusLarge
     }
 
-    backdrop: popup.backdrop
-    cancelLeak: popup.cancelAmount
-    motionGate: 1
-    hlRadius: Theme.radiusMedium
-
     // `item` in this panel's coordinates; the list's rows are cut at the list's edges.
     function rectOf(item, inList) {
         if (!item) return Qt.vector4d(0, 0, 0, 0)
@@ -64,24 +59,26 @@ GlassPanel {
         return Qt.vector4d(p.x, top, item.width, bottom - top)
     }
 
+    // The highlights: the field, the selected row, the hovered row.
     // (mapToItem is not tracked by bindings: the other values are listed so that they re-evaluate.)
-    hlRect0: {
+    readonly property vector4d fieldRect: {
         root.x; root.y; root.width; root.height; field.width
         return rectOf(field, false)
     }
-    hlColor0: Qt.vector4d(highlightColor.r, highlightColor.g, highlightColor.b, fieldStrength)
-    hlRect1: {
+    readonly property vector4d selectedRect: {
         listView.contentY; listView.currentIndex; listView.count; listView.height; root.x; root.y; root.width; root.height
         return rectOf(listView.currentItem, true)
     }
-    hlColor1: Qt.vector4d(highlightColor.r, highlightColor.g, highlightColor.b, selectedStrength)
-    hlRect2: {
+    readonly property vector4d hoveredRect: {
         listView.contentY; listView.height; root.x; root.y; root.width; root.height
         return rectOf(popup.hoveredItem, true)
     }
-    hlColor2: Qt.vector4d(highlightColor.r, highlightColor.g, highlightColor.b, hoveredStrength)
+    function highlight(strength) {
+        return Qt.vector4d(highlightColor.r, highlightColor.g, highlightColor.b, strength)
+    }
 
-    style: GlassStyle {
+    GlassStyle {
+        id: look
         cornerRadius: Theme.radiusLarge
         edges: Qt.vector4d(1, 1, 1, 1)
 
@@ -91,5 +88,43 @@ GlassPanel {
         // Fully frosted: any sharp background mixed into the glass shows as faint text.
         frost: 1.0
         opacity: root.panelOpacity
+    }
+
+    // The glass, one of two: the shell's own, from captures ...
+    GlassPanel {
+        anchors.fill: parent
+        visible: !root.popup.compositorGlass
+        // (Its place in the backdrop is this item's, not its own inside this item.)
+        originPx: Qt.vector2d(root.x * ratio, root.y * ratio)
+
+        backdrop: root.popup.backdrop
+        cancelLeak: root.popup.cancelAmount
+        motionGate: 1
+        hlRadius: Theme.radiusMedium
+        hlRect0: root.fieldRect
+        hlColor0: root.highlight(root.fieldStrength)
+        hlRect1: root.selectedRect
+        hlColor1: root.highlight(root.selectedStrength)
+        hlRect2: root.hoveredRect
+        hlColor2: root.highlight(root.hoveredStrength)
+        style: look
+    }
+
+    // ... or the compositor's (GlassPopup.compositorGlass): the same look, drawn by the Lucent
+    // plugin from what is behind the popup in the very frame it is shown in.
+    LucentGlassPanel {
+        anchors.fill: parent
+        active: root.popup.compositorGlass
+
+        blurRadius: root.popup.blurRadius
+        maxTaps: Math.round(root.popup.backdrop.blurTaps)
+        hlRadius: Theme.radiusMedium
+        hlRect0: root.fieldRect
+        hlColor0: root.highlight(root.fieldStrength)
+        hlRect1: root.selectedRect
+        hlColor1: root.highlight(root.selectedStrength)
+        hlRect2: root.hoveredRect
+        hlColor2: root.highlight(root.hoveredStrength)
+        style: look
     }
 }

@@ -29,7 +29,7 @@ class QWaylandWindow;
 
 // The compositor's global. Not active: the plugin is not loaded (or is a build without glass).
 // Version 2 has the look of the glass (shape, refraction, tone, tint, light, highlights, hole);
-// version 1 only blurred a rectangle.
+// version 1 only blurred a rectangle. Version 3 takes regions with fractions.
 class LucentGlassManager
     : public QWaylandClientExtensionTemplate<LucentGlassManager>
     , public QtWayland::lucent_glass_manager_v1 {

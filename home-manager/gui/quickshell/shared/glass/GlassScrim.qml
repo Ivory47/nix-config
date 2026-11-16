@@ -35,29 +35,45 @@ Item {
     // Below this blur radius (px) the veil is the plain tint, and how opaque that is.
     property real plainBelow: 3
     property real plainOpacity: 0.35
-    readonly property bool plain: !popup.backdrop.glassEnabled || popup.blurRadius < plainBelow
+    readonly property bool plain: (!popup.backdrop.glassEnabled && !popup.compositorGlass) || popup.blurRadius < plainBelow
 
     x: 0
     y: 0
     width: parent.width
     height: parent.height
 
+    GlassStyle {
+        id: look
+        cornerRadius: 0
+        edges: Qt.vector4d(0, 0, 0, 0)
+        tint: Theme.background
+        tintStrength: root.tintStrength
+        frost: Math.max(0, Math.min(1, root.popup.blurRadius / 3))
+    }
+
+    // Drawn by the compositor instead (GlassPopup.compositorGlass): the same veil. The plugin
+    // blurs once for it and for the panel in its hole.
+    LucentGlassPanel {
+        anchors.fill: parent
+        active: !root.plain && root.popup.compositorGlass
+
+        blurRadius: root.popup.blurRadius
+        maxTaps: Math.round(root.popup.backdrop.blurTaps)
+        holeRect: Qt.vector4d(root.hole.x, root.hole.y, root.hole.width, root.hole.height)
+        holeRadius: root.holeRadius
+        style: look
+    }
+
     GlassPanel {
         anchors.fill: parent
-        visible: !root.plain
+        visible: !root.plain && !root.popup.compositorGlass
 
         backdrop: root.popup.backdrop
         cancelLeak: root.popup.cancelAmount
         holeRect: Qt.vector4d(root.hole.x, root.hole.y, root.hole.width, root.hole.height)
         holeRadius: root.holeRadius
 
-        style: GlassStyle {
-            cornerRadius: 0
-            edges: Qt.vector4d(0, 0, 0, 0)
-            tint: Theme.background
-            tintStrength: root.tintStrength
-            frost: Math.max(0, Math.min(1, root.popup.blurRadius / 3))
-        }
+        style: look
     }
 
     // The plain tint: the whole surface except the hole. One shape with the hole as a second

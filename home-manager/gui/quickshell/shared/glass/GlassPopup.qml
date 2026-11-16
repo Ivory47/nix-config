@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Glass.Native
 import qs.shared
 
 // A full-screen overlay window for a popup panel with live glass (the app launcher, the
@@ -72,6 +73,15 @@ PanelWindow {
     // when opening, at once when closing.
     property bool presented: false
     readonly property alias backdrop: glassBackdrop
+    // The glass is drawn by the compositor (Theme.compositorGlass and the Lucent plugin): the
+    // panels use LucentGlassPanel then, nothing is captured, and there is nothing to wait for
+    // when opening (the content appears at once, with the glass of that same frame).
+    readonly property bool compositorGlass: Theme.glass && Theme.compositorGlass && glassProbe.available
+
+    // (Only asked whether the compositor offers the glass.)
+    LucentGlass {
+        id: glassProbe
+    }
     // The root of everything that is drawn.
     readonly property alias content: surface
 
@@ -178,7 +188,8 @@ PanelWindow {
                 // The content appears with the first update, or when this runs out.
                 presentTimer.start()
             else
-                // Glass off (Theme.glass): no capture is coming, nothing to wait for.
+                // Glass off (Theme.glass), or drawn by the compositor: no capture is coming,
+                // nothing to wait for.
                 present(true)
             popupOpened()
         } else {
@@ -214,7 +225,7 @@ PanelWindow {
         blurRadius: root.blurRadius
         ipcTarget: "glass"
         active: root.shown
-        glassEnabled: Theme.glass
+        glassEnabled: Theme.glass && !root.compositorGlass
         tagRed: root.tagRed
         absentTagRed: 30
     }

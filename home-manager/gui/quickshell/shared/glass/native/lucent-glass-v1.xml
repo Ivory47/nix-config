@@ -16,7 +16,7 @@
     Warning: this protocol is experimental and may change in incompatible ways.
   </description>
 
-  <interface name="lucent_glass_manager_v1" version="2">
+  <interface name="lucent_glass_manager_v1" version="3">
     <description summary="makes glass objects for surfaces"/>
 
     <request name="destroy" type="destructor">
@@ -36,7 +36,7 @@
     </request>
   </interface>
 
-  <interface name="lucent_glass_v1" version="2">
+  <interface name="lucent_glass_v1" version="3">
     <description summary="one piece of glass behind a surface">
       All state set here is double-buffered: it takes effect with the next wl_surface.commit
       of the surface, together with that commit's buffer.
@@ -168,6 +168,20 @@
       <arg name="width" type="fixed"/>
       <arg name="height" type="fixed"/>
       <arg name="radius" type="fixed"/>
+    </request>
+
+    <!-- Version 3 -->
+
+    <request name="set_region_precise" since="3">
+      <description summary="where the glass is, with fractions">
+        Like set_region, for a rectangle that is not on whole surface-local units (a panel that
+        was placed on whole pixels of an output with a fractional scale). The last of set_region
+        and set_region_precise before a commit counts.
+      </description>
+      <arg name="x" type="fixed"/>
+      <arg name="y" type="fixed"/>
+      <arg name="width" type="fixed"/>
+      <arg name="height" type="fixed"/>
     </request>
   </interface>
 </protocol>

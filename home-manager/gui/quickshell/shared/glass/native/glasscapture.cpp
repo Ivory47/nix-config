@@ -254,7 +254,13 @@ void GlassCapture::setActive(bool active) {
 	if (active == this->mActive) return;
 	this->mActive = active;
 	if (!active) this->cancelFrames();
-	else QMetaObject::invokeMethod(this, &GlassCapture::pump, Qt::QueuedConnection);
+	else {
+		// Whoever turns the capture on again has no picture any more (GlassBackdrop drops it when
+		// the glass goes off): the first capture is wanted even if the screen still looks as it did
+		// when the last one was published. Without this a still desktop gave no picture at all.
+		this->mForcePublish = true;
+		QMetaObject::invokeMethod(this, &GlassCapture::pump, Qt::QueuedConnection);
+	}
 	emit this->activeChanged();
 }
 
