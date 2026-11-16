@@ -96,9 +96,9 @@ PanelWindow {
         ]
 
         // Glass drawn by the compositor (Theme.compositorGlass, the Lucent plugin): the plugin
-        // blurs what is behind the bar while it makes the frame, under what the bar draws, so the
-        // blur is never behind. The bar then draws only the tint (below) and its content.
-        LucentGlass {
+        // draws the same glass as the GlassPanel below, but while it makes the frame, from what
+        // is behind the bar in that frame, so it is never behind. Nothing is drawn here for it.
+        LucentGlassPanel {
             id: compositorGlass
             anchors.fill: parent
             // (`shown`: asked for and offered. The captured glass below is the fallback.)
@@ -106,12 +106,7 @@ PanelWindow {
             active: shown
             blurRadius: glassBackdrop.blurRadius
             maxTaps: Math.round(glassBackdrop.blurTaps)
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            visible: compositorGlass.shown
-            color: Qt.alpha(barGlassStyle.tint, barGlassStyle.tintStrength)
+            style: barGlassStyle
         }
 
         // Live liquid glass (shared/glass): the real background behind the bar, blurred and

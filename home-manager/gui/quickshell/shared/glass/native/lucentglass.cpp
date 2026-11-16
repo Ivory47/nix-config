@@ -7,7 +7,18 @@
 #include <wayland-client-core.h>
 #include <wayland-lucent-glass-v1-client-protocol.h>
 
-LucentGlassManager::LucentGlassManager(): QWaylandClientExtensionTemplate(1) {
+namespace {
+// The newest version of the protocol this code speaks.
+constexpr int kGlassVersion = 2;
+} // namespace
+
+LucentGlassManager::LucentGlassManager(): QWaylandClientExtensionTemplate(kGlassVersion) {
+	// Qt lowers the extension's version to what a global offered and never raises it again: after
+	// an older plugin build, a newer one would be bound at the old version for good. So when the
+	// global goes away, ask for our own version again.
+	QObject::connect(this, &QWaylandClientExtension::activeChanged, this, [this]() {
+		if (!this->isActive()) this->setVersion(kGlassVersion);
+	});
 	this->initialize();
 }
 
@@ -23,14 +34,18 @@ LucentGlass::LucentGlass(QQuickItem* parent): QQuickItem(parent) {
 	    this,
 	    &LucentGlass::onAvailableChanged
 	);
+	QObject::connect(this, &LucentGlass::lookChanged, this, &QQuickItem::polish);
 }
 
 LucentGlass::~LucentGlass() {
 	this->drop(true);
 }
 
+// (An older plugin build offers version 1: a blurred rectangle without the look. Not used.)
 bool LucentGlass::available() const {
-	return LucentGlassManager::instance()->isActive();
+	auto* manager = LucentGlassManager::instance();
+	// (The version the two sides agreed on when the global was bound.)
+	return manager->isActive() && manager->QWaylandClientExtension::version() >= kGlassVersion;
 }
 
 void LucentGlass::setActive(bool active) {
@@ -100,7 +115,7 @@ void LucentGlass::bindWindow(QQuickWindow* window) {
 void LucentGlass::updatePolish() {
 	auto* w = this->window();
 	auto* manager = LucentGlassManager::instance();
-	if (!w || !manager->isActive()) return;
+	if (!w || !this->available()) return;
 
 	auto* wlw = w->handle() ? dynamic_cast<QtWaylandClient::QWaylandWindow*>(w->handle()) : nullptr;
 	if (wlw != this->mWaylandWindow) {
@@ -141,10 +156,39 @@ void LucentGlass::updatePolish() {
 		    wl_fixed_from_double(std::max(this->mBlurRadius, 0.0)),
 		    uint32_t(std::max(this->mMaxTaps, 0))
 		);
+		this->sendLook();
 	} else {
 		lucent_glass_v1_set_region(this->mGlass, 0, 0, 0, 0);
 	}
 
 	// The state is applied by the surface's next commit: make sure there is one.
 	w->update();
+}
+
+void LucentGlass::sendLook() {
+	const auto fx = [](double v) { return wl_fixed_from_double(v); };
+	auto* g = this->mGlass;
+
+	uint32_t edges = 0;
+	if (this->mEdges.x() > 0.5F) edges |= LUCENT_GLASS_V1_EDGE_LEFT;
+	if (this->mEdges.y() > 0.5F) edges |= LUCENT_GLASS_V1_EDGE_TOP;
+	if (this->mEdges.z() > 0.5F) edges |= LUCENT_GLASS_V1_EDGE_RIGHT;
+	if (this->mEdges.w() > 0.5F) edges |= LUCENT_GLASS_V1_EDGE_BOTTOM;
+
+	lucent_glass_v1_set_shape(g, fx(this->mCornerRadius), edges, fx(this->mBevel), fx(this->mThickness));
+	lucent_glass_v1_set_refraction(g, fx(this->mRefraction), fx(this->mIor), fx(this->mDispersion));
+	lucent_glass_v1_set_tone(g, fx(this->mFrost), fx(this->mBrightness), fx(this->mContrast), fx(this->mSaturation));
+	lucent_glass_v1_set_tint(g, fx(this->mTint.redF()), fx(this->mTint.greenF()), fx(this->mTint.blueF()), fx(this->mTintStrength));
+	lucent_glass_v1_set_light(g, fx(this->mShine), fx(this->mLightDir.x()), fx(this->mLightDir.y()));
+	lucent_glass_v1_set_opacity(g, fx(this->mGlassOpacity));
+
+	const QVector4D* rects[] = {&this->mHlRect0, &this->mHlRect1, &this->mHlRect2};
+	const QVector4D* colors[] = {&this->mHlColor0, &this->mHlColor1, &this->mHlColor2};
+	for (uint32_t i = 0; i < 3; i++) {
+		const auto& r = *rects[i];
+		const auto& c = *colors[i];
+		lucent_glass_v1_set_highlight(g, i, fx(r.x()), fx(r.y()), fx(r.z()), fx(r.w()), fx(this->mHlRadius), fx(c.x()), fx(c.y()), fx(c.z()), fx(c.w()));
+	}
+	const auto& h = this->mHoleRect;
+	lucent_glass_v1_set_hole(g, fx(h.x()), fx(h.y()), fx(h.z()), fx(h.w()), fx(this->mHoleRadius));
 }

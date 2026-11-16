@@ -40,8 +40,8 @@ QtObject {
     // The status bar's glass drawn by the compositor (the Lucent plugin's lucent_glass protocol)
     // instead of from screen captures: blurred from what is behind the bar in the same frame, so
     // it cannot lag. Used only while the plugin offers the protocol; otherwise, and for the
-    // popups, the glass is the captured one. For now this glass is the blur and the tint only: no
-    // refraction, dispersion or shine yet (which is why it is off by default). Applies live.
+    // popups, the glass is the captured one. It is the same glass (the plugin runs a copy of
+    // glass.frag with the same GlassStyle). Applies live. Off by default until the popups have it too.
     readonly property bool compositorGlass: false
 
     // Blur strength of the glass on the bar and on the popups: gaussian sigma in logical pixels.

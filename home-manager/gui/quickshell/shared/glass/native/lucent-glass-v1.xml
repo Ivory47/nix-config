@@ -16,7 +16,7 @@
     Warning: this protocol is experimental and may change in incompatible ways.
   </description>
 
-  <interface name="lucent_glass_manager_v1" version="1">
+  <interface name="lucent_glass_manager_v1" version="2">
     <description summary="makes glass objects for surfaces"/>
 
     <request name="destroy" type="destructor">
@@ -36,7 +36,7 @@
     </request>
   </interface>
 
-  <interface name="lucent_glass_v1" version="1">
+  <interface name="lucent_glass_v1" version="2">
     <description summary="one piece of glass behind a surface">
       All state set here is double-buffered: it takes effect with the next wl_surface.commit
       of the surface, together with that commit's buffer.
@@ -67,6 +67,107 @@
       </description>
       <arg name="radius" type="fixed"/>
       <arg name="max_taps" type="uint"/>
+    </request>
+
+    <!-- Version 2: the look of the glass. Without these the glass is the blurred background as
+         it is, a plain rectangle. Lengths are in surface-local units; colours and strengths
+         are 0..1. -->
+
+    <enum name="edge" bitfield="true" since="2">
+      <entry name="left" value="1"/>
+      <entry name="top" value="2"/>
+      <entry name="right" value="4"/>
+      <entry name="bottom" value="8"/>
+    </enum>
+
+    <request name="set_shape" since="2">
+      <description summary="corners and the bevelled rim">
+        corner_radius rounds the rectangle. The edges named in `edges` get a rim, `bevel` wide,
+        curved like the edge of a thick piece of glass (`thickness`: its height relative to its
+        width); the rim bends the background (set_refraction) and catches the light (set_light).
+      </description>
+      <arg name="corner_radius" type="fixed"/>
+      <arg name="edges" type="uint" enum="edge"/>
+      <arg name="bevel" type="fixed"/>
+      <arg name="thickness" type="fixed"/>
+    </request>
+
+    <request name="set_refraction" since="2">
+      <description summary="how the rim bends the background">
+        strength scales the bending (0: none). ior is the index of refraction of the glass, and
+        dispersion how far apart the indices of red and blue are (coloured fringes).
+      </description>
+      <arg name="strength" type="fixed"/>
+      <arg name="ior" type="fixed"/>
+      <arg name="dispersion" type="fixed"/>
+    </request>
+
+    <request name="set_tone" since="2">
+      <description summary="how the background is shown">
+        frost: how much of the blurred background shows instead of the sharp one (1: only the
+        blurred). brightness is added, contrast and saturation multiply (0, 1, 1: unchanged).
+      </description>
+      <arg name="frost" type="fixed"/>
+      <arg name="brightness" type="fixed"/>
+      <arg name="contrast" type="fixed"/>
+      <arg name="saturation" type="fixed"/>
+    </request>
+
+    <request name="set_tint" since="2">
+      <description summary="colour mixed into the glass">
+        strength 0: none, 1: the glass is that colour.
+      </description>
+      <arg name="red" type="fixed"/>
+      <arg name="green" type="fixed"/>
+      <arg name="blue" type="fixed"/>
+      <arg name="strength" type="fixed"/>
+    </request>
+
+    <request name="set_light" since="2">
+      <description summary="light on the rim">
+        shine: strength of the highlights on the bevelled edges (0: none). x, y: the direction
+        the light comes from, y down.
+      </description>
+      <arg name="shine" type="fixed"/>
+      <arg name="x" type="fixed"/>
+      <arg name="y" type="fixed"/>
+    </request>
+
+    <request name="set_opacity" since="2">
+      <description summary="how opaque the glass is">
+        Below 1 the real, sharp background shows through the glass.
+      </description>
+      <arg name="opacity" type="fixed"/>
+    </request>
+
+    <request name="set_highlight" since="2">
+      <description summary="a rounded rectangle of colour in the glass">
+        Up to three (index 0..2), mixed into the glass after the tint: for a selected row, a text
+        field. The rectangle is relative to the top left of the glass region. Zero size or
+        strength removes it.
+      </description>
+      <arg name="index" type="uint"/>
+      <arg name="x" type="fixed"/>
+      <arg name="y" type="fixed"/>
+      <arg name="width" type="fixed"/>
+      <arg name="height" type="fixed"/>
+      <arg name="radius" type="fixed"/>
+      <arg name="red" type="fixed"/>
+      <arg name="green" type="fixed"/>
+      <arg name="blue" type="fixed"/>
+      <arg name="strength" type="fixed"/>
+    </request>
+
+    <request name="set_hole" since="2">
+      <description summary="a rounded rectangle cut out of the glass">
+        No glass is drawn inside it (a veil over a whole surface that leaves a panel out). The
+        rectangle is relative to the top left of the glass region. Zero size: no hole.
+      </description>
+      <arg name="x" type="fixed"/>
+      <arg name="y" type="fixed"/>
+      <arg name="width" type="fixed"/>
+      <arg name="height" type="fixed"/>
+      <arg name="radius" type="fixed"/>
     </request>
   </interface>
 </protocol>
