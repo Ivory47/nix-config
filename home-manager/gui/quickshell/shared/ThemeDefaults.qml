@@ -42,8 +42,9 @@ QtObject {
     // behind in the same frame, so it cannot lag, and nothing is captured. Used only while the
     // plugin offers the protocol (in a new enough version); otherwise the glass is the captured
     // one. It is the same glass (the plugin runs a copy of glass.frag with the same GlassStyle).
-    // Applies live.
-    readonly property bool compositorGlass: false
+    // Applies live. On by default: without the plugin nothing changes, the shells capture as before.
+    // (Off is for comparing, and for an output with a transform, where the plugin draws no glass.)
+    readonly property bool compositorGlass: true
 
     // Blur strength of the glass on the bar and on the popups: gaussian sigma in logical pixels.
     readonly property real glassBlurRadius: 14
