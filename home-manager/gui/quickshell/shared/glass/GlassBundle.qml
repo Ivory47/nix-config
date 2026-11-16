@@ -23,6 +23,8 @@ Item {
 
     readonly property Item bg: bgSource
     readonly property Item frosted: blurV
+    // The textures of this bundle that are rendered when scheduled (for GlassCapture.scheduledOnly).
+    readonly property list<Item> sources: [bgSource, blurH, blurV]
 
     function update() {
         bgSource.scheduleUpdate();

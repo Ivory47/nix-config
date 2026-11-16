@@ -539,6 +539,13 @@ Item {
     }
 
     Component.onCompleted: {
+        // Every texture of the pipeline is rendered only when scheduled here: without this each
+        // update of the glass was followed by a second frame of the whole window (see
+        // GlassCapture.scheduledOnly).
+        const scheduled = [draftSource, flagSource, accSourceA, accSourceB, r0, r1, r2, r3, r4, r5, r6, r7]
+            .concat(bundle0.sources, bundle1.sources, bundle2.sources);
+        for (const source of scheduled)
+            cap.scheduledOnly(source);
         // Version 0 is the surface as it starts.
         ringMask = 1;
         r0.scheduleUpdate();

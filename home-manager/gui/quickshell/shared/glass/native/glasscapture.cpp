@@ -359,6 +359,32 @@ void GlassCapture::nudge() {
 	this->pump();
 }
 
+void GlassCapture::scheduledOnly(QQuickItem* source) {
+	if (!source) return;
+	for (const auto& s: this->mQuietSources)
+		if (s.item == source) return;
+	this->mQuietSources.push_back({source, nullptr});
+	// Looked at in the next scene synchronisation (the texture belongs to the render thread).
+	this->update();
+}
+
+// Render thread, with the GUI thread blocked. The texture of a ShaderEffectSource (a QSGLayer) is
+// made by the render thread when the source is first used, and made anew after the scene graph
+// was torn down, so it is looked up here every time; the QPointer tells a new one from the one
+// already handled, also at the same address. Until this has run once after a texture was made,
+// that source's updates still cost the extra frame.
+void GlassCapture::quietSources() {
+	for (auto& s: this->mQuietSources) {
+		auto* item = s.item.data();
+		if (!item || item->window() != this->window() || !item->isTextureProvider()) continue;
+		auto* provider = item->textureProvider();
+		QObject* texture = provider ? provider->texture() : nullptr;
+		if (!texture || texture == s.texture) continue;
+		QObject::disconnect(texture, SIGNAL(updateRequested()), item, SLOT(update()));
+		s.texture = texture;
+	}
+}
+
 void GlassCapture::setStatus(const QString& status) {
 	if (status == this->mStatus) return;
 	this->mStatus = status;
@@ -1165,6 +1191,7 @@ QSGTextureProvider* GlassCapture::textureProvider() const {
 
 // Render thread, with the GUI thread blocked (the scene synchronisation).
 QSGNode* GlassCapture::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
+	if (!this->mQuietSources.empty() && this->window()) this->quietSources();
 	if (this->mTextureDirty && this->window()) {
 		if (!this->mProvider) this->mProvider = new GlassTextureProvider();
 

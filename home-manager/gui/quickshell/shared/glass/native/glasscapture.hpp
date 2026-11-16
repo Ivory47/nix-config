@@ -31,6 +31,7 @@
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QHash>
 #include <QtCore/QList>
+#include <QtCore/QPointer>
 #include <QtCore/QRectF>
 #include <QtCore/QTimer>
 #include <QtCore/QVariantMap>
@@ -275,6 +276,14 @@ public:
 	Q_INVOKABLE void nudge();
 	// How many times the window synchronised the scene so far (see swapped()).
 	Q_INVOKABLE int syncCount() const { return this->mSyncs.load(); }
+	// For a ShaderEffectSource that is not live and only ever updated with scheduleUpdate(): no
+	// second frame after each update. Qt connects the source's texture to the item's update(), so
+	// that a texture which got dirty on its own gets a frame to be rendered in. A scheduled update
+	// is rendered by the frame that scheduleUpdate() itself asked for, and the texture's request,
+	// which reaches the item after that frame was synchronised, only made Qt render and commit
+	// the whole window once more with the same content. That connection is removed here (and
+	// again whenever the source gets a new texture). Not for live or recursive sources.
+	Q_INVOKABLE void scheduledOnly(QQuickItem* source);
 
 	bool isTextureProvider() const override { return true; }
 	QSGTextureProvider* textureProvider() const override;
@@ -341,6 +350,7 @@ private:
 	void checkRatio();
 	bool sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, bool linear, int stride, QRect crop);
 	void publish(QSize size, QRectF cropUv);
+	void quietSources();
 	QRect cropFor(QSize buffer, bool wholeOutput) const;
 
 	bool mActive = false;
@@ -384,6 +394,14 @@ private:
 	QRectF mSampleRegion;
 	bool mTextureDirty = false;
 	mutable GlassTextureProvider* mProvider = nullptr;
+	// The sources given to scheduledOnly(), and for each the texture whose connection was removed.
+	// Written on the GUI thread, used by the render thread while the GUI thread is blocked (the
+	// scene synchronisation).
+	struct QuietSource {
+		QPointer<QQuickItem> item;
+		QPointer<QObject> texture;
+	};
+	std::vector<QuietSource> mQuietSources;
 	GlassFrame* mWaiting = nullptr;
 
 	qreal mRatio = 0;

@@ -16,6 +16,8 @@
 #                     height for a surface like the popups'). Multiples of 3 at scale 1.333.
 #   GLASS_QML         .../lib/qt-6/qml of a Glass.Native build to test instead of the deployed one
 #                     (see CLAUDE.md for the nix build command)
+#   GLASS_SRC=1       use the repository's shared/glass/*.qml instead of the deployed ones
+#                     (QML changes before `hms`; the compiled shaders stay the deployed ones)
 #   LAGCAP=1          record with Lucent's lagcap (LAGCAP_BIN, default ~/Documents/Code/Lucent/tools/build/lagcap)
 #   OUT               where the logs go (default: a new directory under $XDG_RUNTIME_DIR)
 # Results: $OUT/probe-<tag>.log + clocks-<tag>.txt (timeline.py), lagcap-<tag>.txt (pulse.py).
@@ -30,6 +32,7 @@ OUT="${OUT:-$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/glass-latency.XXXXXX")}"; mkdi
 work="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/glass-probe.XXXXXX")"
 cp -r "$here/probe" "$work/probe" && cp -rL "$HOME/.config/quickshell/status-bar/shared" "$work/probe/shared" || exit 1
 chmod -R u+w "$work"
+[ "${GLASS_SRC:-0}" = 1 ] && cp "$here"/../../*.qml "$work/probe/shared/glass/"
 
 LOAD_MODE="$mode" setsid qs -p "$here/load" >"$OUT/load-$tag.log" 2>&1 &
 LP=$!
