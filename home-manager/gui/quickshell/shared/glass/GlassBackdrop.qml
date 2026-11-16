@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Glass.Native
+import qs.shared
 
 // The live backdrop of a layer-shell surface: what is really behind it, kept up to date.
 //
@@ -27,12 +28,26 @@ Item {
     // Top left of the surface, in logical pixels of the output.
     property point origin: Qt.point(0, 0)
     // Blur strength: gaussian sigma in logical pixels.
-    property real blurRadius: 14
-    // Minimum time between captures in ms. 0 = one refresh period of the monitor.
+    property real blurRadius: Theme.glassBlurRadius
+    // Blur cost: most samples per side of each blur pass (Theme.blurMaxTaps).
+    // Theme.blurTapsFalloff lowers it for a stronger blur than the reference radius (14): a wide
+    // blur hides the coarser sampling. Falloff 0: always the same count; 1: inversely with the
+    // radius. Never below 4, never above Theme.blurMaxTaps.
+    property real blurTaps: Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, blurRadius)), Theme.blurTapsFalloff))
+    // Minimum time between captures in ms. 0 = no limit of our own: the compositor answers at most once per frame.
     property int minInterval: 0
     property bool active: true
     // Off: no capture, nothing kept up to date (for comparing against the bar without glass).
     property bool glassEnabled: true
+    // Clean mode: the compositor leaves our own surfaces out of the captures we make (the Pane
+    // Hyprland plugin, see LucentStatus), so a capture is the background as it is. No unmixing, no
+    // tag pixel, no history of what we presented, and the glass is drawn opaque (GlassPanel).
+    // Otherwise the background is estimated by subtracting our own surface (unmix.frag).
+    // There is no setting for it: with the plugin loaded EVERY capture of ours is clean, and the
+    // unmix cannot work on one. To go back to estimating, unload the plugin (hyprland.lua).
+    // Whole-output captures only: the plugin does not handle region captures, which GlassCapture
+    // asks for when it has to fall back to shared memory (dmabufBroken).
+    readonly property bool clean: LucentStatus.active && cap.wholeOutput && !cap.dmabufBroken
     // Log what the pipeline does (twice a second).
     property bool debug: false
     // Name of an IPC target (`qs ipc call <target> ...`) to switch parts of the pipeline on and
@@ -59,6 +74,9 @@ Item {
     readonly property size texPx: cap.captureSize.width > 0 ? cap.captureSize : sizePx
     // True once a background has been settled; before that panels draw a plain tint.
     property bool ready: false
+    // Turning the glass off drops the saved background: turning it on again starts from "no
+    // backdrop yet" (a plain tint) until the first fresh capture, never from an old picture.
+    onGlassEnabledChanged: if (!glassEnabled) ready = false
     readonly property alias capture: cap
 
     width: composite.width
@@ -98,7 +116,14 @@ Item {
     property int version: 0
     // Bit i: slot i holds a version that was presented.
     property int ringMask: 0
-    readonly property color tagColor: Qt.rgba(30 / 255, 30 / 255, (46 + 4 * (version % 8)) / 255, 1)
+    // Red channel of the tag: one value per instance (bar 30, launcher 34, clipboard 38), so that
+    // one instance's tag is never taken for a version of another's.
+    property int tagRed: 30
+    // Red of the tag that means "my surface is not in this frame", or 0. A popup sets it to the
+    // bar's (30): while the popup is closed or still opening that is what shows at the tag's
+    // place, and such a capture is the background as it is (see unmix.frag).
+    property int absentTagRed: 0
+    readonly property color tagColor: Qt.rgba(tagRed / 255, 30 / 255, (46 + 4 * (version % 8)) / 255, 1)
     function ringAt(i) {
         return [r0, r1, r2, r3, r4, r5, r6, r7][i];
     }
@@ -111,6 +136,17 @@ Item {
         onCaptured: root.process()
         publishing: root.processing
         onSwapped: syncSerial => root.handleSwapped(syncSerial)
+    }
+
+    // A new blur radius applies at once: the blur is only rendered when scheduled, which happens
+    // when a capture arrives, and an idle screen sends none (the status bar sits still behind
+    // nothing that changes). So blur the background on screen again. (Later, so that the sigma of
+    // the bundle, which follows the radius, has been updated first.)
+    onBlurRadiusChanged: Qt.callLater(reblurShown)
+    onBlurTapsChanged: Qt.callLater(reblurShown)
+    function reblurShown() {
+        if (ready)
+            bundleAt(readIdx).reblur();
     }
 
     // A capture arrived: unmix and blur it into a bundle that is not on screen, and show that
@@ -146,10 +182,19 @@ Item {
         flips++;
         // The surface changes in the next synchronised frame, which also draws the new glass:
         // keep that version, tagged.
+        bumpVersion();
+    }
+
+    // Start a new version of the surface: it is kept (and tagged) as the next synchronised frame
+    // renders it. Called for every update, and by a popup that makes its content visible without
+    // an update (GlassPopup), so that the version its tag shows holds that content.
+    function bumpVersion() {
         version++;
         const slot = version % ringSize;
         ringMask |= 1 << slot;
-        ringAt(slot).scheduleUpdate();
+        // (The snapshots are only read by the unmix.)
+        if (!clean)
+            ringAt(slot).scheduleUpdate();
         // What the scene graph synchronises from now on includes this update.
         scheduledAt = cap.syncCount();
     }
@@ -254,9 +299,11 @@ Item {
         property variant own7: root.version % 8 === 7 ? r0 : r7
         property vector2d texPx: Qt.vector2d(root.texPx.width, root.texPx.height)
         property real tagMask: root.ringMask
+        property real tagRed: root.tagRed
+        property real absentRed: root.absentTagRed
         property variant previous: root.last
 
-        fragmentShader: Qt.resolvedUrl("shaders/unmix.frag.qsb")
+        fragmentShader: root.clean ? Qt.resolvedUrl("shaders/clean.frag.qsb") : Qt.resolvedUrl("shaders/unmix.frag.qsb")
     }
 
     ShaderEffectSource {
@@ -269,8 +316,9 @@ Item {
 
     ShaderEffect {
         id: flagFx
-        width: root.texPx.width
-        height: root.texPx.height
+        // One texel in clean mode (flag0.frag): nothing to measure.
+        width: root.clean ? 1 : root.texPx.width
+        height: root.clean ? 1 : root.texPx.height
         visible: false
         blending: false
 
@@ -290,9 +338,11 @@ Item {
         property variant own7: root.version % 8 === 7 ? r0 : r7
         property vector2d texPx: Qt.vector2d(root.texPx.width, root.texPx.height)
         property real tagMask: root.ringMask
+        property real tagRed: root.tagRed
+        property real absentRed: root.absentTagRed
         property variant previous: root.last
 
-        fragmentShader: Qt.resolvedUrl("shaders/unmix.frag.qsb")
+        fragmentShader: root.clean ? Qt.resolvedUrl("shaders/flag0.frag.qsb") : Qt.resolvedUrl("shaders/unmix.frag.qsb")
     }
 
     // Float, with mip levels: the top level is the fraction of wrong pixels.
@@ -303,7 +353,7 @@ Item {
         visible: false
         mipmap: true
         format: ShaderEffectSource.RGBA16F
-        textureSize: root.texPx
+        textureSize: root.clean ? Qt.size(1, 1) : root.texPx
     }
 
     // What settle.frag decides, counted on the GPU (verdict.frag): a 3x1 float texture, rewritten
@@ -436,6 +486,7 @@ Item {
         kept: root.prevIdx === 0 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+        taps: root.blurTaps
     }
 
     GlassBundle {
@@ -445,6 +496,7 @@ Item {
         kept: root.prevIdx === 1 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+        taps: root.blurTaps
     }
 
     GlassBundle {
@@ -454,6 +506,7 @@ Item {
         kept: root.prevIdx === 2 ? draftSource : root.last
         sizePx: root.texPx
         sigma: root.blurRadius * root.texPx.width / Math.max(1, root.width)
+        taps: root.blurTaps
     }
 
     // Keep-alive consumer. Qt appears to render a hidden, non-live ShaderEffectSource only when
@@ -486,6 +539,13 @@ Item {
     }
 
     Component.onCompleted: {
+        // Every texture of the pipeline is rendered only when scheduled here: without this each
+        // update of the glass was followed by a second frame of the whole window (see
+        // GlassCapture.scheduledOnly).
+        const scheduled = [draftSource, flagSource, accSourceA, accSourceB, r0, r1, r2, r3, r4, r5, r6, r7]
+            .concat(bundle0.sources, bundle1.sources, bundle2.sources);
+        for (const source of scheduled)
+            cap.scheduledOnly(source);
         // Version 0 is the surface as it starts.
         ringMask = 1;
         r0.scheduleUpdate();
@@ -523,6 +583,7 @@ Item {
                     updatesDeferred: root.updatesDeferred,
                     ready: root.ready,
                     forceReject: root.forceReject,
+                    clean: root.clean,
                     version: root.version,
                     diagnostics: root.diagnostics
                 },

@@ -153,7 +153,8 @@
         "hyprmod": "hyprmod",
         "matugen": "matugen",
         "nixpkgs": "nixpkgs_2",
-        "nur": "nur"
+        "nur": "nur",
+        "video-editor": "video-editor"
       }
     },
     "systems": {
@@ -169,6 +170,26 @@
         "owner": "nix-systems",
         "repo": "default-linux",
         "type": "github"
+      }
+    },
+    "video-editor": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794154248,
+        "narHash": "sha256-WKEjyu4qNNsdGdlDHN7+6lqephL3wRSlqXlGo8nhZwA=",
+        "ref": "refs/heads/main",
+        "rev": "a732ce675b9d15ed782b147c03b45baae2dd63c0",
+        "revCount": 87,
+        "type": "git",
+        "url": "ssh://git@github.com/Ivory47/Video-Editor"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/Ivory47/Video-Editor"
       }
     }
   },

@@ -19,6 +19,8 @@ ShaderEffect {
 
     property variant sharp: backdrop.sharp
     property variant frosted: backdrop.frosted
+    // The background of the update before the one on screen (see motionGate).
+    property variant previous: backdrop.last
 
     property vector2d sizePx: Qt.vector2d(width * ratio, height * ratio)
     property vector2d originPx: Qt.vector2d(x * ratio, y * ratio)
@@ -27,7 +29,8 @@ ShaderEffect {
     property vector4d tint: Qt.vector4d(style.tint.r, style.tint.g, style.tint.b, style.tintStrength)
     property vector2d lightDir: style.lightDir
     property real pxRatio: ratio
-    property real known: backdrop.ready ? 1 : 0
+    // With the glass off the saved blur is not used any more (it would only be the last picture).
+    property real known: backdrop.ready && backdrop.glassEnabled ? 1 : 0
     property real cornerRadius: style.cornerRadius
     property real bevel: style.bevel
     property real thickness: style.thickness
@@ -39,7 +42,10 @@ ShaderEffect {
     property real contrast: style.contrast
     property real saturation: style.saturation
     property real shine: style.shine
-    property real alpha: style.alpha
+    // Below 1 only so that the background can be recovered from the capture (not in clean mode,
+    // where the capture has none of our surface in it); with the glass off
+    // (Theme.glass) there is no capture, and 8% of the sharp background showing is just noise.
+    property real alpha: backdrop.glassEnabled && !backdrop.clean ? style.alpha : 1.0
     property real glassOpacity: style.opacity
     property real debugView: debugMode
 
@@ -61,6 +67,17 @@ ShaderEffect {
     // (just after a surface was shown again): cancelling an old picture draws it inverted, while
     // not cancelling only lets a faint trace of the real background through.
     property real cancelLeak: 1
+
+    // 1: do not cancel the leak where the background changed since the update before (a window
+    // moving behind the panel): the picture is a few frames old there, and cancelling it draws a
+    // ghost of the sharp background. 0: always cancel.
+    property real motionGate: 0
+
+    // A rounded rectangle cut out of the glass (x, y, width, height in logical pixels of this
+    // panel, and its corner radius; zero size = none). For a veil over a whole surface that
+    // leaves out the popup's own panel (GlassScrim).
+    property vector4d holeRect: Qt.vector4d(0, 0, 0, 0)
+    property real holeRadius: 0
 
     fragmentShader: Qt.resolvedUrl("shaders/glass.frag.qsb")
 }

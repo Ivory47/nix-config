@@ -5,6 +5,7 @@ import Quickshell.Hyprland
 import Quickshell.Services.UPower
 import qs.shared
 import qs.shared.glass
+import Glass.Native
 
 PanelWindow {
     id: statusBar
@@ -94,20 +95,34 @@ PanelWindow {
             }
         ]
 
+        // Glass drawn by the compositor (Theme.compositorGlass, the Lucent plugin): the plugin
+        // draws the same glass as the GlassPanel below, but while it makes the frame, from what
+        // is behind the bar in that frame, so it is never behind. Nothing is drawn here for it.
+        LucentGlassPanel {
+            id: compositorGlass
+            anchors.fill: parent
+            // (`shown`: asked for and offered. The captured glass below is the fallback.)
+            readonly property bool shown: Theme.glass && Theme.compositorGlass && available
+            active: shown
+            blurRadius: glassBackdrop.blurRadius
+            maxTaps: Math.round(glassBackdrop.blurTaps)
+            style: barGlassStyle
+        }
+
         // Live liquid glass (shared/glass): the real background behind the bar, blurred and
         // refracted on the GPU. Its look is this GlassStyle; the blur radius is on the backdrop.
         // Only for measuring (glassBackdrop.glassEnabled): the bar without glass.
         Rectangle {
             anchors.fill: parent
-            visible: !glassBackdrop.glassEnabled
-            color: Qt.rgba(0.12, 0.12, 0.18, 0.55)
+            visible: !glassBackdrop.glassEnabled && !compositorGlass.shown
+            color: Qt.alpha(Theme.background, Theme.barFillOpacity)
         }
 
         GlassPanel {
             anchors.fill: parent
             visible: glassBackdrop.glassEnabled
             backdrop: glassBackdrop
-            style: GlassStyle {}
+            style: GlassStyle { id: barGlassStyle }
         }
 
         // One opaque pixel at the top left: says which version of the bar a capture holds.
@@ -158,6 +173,8 @@ PanelWindow {
 
                 spacing: 15
 
+                SettingsButton {}
+
                 Wifi {}
 
                 Audio {}
@@ -180,7 +197,7 @@ PanelWindow {
                 }
 
                 height: 1
-                color: Qt.alpha("#494965", 0.85)
+                color: Qt.alpha(Theme.barBorderColor, Theme.barBorderOpacity)
             }
         }
     }
@@ -190,7 +207,9 @@ PanelWindow {
     GlassBackdrop {
         id: glassBackdrop
         composite: barContent
-        blurRadius: 14
+        blurRadius: Theme.glassBlurRadius
         ipcTarget: "glass"
+        // (Not while the compositor draws the glass: no capture, no pipeline.)
+        glassEnabled: Theme.glass && !compositorGlass.shown
     }
 }

@@ -18,12 +18,25 @@ Item {
     required property size sizePx
     // Gaussian sigma of the blur, in real pixels.
     required property real sigma
+    // Most blur samples per side (the blur cost, see Theme.blurMaxTaps).
+    property real taps: 48
 
     readonly property Item bg: bgSource
     readonly property Item frosted: blurV
+    // The textures of this bundle that are rendered when scheduled (for GlassCapture.scheduledOnly).
+    readonly property list<Item> sources: [bgSource, blurH, blurV]
 
     function update() {
         bgSource.scheduleUpdate();
+        blurH.scheduleUpdate();
+        blurV.scheduleUpdate();
+    }
+
+    // Blur the background it holds again, with the current sigma (the radius was changed): the
+    // blur passes only, from the settled background, which stays as it is. (Without this the
+    // textures are only rendered when a capture arrives, so a new radius would show only when
+    // the screen behind changes.)
+    function reblur() {
         blurH.scheduleUpdate();
         blurV.scheduleUpdate();
     }
@@ -63,6 +76,7 @@ Item {
         property variant src: bgSource
         property vector2d stepUv: Qt.vector2d(1 / root.sizePx.width, 0)
         property real sigma: root.sigma
+        property real maxTaps: root.taps
 
         fragmentShader: Qt.resolvedUrl("shaders/blur.frag.qsb")
     }
@@ -87,6 +101,7 @@ Item {
         property variant src: blurH
         property vector2d stepUv: Qt.vector2d(0, 1 / blurHFx.height)
         property real sigma: root.sigma / 2
+        property real maxTaps: root.taps
 
         fragmentShader: Qt.resolvedUrl("shaders/blur.frag.qsb")
     }

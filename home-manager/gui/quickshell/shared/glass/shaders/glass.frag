@@ -44,10 +44,16 @@ layout(std140, binding = 0) uniform buf {
     vec4 hlColor2;
     float hlRadius;     // corner radius of the highlights, logical
     float cancelLeak;   // 1 = subtract the background that leaks through (normal), 0 = do not
+    vec4 holeRect;      // a rounded rectangle cut out of the glass: x, y, width, height in logical
+                        // pixels of this panel (zero size = none)
+    float holeRadius;   // its corner radius, logical
+    float motionGate;   // 1 = do not cancel the leak where the background changed since the
+                        // update before (it is out of date there), 0 = always cancel
 };
 
 layout(binding = 1) uniform sampler2D sharp;
 layout(binding = 2) uniform sampler2D frosted;
+layout(binding = 3) uniform sampler2D previous;  // the background of the update before
 
 vec2 backdropUv(vec2 px) {
     return clamp(px, vec2(0.5), backdropPx - vec2(0.5)) / backdropPx;
@@ -112,6 +118,15 @@ void main() {
     float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
     float coverage = clamp(0.5 - d, 0.0, 1.0);
 
+    // The hole (a veil over a whole surface leaves the popup's own panel out): no glass inside it.
+    if (holeRect.z > 0.0 && holeRect.w > 0.0) {
+        vec2 hp = p / pxRatio;
+        vec2 hs = holeRect.zw * 0.5;
+        vec2 hq = abs(hp - holeRect.xy - hs) - (hs - vec2(holeRadius));
+        float hd = length(max(hq, 0.0)) + min(max(hq.x, hq.y), 0.0) - holeRadius;
+        coverage *= clamp(0.5 + hd * pxRatio, 0.0, 1.0);
+    }
+
     // The rim: a quarter circle from the edge (t = 0) to the flat middle (t = 1).
     float t = clamp(inside / b, 0.0, 1.0);
     float u = 1.0 - t;
@@ -166,11 +181,31 @@ void main() {
         // No backdrop yet: a plain tinted surface that already lets the background through,
         // so that the first capture can be unmixed.
         vec3 plain = mix(mid, tint.rgb, max(tint.a, 0.6));
+        // (The highlights are drawn here too: with Theme.glass off this is all there is.)
+        vec2 plp = p / pxRatio;
+        plain = highlight(plain, plp, hlRect0, hlColor0);
+        plain = highlight(plain, plp, hlRect1, hlColor1);
+        plain = highlight(plain, plp, hlRect2, hlColor2);
         fragColor = vec4(plain * a, a) * qt_Opacity;
         return;
     }
 
     vec3 underneath = trueAt(base, mid);
-    vec3 rgb = clamp(seen * (col - cancelLeak * (1.0 - alpha) * underneath), vec3(0.0), vec3(a));
+
+    // Where the background changed between the last two updates (a window being moved), the
+    // picture we hold is a few frames behind the real one, and subtracting it would leave a ghost
+    // of the sharp background. There the leak is not cancelled: the real background shows
+    // faintly instead, which is what is really behind. Where nothing changed, it is cancelled.
+    float cancel = cancelLeak;
+    if (motionGate > 0.5) {
+        vec2 buv = backdropUv(base);
+        vec4 now = texture(sharp, buv);
+        vec4 before = texture(previous, buv);
+        if (now.a > 0.5 && before.a > 0.5) {
+            vec3 d = abs(now.rgb - before.rgb);
+            cancel *= 1.0 - smoothstep(0.08, 0.2, max(d.r, max(d.g, d.b)));
+        }
+    }
+    vec3 rgb = clamp(seen * (col - cancel * (1.0 - alpha) * underneath), vec3(0.0), vec3(a));
     fragColor = vec4(rgb, a) * qt_Opacity;
 }

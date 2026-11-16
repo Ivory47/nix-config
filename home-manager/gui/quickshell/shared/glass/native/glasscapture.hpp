@@ -31,6 +31,7 @@
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QHash>
 #include <QtCore/QList>
+#include <QtCore/QPointer>
 #include <QtCore/QRectF>
 #include <QtCore/QTimer>
 #include <QtCore/QVariantMap>
@@ -171,7 +172,8 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
 	// Region to capture, in logical pixels of the output (origin: the output's top left).
 	Q_PROPERTY(QRectF region READ region WRITE setRegion NOTIFY regionChanged)
-	// Minimum time between two requests, ms. 0 = one refresh period of the window's screen.
+	// Minimum time between the starts of two requests, ms. 0 = no limit of our own: the compositor
+	// answers at most once per output commit, which paces the requests.
 	Q_PROPERTY(int minInterval READ minInterval WRITE setMinInterval NOTIFY minIntervalChanged)
 	// How many captures may be on their way at once. One: Hyprland completes every pending capture
 	// at the same output commit, so more requests only bring the same pixels again.
@@ -208,7 +210,8 @@ class GlassCapture: public QQuickItem {
 	Q_PROPERTY(bool dmabufBroken READ dmabufBroken NOTIFY statsChanged)
 	// Frames the window presented (polled, not notified).
 	Q_PROPERTY(int frames READ frames NOTIFY statsChanged)
-	// The effective minimum interval in ms, and the pixel size of the last capture.
+	// The refresh period in ms when minInterval is 0, else minInterval. A single request is not
+	// paced by it any more; it only spaces the additional requests when depth is above one.
 	Q_PROPERTY(qreal effectiveInterval READ effectiveInterval NOTIFY statsChanged)
 	// How long the last capture took from the request to the pixels (ms), of which until the
 	// compositor told which buffer it wants, and the time between the last two captures arriving.
@@ -273,6 +276,14 @@ public:
 	Q_INVOKABLE void nudge();
 	// How many times the window synchronised the scene so far (see swapped()).
 	Q_INVOKABLE int syncCount() const { return this->mSyncs.load(); }
+	// For a ShaderEffectSource that is not live and only ever updated with scheduleUpdate(): no
+	// second frame after each update. Qt connects the source's texture to the item's update(), so
+	// that a texture which got dirty on its own gets a frame to be rendered in. A scheduled update
+	// is rendered by the frame that scheduleUpdate() itself asked for, and the texture's request,
+	// which reaches the item after that frame was synchronised, only made Qt render and commit
+	// the whole window once more with the same content. That connection is removed here (and
+	// again whenever the source gets a new texture). Not for live or recursive sources.
+	Q_INVOKABLE void scheduledOnly(QQuickItem* source);
 
 	bool isTextureProvider() const override { return true; }
 	QSGTextureProvider* textureProvider() const override;
@@ -313,6 +324,7 @@ private slots:
 	void retryWaiting();
 	void warmupEnded();
 	void healDmabuf();
+	void deliverUpdateNow();
 
 private:
 	enum class DmaResult { Ok, Exhausted, Unsupported, AllocFailed };
@@ -338,6 +350,7 @@ private:
 	void checkRatio();
 	bool sameAsBefore(const uchar* bits, qsizetype bytes, QSize size, bool linear, int stride, QRect crop);
 	void publish(QSize size, QRectF cropUv);
+	void quietSources();
 	QRect cropFor(QSize buffer, bool wholeOutput) const;
 
 	bool mActive = false;
@@ -381,6 +394,14 @@ private:
 	QRectF mSampleRegion;
 	bool mTextureDirty = false;
 	mutable GlassTextureProvider* mProvider = nullptr;
+	// The sources given to scheduledOnly(), and for each the texture whose connection was removed.
+	// Written on the GUI thread, used by the render thread while the GUI thread is blocked (the
+	// scene synchronisation).
+	struct QuietSource {
+		QPointer<QQuickItem> item;
+		QPointer<QObject> texture;
+	};
+	std::vector<QuietSource> mQuietSources;
 	GlassFrame* mWaiting = nullptr;
 
 	qreal mRatio = 0;

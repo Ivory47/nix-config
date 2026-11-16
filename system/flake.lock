@@ -1,5 +1,25 @@
 {
   "nodes": {
+    "lucent": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794846097,
+        "narHash": "sha256-eUJcOAAs7fSLnTsaRLeuC24QUxj+E8HNBbY3C47ra3M=",
+        "ref": "refs/heads/feature/compositor-glass",
+        "rev": "80b3d4ca03a9ffcc6e796079f772647e7424d5b9",
+        "revCount": 6,
+        "type": "git",
+        "url": "file:///home/user/Documents/Code/Lucent"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///home/user/Documents/Code/Lucent"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793540411,
@@ -34,6 +54,7 @@
     },
     "root": {
       "inputs": {
+        "lucent": "lucent",
         "nixpkgs": "nixpkgs",
         "nixpkgs-tailscale": "nixpkgs-tailscale",
         "silentSDDM": "silentSDDM"
