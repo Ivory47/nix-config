@@ -5,6 +5,7 @@ import Quickshell.Hyprland
 import Quickshell.Services.UPower
 import qs.shared
 import qs.shared.glass
+import Glass.Native
 
 PanelWindow {
     id: statusBar
@@ -94,12 +95,31 @@ PanelWindow {
             }
         ]
 
+        // Glass drawn by the compositor (Theme.compositorGlass, the Lucent plugin): the plugin
+        // blurs what is behind the bar while it makes the frame, under what the bar draws, so the
+        // blur is never behind. The bar then draws only the tint (below) and its content.
+        LucentGlass {
+            id: compositorGlass
+            anchors.fill: parent
+            // (`shown`: asked for and offered. The captured glass below is the fallback.)
+            readonly property bool shown: Theme.glass && Theme.compositorGlass && available
+            active: shown
+            blurRadius: glassBackdrop.blurRadius
+            maxTaps: Math.round(glassBackdrop.blurTaps)
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            visible: compositorGlass.shown
+            color: Qt.alpha(barGlassStyle.tint, barGlassStyle.tintStrength)
+        }
+
         // Live liquid glass (shared/glass): the real background behind the bar, blurred and
         // refracted on the GPU. Its look is this GlassStyle; the blur radius is on the backdrop.
         // Only for measuring (glassBackdrop.glassEnabled): the bar without glass.
         Rectangle {
             anchors.fill: parent
-            visible: !glassBackdrop.glassEnabled
+            visible: !glassBackdrop.glassEnabled && !compositorGlass.shown
             color: Qt.alpha(Theme.background, Theme.barFillOpacity)
         }
 
@@ -107,7 +127,7 @@ PanelWindow {
             anchors.fill: parent
             visible: glassBackdrop.glassEnabled
             backdrop: glassBackdrop
-            style: GlassStyle {}
+            style: GlassStyle { id: barGlassStyle }
         }
 
         // One opaque pixel at the top left: says which version of the bar a capture holds.
@@ -194,6 +214,7 @@ PanelWindow {
         composite: barContent
         blurRadius: Theme.glassBlurRadius
         ipcTarget: "glass"
-        glassEnabled: Theme.glass
+        // (Not while the compositor draws the glass: no capture, no pipeline.)
+        glassEnabled: Theme.glass && !compositorGlass.shown
     }
 }

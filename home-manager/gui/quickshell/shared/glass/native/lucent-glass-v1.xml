@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="lucent_glass_v1">
+  <copyright>
+    SPDX-License-Identifier: MIT
+  </copyright>
+
+  <description summary="glass drawn by the compositor behind parts of a surface">
+    A client that draws frosted glass has to blur what is behind its surface. Doing that from
+    a screen capture is always at least one frame late. With this protocol the client only says
+    where the glass is and what it looks like, and the compositor draws it, under the surface's
+    own content, from what is behind the surface in the very same frame.
+
+    The client leaves the glass area of its buffer transparent (or draws over it what belongs
+    on top of the glass: text, a tint, highlights).
+
+    Warning: this protocol is experimental and may change in incompatible ways.
+  </description>
+
+  <interface name="lucent_glass_manager_v1" version="1">
+    <description summary="makes glass objects for surfaces"/>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the manager">
+        Glass objects made from it stay valid.
+      </description>
+    </request>
+
+    <request name="get_glass">
+      <description summary="make a piece of glass for a surface">
+        Makes a piece of glass behind the given surface. A surface may have several; they are
+        drawn in the order they were made. A new piece has no region and is not drawn until one
+        is set and the surface is committed.
+      </description>
+      <arg name="id" type="new_id" interface="lucent_glass_v1"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+  </interface>
+
+  <interface name="lucent_glass_v1" version="1">
+    <description summary="one piece of glass behind a surface">
+      All state set here is double-buffered: it takes effect with the next wl_surface.commit
+      of the surface, together with that commit's buffer.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="remove the glass">
+        The glass is no longer drawn. Takes effect at once.
+      </description>
+    </request>
+
+    <request name="set_region">
+      <description summary="where the glass is">
+        A rectangle in surface-local coordinates. A width or height of zero means the glass is
+        not drawn.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
+
+    <request name="set_blur">
+      <description summary="how strongly the background is blurred">
+        radius: the sigma of a gaussian blur, in surface-local units. Zero: no blur.
+        max_taps: the most samples per side the compositor should spend on each blur pass; a
+        wider blur spreads them out. Zero: the compositor's default.
+      </description>
+      <arg name="radius" type="fixed"/>
+      <arg name="max_taps" type="uint"/>
+    </request>
+  </interface>
+</protocol>

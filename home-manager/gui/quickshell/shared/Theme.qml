@@ -35,6 +35,8 @@ QtObject {
 
     // Glass (a changed `glass` may need a restart of the shells, see ThemeDefaults.qml)
     readonly property bool glass: ThemeFromSettingsApp.bool("glass", ThemeDefaults.glass)
+    // The bar's glass drawn by the compositor (no lag; needs the Lucent plugin, see ThemeDefaults.qml).
+    readonly property bool compositorGlass: ThemeFromSettingsApp.bool("compositorGlass", ThemeDefaults.compositorGlass)
     readonly property real glassBlurRadius: ThemeFromSettingsApp.real("glassBlurRadius", ThemeDefaults.glassBlurRadius)
     readonly property int blurMaxTaps: ThemeFromSettingsApp.integer("blurMaxTaps", ThemeDefaults.blurMaxTaps)
     readonly property real blurTapsFalloff: ThemeFromSettingsApp.real("blurTapsFalloff", ThemeDefaults.blurTapsFalloff)

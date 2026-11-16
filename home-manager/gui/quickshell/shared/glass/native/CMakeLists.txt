@@ -32,10 +32,14 @@ qt_add_qml_module(glassnative
 	SOURCES
 		glasscapture.cpp
 		glasscapture.hpp
+		lucentglass.cpp
+		lucentglass.hpp
 )
 
 qt6_generate_wayland_protocol_client_sources(glassnative FILES ${WLR_SCREENCOPY_XML})
 qt6_generate_wayland_protocol_client_sources(glassnative PRIVATE_CODE FILES ${LINUX_DMABUF_XML})
+# Glass drawn by the compositor (the Lucent plugin): a copy of the protocol in Lucent's repository.
+qt6_generate_wayland_protocol_client_sources(glassnative PRIVATE_CODE FILES ${CMAKE_CURRENT_SOURCE_DIR}/lucent-glass-v1.xml)
 
 # C is enabled above on purpose: the generated protocol interface tables are a .c file.
 
