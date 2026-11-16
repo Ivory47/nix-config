@@ -343,7 +343,10 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("qs -c clipboard ipc call clipboard t
 hl.bind("print", hl.dsp.exec_cmd([[
     mkdir -p ~/Pictures/Screenshots &&
     grimblast --freeze --cursor copysave area ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png
-]]))
+]]), {
+    ignore_mods = true,
+    transparent = true,
+})
 
 
 -- Switch workspaces with mainMod + [0-9]
