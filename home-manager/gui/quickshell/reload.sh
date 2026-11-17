@@ -38,6 +38,9 @@ qs -c app-launcher >/dev/null 2>&1 & disown
 pkill -f "quickshell -c settings"
 qs -c settings >/dev/null 2>&1 & disown
 
+pkill -f "quickshell -c wallpapers"
+qs -c wallpapers >/dev/null 2>&1 & disown
+
 pkill -f "quickshell -c clipboard"
 
 # Stop old clipboard watchers (text and image) so reloads don't stack them up
