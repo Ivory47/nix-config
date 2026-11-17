@@ -44,14 +44,64 @@ Item {
     // key -> the field of that setting, to scroll to it.
     property var fields: ({})
 
-    // Scrolls the page so that the setting is near the top, and outlines it for a moment.
+    // The collapsible groups (ThemeSchema `groups`): which are open (id -> true), and which group a
+    // setting is in (key -> id). All start closed.
+    property var openGroups: ({})
+    readonly property var groupOf: {
+        const out = {}
+        for (const s of sections)
+            for (const g of (s.groups || []))
+                for (const item of g.items)
+                    out[item.key] = g.id
+        return out
+    }
+
+    function setGroupOpen(id, open) {
+        const next = Object.assign({}, openGroups)
+        if (open)
+            next[id] = true
+        else
+            delete next[id]
+        openGroups = next
+    }
+
+    // How many of the settings of a group were changed from their defaults (shown on a closed group,
+    // so that a change cannot hide in it).
+    function changedIn(items) {
+        let n = 0
+        for (const item of items)
+            if (ThemeStore.isSet(item.key))
+                n++
+        return n
+    }
+
+    // Scrolls the page so that the setting is near the top, and outlines it for a moment. A setting in
+    // a closed group opens the group first (and waits for the page to be laid out again).
     function scrollTo(key) {
+        const g = groupOf[key]
+        if (g && !openGroups[g]) {
+            setGroupOpen(g, true)
+            scrollTimer.key = key
+            scrollTimer.restart()
+            return
+        }
+        _scrollNow(key)
+    }
+
+    function _scrollNow(key) {
         const f = fields[key]
         if (!f)
             return
         flick.stopGlide()
         flick.contentY = flick._clamp(f.mapToItem(flick.contentItem, 0, 0).y - 70)
         f.flash()
+    }
+
+    Timer {
+        id: scrollTimer
+        property string key: ""
+        interval: 60
+        onTriggered: root._scrollNow(key)
     }
 
     KineticFlickable {
@@ -122,6 +172,124 @@ Item {
                             spec: modelData
 
                             Component.onCompleted: root.fields[modelData.key] = field
+                        }
+                    }
+
+                    // The section's collapsible groups: a header row (click to open or close; closed
+                    // shows how many of its settings were changed), then its settings.
+                    Repeater {
+                        model: section.modelData.groups || []
+
+                        delegate: Column {
+                            id: group
+                            required property var modelData
+                            readonly property bool open: !!root.openGroups[modelData.id]
+                            readonly property int changed: root.changedIn(modelData.items)
+                            width: section.width
+
+                            Rectangle {
+                                width: parent.width
+                                height: 1
+                                color: Theme.surfaceAlt
+                            }
+
+                            Item {
+                                id: header
+                                width: parent.width
+                                height: 42
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    anchors.topMargin: 1
+                                    radius: Theme.radiusSmall
+                                    // (Opaque: nothing translucent over the glass.)
+                                    color: headerArea.containsMouse ? Theme.surface : "transparent"
+                                }
+
+                                Text {
+                                    id: chevron
+                                    x: 6
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 16
+                                    text: group.open ? "\u25BE" : "\u25B8"
+                                    color: Theme.textSecondary
+                                    font.pixelSize: Theme.textMedium
+                                }
+
+                                Column {
+                                    anchors.left: chevron.right
+                                    anchors.leftMargin: Theme.spacingSmall
+                                    anchors.right: badge.visible ? badge.left : parent.right
+                                    anchors.rightMargin: Theme.spacingMedium
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 1
+
+                                    Text {
+                                        width: parent.width
+                                        elide: Text.ElideRight
+                                        text: group.modelData.title
+                                        color: Theme.text
+                                        font.pixelSize: Theme.textMedium
+                                        font.bold: true
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        elide: Text.ElideRight
+                                        text: group.modelData.note || ""
+                                        color: Theme.textMuted
+                                        font.pixelSize: Theme.textSmall - 1
+                                    }
+                                }
+
+                                // Closed: how many settings in it were changed.
+                                Rectangle {
+                                    id: badge
+                                    visible: !group.open && group.changed > 0
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 22 + Theme.spacingSmall
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: badgeText.implicitWidth + 16
+                                    height: 20
+                                    radius: 10
+                                    color: Theme.accent
+
+                                    Text {
+                                        id: badgeText
+                                        anchors.centerIn: parent
+                                        text: group.changed + " changed"
+                                        color: Theme.background
+                                        font.pixelSize: Theme.textSmall - 2
+                                        font.bold: true
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: headerArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.setGroupOpen(group.modelData.id, !group.open)
+                                }
+                            }
+
+                            // The settings, only while open (an invisible Column takes no room).
+                            Column {
+                                visible: group.open
+                                width: parent.width
+
+                                Repeater {
+                                    model: group.modelData.items
+
+                                    delegate: SettingField {
+                                        id: groupField
+                                        required property var modelData
+                                        width: group.width
+                                        spec: modelData
+
+                                        Component.onCompleted: root.fields[modelData.key] = groupField
+                                    }
+                                }
+                            }
                         }
                     }
 

@@ -27,7 +27,7 @@ Item {
     property real selectedStrength: 0.7
     property real hoveredStrength: 0.5
     // How much of the tint colour is mixed into the glass (more hides more of what is behind).
-    property real tintStrength: 0.65
+    property real tintStrength: Theme.glassPanelTintStrength
     // Opacity of the whole panel (1 = opaque glass; lower lets the live desktop show through).
     property real panelOpacity: 1.0
 
@@ -77,7 +77,9 @@ Item {
         return Qt.vector4d(highlightColor.r, highlightColor.g, highlightColor.b, strength)
     }
 
-    GlassStyle {
+    // (The look is Theme's: Settings > Glass > Panels. Frost below 1 mixes some sharp background into
+    // the captured glass, which shows as faint text.)
+    PanelGlassStyle {
         id: look
         cornerRadius: Theme.radiusLarge
         edges: Qt.vector4d(1, 1, 1, 1)
@@ -85,8 +87,6 @@ Item {
         // The old panel colour over the blur, translucent (raise tintStrength for more colour).
         tint: Theme.background
         tintStrength: root.tintStrength
-        // Fully frosted: any sharp background mixed into the glass shows as faint text.
-        frost: 1.0
         opacity: root.panelOpacity
     }
 

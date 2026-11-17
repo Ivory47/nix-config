@@ -54,6 +54,22 @@ let
         mkdir -p $out/shared/glass/shaders
         cp ${glassShaders}/*.qsb $out/shared/glass/shaders/
     '';
+
+    # Opens (or starts, if it is not running) the wallpaper picker: what the desktop entry runs.
+    # `ipc call` fails when no `qs -c wallpapers` instance is there, then one is started and asked to show.
+    wallpapersToggle = pkgs.writeShellScript "quickshell-wallpapers-toggle" ''
+        qs=${quickshellWithGlass}/bin/qs
+        if ! $qs -c wallpapers ipc call wallpapers toggle >/dev/null 2>&1; then
+            ${pkgs.util-linux}/bin/setsid -f $qs -c wallpapers >/dev/null 2>&1
+            for _ in $(${pkgs.coreutils}/bin/seq 1 30); do
+                ${pkgs.coreutils}/bin/sleep 0.1
+                if $qs -c wallpapers ipc call wallpapers show >/dev/null 2>&1; then
+                    exit 0
+                fi
+            done
+            exit 1
+        fi
+    '';
 in
 {
     home.packages = with pkgs; [
@@ -69,6 +85,7 @@ in
     xdg.configFile."quickshell/app-launcher".source = mkConfig "app-launcher" ./app-launcher;
     xdg.configFile."quickshell/clipboard".source = mkConfig "clipboard" ./clipboard;
     xdg.configFile."quickshell/settings".source = mkConfig "settings" ./settings;
+    xdg.configFile."quickshell/wallpapers".source = mkConfig "wallpapers" ./wallpapers;
 
     # The icon of that entry: Quickshell's icon lookup does not find the generic theme icons
     # (preferences-system and the like), only app icons, so the app brings its own: an outlined eight-tooth gear.
@@ -82,7 +99,7 @@ in
     '';
 
     # Lets the app launcher (and any other launcher) open the settings app: it toggles the
-    # running `qs -c settings` instance over IPC.
+    # running `qs -c settings` instance over IPC (as the full-screen overlay; see the action below).
     xdg.desktopEntries.quickshell-settings = {
         name = "Shell Settings";
         genericName = "Settings";
@@ -91,5 +108,35 @@ in
         icon = "quickshell-settings";
         terminal = false;
         categories = [ "Settings" ];
+
+        # The settings can also be a normal window. An app with an action called `window` gets an
+        # Overlay | Window toggle in the app launcher (app-launcher/LauncherModes.qml), which then
+        # runs this instead of `exec` when "Window" is chosen. (Other launchers list it as an action.)
+        actions.window = {
+            name = "Open as window";
+            exec = "qs -c settings ipc call settings toggleWindow";
+        };
+    };
+
+    # The wallpaper picker (wallpapers/): same outlined style as the gear above, a picture with a sun and mountains.
+    xdg.dataFile."icons/hicolor/scalable/apps/quickshell-wallpapers.svg".text = ''
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+                  <g fill="none" stroke="#cdd6f4" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+                    <rect x="6" y="10" width="52" height="44" rx="6"/>
+                    <circle cx="22" cy="25" r="5"/>
+                    <path d="M6 46 L22 33 L33 42 L44 30 L58 43"/>
+                  </g>
+        </svg>
+    '';
+
+    # Lets the app launcher open the wallpaper picker.
+    xdg.desktopEntries.quickshell-wallpapers = {
+        name = "Wallpapers";
+        genericName = "Wallpaper picker";
+        comment = "Browse wallpapers, pick matugen colours and tag them";
+        exec = "${wallpapersToggle}";
+        icon = "quickshell-wallpapers";
+        terminal = false;
+        categories = [ "Settings" "Utility" ];
     };
 }

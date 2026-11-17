@@ -29,7 +29,9 @@ class QWaylandWindow;
 
 // The compositor's global. Not active: the plugin is not loaded (or is a build without glass).
 // Version 2 has the look of the glass (shape, refraction, tone, tint, light, highlights, hole);
-// version 1 only blurred a rectangle. Version 3 takes regions with fractions.
+// version 1 only blurred a rectangle. Version 3 takes regions with fractions. Version 4 also draws
+// glass behind the surface of a window (an xdg_toplevel); layer surfaces need 3, windows 4.
+// Version 5 has the curve of the rim (bevelProfile).
 class LucentGlassManager
     : public QWaylandClientExtensionTemplate<LucentGlassManager>
     , public QtWayland::lucent_glass_manager_v1 {
@@ -45,8 +47,8 @@ private:
 class LucentGlass: public QQuickItem {
 	Q_OBJECT
 	QML_ELEMENT
-	// The compositor offers the protocol, in a version that has the whole look. False: draw the
-	// glass some other way.
+	// The compositor offers the protocol, in a version that has the whole look and that does this
+	// window's kind of surface (layer: 3, window: 4). False: draw the glass some other way.
 	Q_PROPERTY(bool available READ available NOTIFY availableChanged)
 	// Ask for the glass. (Without this, or while `available` is false, nothing is drawn.)
 	Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
@@ -61,6 +63,10 @@ class LucentGlass: public QQuickItem {
 	Q_PROPERTY(qreal frost MEMBER mFrost NOTIFY lookChanged)
 	Q_PROPERTY(qreal bevel MEMBER mBevel NOTIFY lookChanged)
 	Q_PROPERTY(qreal thickness MEMBER mThickness NOTIFY lookChanged)
+	// The curve of the rim, (1 - u^n)^(1/n): 2 is a quarter circle (the bending ends in a visible
+	// edge where the rim meets the flat middle), 3 fades it out smoothly, 4 more so. Needs a
+	// compositor with protocol version 5; with an older one the compositor's own curve is used.
+	Q_PROPERTY(qreal bevelProfile MEMBER mBevelProfile NOTIFY lookChanged)
 	Q_PROPERTY(qreal cornerRadius MEMBER mCornerRadius NOTIFY lookChanged)
 	// 1 where the edge is bevelled: left, top, right, bottom.
 	Q_PROPERTY(QVector4D edges MEMBER mEdges NOTIFY lookChanged)
@@ -119,16 +125,20 @@ private slots:
 private:
 	void bindWindow(QQuickWindow* window);
 	void drop(bool tellCompositor);
+	bool isToplevel() const;
+	void refreshAvailable();
 
 	void sendLook();
 
 	bool mActive = false;
+	bool mAvailable = false; // what availableChanged last told
 	qreal mBlurRadius = 0;
 	int mMaxTaps = 0;
 
 	qreal mFrost = 1;
 	qreal mBevel = 0;
 	qreal mThickness = 0;
+	qreal mBevelProfile = 3;
 	qreal mCornerRadius = 0;
 	QVector4D mEdges;
 	qreal mRefraction = 0;
@@ -154,4 +164,5 @@ private:
 	QPointer<QtWaylandClient::QWaylandWindow> mWaylandWindow;
 	QMetaObject::Connection mSurfaceCreated;
 	QMetaObject::Connection mSurfaceDestroyed;
+	QMetaObject::Connection mWindowVisible;
 };

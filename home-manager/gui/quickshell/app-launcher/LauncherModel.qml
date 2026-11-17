@@ -21,8 +21,8 @@ QtObject {
         })
     }
 
+    // Opens the app the way LauncherModes says (overlay or normal window).
     function launch(app) {
-        if (app)
-            app.execute()
+        LauncherModes.launch(app)
     }
 }

@@ -77,6 +77,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("qs -c app-launcher")
     hl.exec_cmd("qs -c clipboard")
     hl.exec_cmd("qs -c settings")
+    hl.exec_cmd("qs -c wallpapers")
     hl.exec_cmd("rm -f /tmp/kitty-socket && kitty --class HeadlessKitty --single-instance --listen-on unix:/tmp/kitty-socket --start-as=hidden tail -f /dev/null")
 end)
 
@@ -340,6 +341,7 @@ hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", actio
 
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("qs -c app-launcher ipc call launcher toggle"))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("qs -c clipboard ipc call clipboard toggle"))
+hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -c wallpapers ipc call wallpapers toggle"))
 hl.bind("print", hl.dsp.exec_cmd([[
     mkdir -p ~/Pictures/Screenshots &&
     grimblast --freeze --cursor copysave area ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png
@@ -472,6 +474,47 @@ hl.window_rule({
     opacity = "1.0 override 0.9 override 1.0 override",
 })
 
+-- Lucent glass behind normal windows. `lucent_glass` is a window rule effect that the Lucent plugin
+-- registers when it loads (the plugin draws blurred, tinted glass behind the whole window, in the
+-- compositor's own frame, and switches Hyprland's own blur off for that window). The value is
+-- "key=value ..." (radius, tint, tint_strength, bevel, refraction, shine, corner_radius, ...; see
+-- the Lucent README), "true" for the plain look, "false" for none. It only shows where the window's
+-- own content is translucent: kitty has background_opacity 0.73 (gui/applications/kitty).
+-- The rule exists only when the plugin is installed: without it the key is unknown and Hyprland
+-- reports a config error. SUPER+ALT+G switches the glass on and off for all windows this rule
+-- matches (it starts on again after a config reload). Add more rules (other classes) the same way.
+if lucentFile then
+    local lucentGlassOn   = true
+    local lucentGlassRule = hl.window_rule({
+        name         = "lucent-glass-kitty",
+        match        = { class = "^(kitty|HeadlessKitty)$" },
+        lucent_glass = table.concat({
+            "radius=4",          -- blur strength
+            "taps=32",            -- blur quality / cost
+            "frost=1",            -- fully blurred background
+            "corner_radius=6",    -- left out: the window's own rounding
+            "bevel=14",            -- no glass rim
+            "thickness=10",        -- flat glass
+            "bevel_profile=4",    -- rim curve: 2 quarter circle, 3 smoother, 4 smoothest
+            "refraction=1",       -- the rim does not bend the background
+            "ior=1.45",           -- index of refraction (glass)
+            "dispersion=0.1",       -- no coloured fringes
+            "shine=0.6",            -- no light on the rim
+            "brightness=0",       -- background brightness unchanged
+            "contrast=1",         -- contrast unchanged
+            "saturation=1",       -- saturation unchanged
+            "tint=#000000",       -- tint colour ...
+            "tint_strength=0",    -- ... mixed in with this strength: no tint
+            "opacity=1",          -- fully opaque glass
+        }, " "),
+    })
+
+    hl.bind(mainMod .. " + ALT + G", function()
+        lucentGlassOn = not lucentGlassOn
+        lucentGlassRule:set_enabled(lucentGlassOn)
+    end)
+end
+
 hl.window_rule({
     name   = "video-editor",
     match  = { class = "^video-editor$" },
@@ -551,3 +594,19 @@ end
 -- hl.on("window.destroy", set_single_window_mode)
 -- hl.on("workspace.active", set_single_window_mode)
 
+
+-----------------------------------
+---- SETTINGS APP (Hyprland) ------
+-----------------------------------
+
+-- Window rules (with the Lucent glass parameters) that are made in the settings app, Settings > Hyprland.
+-- The app writes them to hyprland-settings.lua next to this file's source (like hyprmod's
+-- hyprland-gui.lua; it is in .gitignore, so it never goes to GitHub) and runs `hyprctl reload`, so they
+-- apply at once, without hms. It is loaded LAST on purpose: a later rule wins, so a rule there overrides
+-- one above for the same windows, and the base config above stays untouched.
+local settingsFile = home .. "/src/nix-config/home-manager/gui/hyprland/hyprland-settings.lua"
+local sf = io.open(settingsFile, "r")
+if sf then
+    sf:close()
+    dofile(settingsFile)
+end

@@ -5,13 +5,15 @@ import QtQuick
 // The categories of the settings app and the search over all their settings.
 //
 // A category: id, name, icon, sections (the same shape as ThemeSchema.sections). Its page is the
-// item of the same index in Settings.qml's StackLayout. To add a category: an entry here and a
+// item of the same index in SettingsView.qml's StackLayout. To add a category: an entry here and a
 // page there; its settings are searchable as soon as they are in `sections`.
 QtObject {
     id: root
 
     readonly property var categories: [
-        { id: "theme", name: "Theme", icon: "󰏘", sections: ThemeSchema.sections }
+        { id: "theme", name: "Theme", icon: "󰏘", sections: ThemeSchema.sections },
+        // (No searchable settings: its page is a list of rules, not fixed settings.)
+        { id: "hyprland", name: "Hyprland", icon: "󰖯", sections: [] }
     ]
 
     function indexOf(catId) {
@@ -24,19 +26,26 @@ QtObject {
         let order = 0
         for (const c of categories) {
             for (const s of c.sections) {
-                for (const item of s.items) {
+                // The section's own settings, then those in its (collapsible) groups.
+                // (No flatMap: Qt's JavaScript engine does not have it.)
+                const all = s.items.map(i => ({ item: i, group: null }))
+                for (const g of (s.groups || []))
+                    for (const i of g.items)
+                        all.push({ item: i, group: g })
+                for (const { item, group } of all) {
+                    const where = s.title + (group ? " › " + group.title : "")
                     out.push({
                         order: order++,
                         catId: c.id,
                         catName: c.name,
-                        section: s.title,
+                        section: where,
                         spec: item,
                         label: item.label.toLowerCase(),
                         note: (item.note || "").toLowerCase(),
                         // "radiusLarge" -> "radius large"
                         key: item.key.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(),
                         keywords: (item.keywords || []).map(k => k.toLowerCase()),
-                        place: (s.title + " " + c.name).toLowerCase()
+                        place: (where + " " + c.name).toLowerCase()
                     })
                 }
             }

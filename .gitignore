@@ -1,3 +1,6 @@
 system/hardware-configuration.nix
 system/local/local-config.nix
-home-manager/hypr/hyprland-gui.lua
+# hyprmod writes its changes here (hyprland.lua loads it if it exists); it was tracked by mistake
+home-manager/gui/hyprland/hyprland-gui.lua
+# written by the settings app (Settings > Hyprland): window rules, applied by hyprland.lua
+home-manager/gui/hyprland/hyprland-settings.lua

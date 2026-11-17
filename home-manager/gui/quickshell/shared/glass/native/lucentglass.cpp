@@ -1,15 +1,23 @@
 #include "lucentglass.hpp"
 
 #include <cmath>
+#include <string>
+#include <typeinfo>
 
 #include <QtQuick/QQuickWindow>
+#include <QtWaylandClient/private/qwaylandshellsurface_p.h>
 #include <QtWaylandClient/private/qwaylandwindow_p.h>
 #include <wayland-client-core.h>
 #include <wayland-lucent-glass-v1-client-protocol.h>
 
 namespace {
 // The newest version of the protocol this code speaks.
-constexpr int kGlassVersion = 3;
+constexpr int kGlassVersion = 5;
+// The oldest that does the job: regions with fractions and the whole look (layer surfaces), and
+// glass behind the toplevel surface of a window (version 4; a plugin build that offers 3 only
+// draws it behind layers, and would silently show a window nothing).
+constexpr int kLayerVersion = 3;
+constexpr int kToplevelVersion = 4;
 } // namespace
 
 LucentGlassManager::LucentGlassManager(): QWaylandClientExtensionTemplate(kGlassVersion) {
@@ -35,18 +43,41 @@ LucentGlass::LucentGlass(QQuickItem* parent): QQuickItem(parent) {
 	    &LucentGlass::onAvailableChanged
 	);
 	QObject::connect(this, &LucentGlass::lookChanged, this, &QQuickItem::polish);
+	// What QML reads first (before there is a window, so the lower requirement): availableChanged
+	// is only sent when the answer differs from it.
+	this->mAvailable = this->available();
 }
 
 LucentGlass::~LucentGlass() {
 	this->drop(true);
 }
 
+// A window that is not a layer surface is a toplevel (an xdg_toplevel). Unknown (no shell surface
+// yet, e.g. the window is not shown): treated as a layer, the lower requirement; this is asked
+// again once the shell surface exists.
+bool LucentGlass::isToplevel() const {
+	auto* w = this->window();
+	auto* wlw = w && w->handle() ? dynamic_cast<QtWaylandClient::QWaylandWindow*>(w->handle()) : nullptr;
+	auto* shell = wlw ? wlw->shellSurface() : nullptr;
+	if (!shell) return false;
+	return std::string(typeid(*shell).name()).find("Layer") == std::string::npos;
+}
+
 // (An older plugin build offers a lower version: without the look, or without regions that are not
-// on whole pixels. Not used.)
+// on whole pixels, or, below 4, without glass behind windows. Not used.)
 bool LucentGlass::available() const {
 	auto* manager = LucentGlassManager::instance();
 	// (The version the two sides agreed on when the global was bound.)
-	return manager->isActive() && manager->QWaylandClientExtension::version() >= kGlassVersion;
+	return manager->isActive()
+	    && manager->QWaylandClientExtension::version() >= (this->isToplevel() ? kToplevelVersion : kLayerVersion);
+}
+
+// available() depends on the window, which can change: tell QML when the answer did.
+void LucentGlass::refreshAvailable() {
+	const bool now = this->available();
+	if (now == this->mAvailable) return;
+	this->mAvailable = now;
+	emit this->availableChanged();
 }
 
 void LucentGlass::setActive(bool active) {
@@ -75,6 +106,7 @@ void LucentGlass::setMaxTaps(int taps) {
 // ends the whole shell).
 void LucentGlass::onAvailableChanged() {
 	if (!this->available()) this->drop(false);
+	this->mAvailable = this->available();
 	emit this->availableChanged();
 	this->polish();
 }
@@ -105,9 +137,16 @@ void LucentGlass::itemChange(ItemChange change, const ItemChangeData& data) {
 void LucentGlass::bindWindow(QQuickWindow* window) {
 	QObject::disconnect(this->mSurfaceCreated);
 	QObject::disconnect(this->mSurfaceDestroyed);
+	QObject::disconnect(this->mWindowVisible);
 	this->drop(true);
 	this->mWaylandWindow = nullptr;
-	if (window) this->polish();
+	this->refreshAvailable();
+	if (window) {
+		// A window has no platform window (so no surface) until it is shown: the first polish can come
+		// before that, and nothing else need follow it.
+		this->mWindowVisible = QObject::connect(window, &QWindow::visibleChanged, this, &QQuickItem::polish);
+		this->polish();
+	}
 }
 
 // Before every frame of the window that follows a change: tell the compositor where the glass is.
@@ -116,6 +155,8 @@ void LucentGlass::bindWindow(QQuickWindow* window) {
 void LucentGlass::updatePolish() {
 	auto* w = this->window();
 	auto* manager = LucentGlassManager::instance();
+	// (The shell surface exists now, if the window has one: the version needed may have changed.)
+	if (w) this->refreshAvailable();
 	if (!w || !this->available()) return;
 
 	auto* wlw = w->handle() ? dynamic_cast<QtWaylandClient::QWaylandWindow*>(w->handle()) : nullptr;
@@ -179,6 +220,8 @@ void LucentGlass::sendLook() {
 	if (this->mEdges.w() > 0.5F) edges |= LUCENT_GLASS_V1_EDGE_BOTTOM;
 
 	lucent_glass_v1_set_shape(g, fx(this->mCornerRadius), edges, fx(this->mBevel), fx(this->mThickness));
+	// (A request newer than the object's version is a protocol error: an older plugin keeps its curve.)
+	if (wl_proxy_get_version(reinterpret_cast<wl_proxy*>(g)) >= 5) lucent_glass_v1_set_bevel_profile(g, fx(this->mBevelProfile));
 	lucent_glass_v1_set_refraction(g, fx(this->mRefraction), fx(this->mIor), fx(this->mDispersion));
 	lucent_glass_v1_set_tone(g, fx(this->mFrost), fx(this->mBrightness), fx(this->mContrast), fx(this->mSaturation));
 	lucent_glass_v1_set_tint(g, fx(this->mTint.redF()), fx(this->mTint.greenF()), fx(this->mTint.blueF()), fx(this->mTintStrength));
