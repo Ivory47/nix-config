@@ -11,7 +11,8 @@ Item {
     required property var modelData
     required property int index
     readonly property var entry: modelData
-    property bool selected: false
+    // Only without glass (the glass draws the selected / hovered highlight itself).
+    property bool highlight: false
     property bool isCurrent: false
     property var colors: undefined
     // Pixels the thumbnail is decoded at (the cell size times the screen's scale).
@@ -23,6 +24,12 @@ Item {
     signal applied()     // double-clicked
 
     readonly property int pad: 8
+
+    Rectangle {
+        anchors.fill: parent
+        radius: Theme.radiusMedium
+        color: root.highlight ? Theme.surface : "transparent"
+    }
 
     ClippingRectangle {
         id: frame

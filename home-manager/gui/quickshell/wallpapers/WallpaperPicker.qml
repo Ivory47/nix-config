@@ -2,25 +2,39 @@ import QtQuick
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
-import Quickshell.Hyprland
 import qs.shared
 import qs.shared.glass
 
 // The wallpaper picker: browse ~/Pictures/Wallpapers, pick one of the colours matugen finds in a
 // wallpaper (and a scheme type, light or dark), tag wallpapers and search by name or tag, then
-// apply it (awww for the picture, matugen for the colours). The window, the glass and the opening
-// and closing are GlassPopup's (see there), the panel is the launcher's.
+// apply it (awww for the picture, matugen for the colours).
+//
+// It is a normal window (a Quickshell FloatingWindow, placed and floated by the window rule in
+// hyprland.lua) with the compositor's glass behind it: see shared/glass/GLASS-WINDOWS.md. Open and
+// close it with `shown` (IPC: toggle/show/hide/isOpen); closing the window (Super+C) hides it too.
+// Without the Lucent plugin (or with Theme.glass / Theme.compositorGlass off) it is a plain opaque
+// panel.
 //
 // Keys (typed in the search field, which has the keyboard): arrows move in the grid, Enter applies
 // and closes, Alt+1..5 picks a colour, Alt+Left/Right the scheme type, Alt+M light/dark, Ctrl+T goes to the tag field (Esc comes back), Esc clears the
 // search and the tag filters and then closes, Ctrl+C closes.
-GlassPopup {
+FloatingWindow {
     id: root
-    WlrLayershell.namespace: "wallpapers"
-    tagRed: 42    // bar 30, launcher and settings 34, clipboard 38
 
-    focusItem: searchField
+    title: "Wallpapers"
+    color: "transparent"    // the glass shows through the window
+    implicitWidth: 1120
+    implicitHeight: 700
+    minimumSize: Qt.size(780, 520)
+
+    // Open / closed. (The window only exists while this is true.)
+    property bool shown: false
+    visible: shown
+    onClosed: shown = false
+
+    // The card under the mouse, if any: set by the cards, highlighted by the glass.
+    property Item hoveredItem: null
+    readonly property bool glassOn: glass.active && glass.available
 
     // ---- what is selected -----------------------------------------------------------------------
 
@@ -145,32 +159,33 @@ GlassPopup {
 
     // ---- window ---------------------------------------------------------------------------------
 
-    onPopupOpened: {
-        followCurrent = true
-        wpModel.refreshCurrent()
-        ColorCache.enqueue(wpModel.entries)
-        if (wpModel.current !== "" && wpModel.indexOfName(wpModel.current) >= 0)
-            selectedName = wpModel.current
-        Qt.callLater(() => { root.restoreSelection(); root.showSelected() })
+    onShownChanged: {
+        if (shown) {
+            followCurrent = true
+            wpModel.refreshCurrent()
+            ColorCache.enqueue(wpModel.entries)
+            if (wpModel.current !== "" && wpModel.indexOfName(wpModel.current) >= 0)
+                selectedName = wpModel.current
+            Qt.callLater(() => { root.restoreSelection(); root.showSelected(); searchField.forceActiveFocus() })
+            focusTimer.restart()
+        } else {
+            // A fresh start the next time: no search, no tag filters.
+            searchField.text = ""
+            detail.tagField.text = ""
+            wpModel.activeTags = []
+            hoveredItem = null
+        }
     }
 
-    onPopupClosed: {
-        // A fresh start the next time: no search, no tag filters.
-        searchField.text = ""
-        detail.tagField.text = ""
-        wpModel.activeTags = []
+    // The compositor may give the new window the keyboard a moment after it is mapped.
+    Timer {
+        id: focusTimer
+        interval: 80
+        onTriggered: if (root.shown) searchField.forceActiveFocus()
     }
 
     function closePicker() {
         root.shown = false
-    }
-
-    Connections {
-        target: Hyprland
-
-        function onFocusedWorkspaceChanged() {
-            root.shown = false
-        }
     }
 
     IpcHandler {
@@ -200,7 +215,7 @@ GlassPopup {
 
         onFilteredChanged: Qt.callLater(root.restoreSelection)
         onCurrentChanged: {
-            // The wallpaper on the screen was found after the popup opened.
+            // The wallpaper on the screen was found after the window opened.
             if (root.shown && root.followCurrent && indexOfName(current) >= 0)
                 Qt.callLater(() => { root.selectedName = wpModel.current; root.restoreSelection(); root.showSelected() })
         }
@@ -212,32 +227,29 @@ GlassPopup {
     readonly property int margin: Theme.spacingLarge
     readonly property int detailWidth: 340
 
-    GlassListPanel {
-        // Placed in the surface's coordinates (whole pixels, as the glass needs).
-        x: Math.round(panel.x)
-        y: Math.round(panel.y)
-        width: panel.width
-        height: panel.height
-
-        popup: root
-        shadow: true
-        panelOpacity: Theme.popupOpacity
-        field: searchField
-        listView: grid
+    // Plain panel when there is no compositor glass.
+    Rectangle {
+        anchors.fill: parent
+        visible: !root.glassOn
+        color: Theme.background
+        radius: 6
     }
 
-    Rectangle {
+    // The glass: fills the window; Hyprland draws the border and the shadow.
+    LucentListPanel {
+        id: glass
+        anchors.fill: parent
+        active: Theme.glass && Theme.compositorGlass
+        blurRadius: Theme.glassBlurRadius
+        maxTaps: Math.round(Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, Theme.glassBlurRadius)), Theme.blurTapsFalloff)))
+        field: searchField
+        listView: grid
+        hoveredItem: root.hoveredItem
+    }
+
+    Item {
         id: panel
-
-        anchors.centerIn: parent
-        width: Math.round(Math.min(1120, root.width * 0.86))
-        height: Math.round(Math.min(700, root.height * 0.86))
-
-        radius: Theme.radiusLarge
-        color: "transparent"
-
-        border.width: 1
-        border.color: Theme.surfaceAlt
+        anchors.fill: parent
 
         // ---- left: search, tag filters, grid ----
         Item {
@@ -262,7 +274,8 @@ GlassPopup {
 
                 background: Rectangle {
                     radius: Theme.radiusMedium
-                    color: "transparent" // drawn by the glass (hlRect0)
+                    // Drawn by the glass (hlRect0); a plain fill only when there is no glass.
+                    color: root.glassOn ? "transparent" : Theme.surface
                 }
 
                 Component.onCompleted: forceActiveFocus()
@@ -363,6 +376,11 @@ GlassPopup {
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 currentIndex: -1
+
+                // The window is laid out after it opens and can be resized: keep the wallpaper that is
+                // on the screen in view until the user has chosen one.
+                onHeightChanged: if (root.shown && root.followCurrent) Qt.callLater(root.showSelected)
+                onCellWidthChanged: if (root.shown && root.followCurrent) Qt.callLater(root.showSelected)
                 model: wpModel.filtered
                 cacheBuffer: cellHeight * 2
 
@@ -384,6 +402,7 @@ GlassPopup {
                     decodeWidth: (grid.cellWidth - 16) * root.devicePixelRatio
                     isCurrent: modelData.name === wpModel.current
                     colors: ColorCache.colorsOf(modelData)
+                    highlight: !root.glassOn && (index === grid.currentIndex || hovered)
 
                     // The glass highlights the hovered card (hlRect2) and the selected one (hlRect1).
                     onHoveredChanged: {
