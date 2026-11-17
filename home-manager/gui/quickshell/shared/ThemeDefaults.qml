@@ -74,6 +74,37 @@ QtObject {
     // blurred picture is shared by that veil and the settings panel). Sigma in logical pixels.
     readonly property real scrimBlurRadius: 10.5
 
+    // The look of the glass (the same parameters as the Lucent plugin's glass and GlassStyle; see
+    // shared/glass/PanelGlassStyle.qml and BarGlassStyle.qml). The defaults are the look the shells had
+    // before these were settings. `Panel` is the launcher, the clipboard, the settings and the wallpaper
+    // picker; `Bar` is the status bar. The rim curve is only used by the compositor glass.
+
+    readonly property real glassPanelFrost: 1.0
+    readonly property real glassPanelTintStrength: 0.65
+    readonly property real glassPanelBrightness: 0.02
+    readonly property real glassPanelContrast: 1.04
+    readonly property real glassPanelSaturation: 1.2
+    readonly property real glassPanelBevel: 14
+    readonly property real glassPanelThickness: 0.7
+    readonly property real glassPanelBevelProfile: 3
+    readonly property real glassPanelRefraction: 1.0
+    readonly property real glassPanelIor: 1.45
+    readonly property real glassPanelDispersion: 0.05
+    readonly property real glassPanelShine: 0.6
+
+    readonly property real glassBarFrost: 0.9
+    readonly property real glassBarTintStrength: 0.35
+    readonly property real glassBarBrightness: 0.02
+    readonly property real glassBarContrast: 1.04
+    readonly property real glassBarSaturation: 1.2
+    readonly property real glassBarBevel: 14
+    readonly property real glassBarThickness: 0.7
+    readonly property real glassBarBevelProfile: 3
+    readonly property real glassBarRefraction: 1.0
+    readonly property real glassBarIor: 1.45
+    readonly property real glassBarDispersion: 0.05
+    readonly property real glassBarShine: 0.6
+
     // Backdrop blur, used by shared/BackdropBlur.qml (independent of the compositor's blur).
     // 0.0 = off, 1.0 = strongest. Every config that uses BackdropBlur inherits this value.
     readonly property real backdropBlur: 0.8

@@ -99,7 +99,7 @@ in
     '';
 
     # Lets the app launcher (and any other launcher) open the settings app: it toggles the
-    # running `qs -c settings` instance over IPC.
+    # running `qs -c settings` instance over IPC (as the full-screen overlay; see the action below).
     xdg.desktopEntries.quickshell-settings = {
         name = "Shell Settings";
         genericName = "Settings";
@@ -108,6 +108,14 @@ in
         icon = "quickshell-settings";
         terminal = false;
         categories = [ "Settings" ];
+
+        # The settings can also be a normal window. An app with an action called `window` gets an
+        # Overlay | Window toggle in the app launcher (app-launcher/LauncherModes.qml), which then
+        # runs this instead of `exec` when "Window" is chosen. (Other launchers list it as an action.)
+        actions.window = {
+            name = "Open as window";
+            exec = "qs -c settings ipc call settings toggleWindow";
+        };
     };
 
     # The wallpaper picker (wallpapers/): same outlined style as the gear above, a picture with a sun and mountains.

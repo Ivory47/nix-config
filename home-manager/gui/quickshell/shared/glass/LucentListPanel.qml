@@ -21,6 +21,9 @@ LucentGlassPanel {
     // The row or card under the mouse, if any.
     property Item hoveredItem: null
 
+    // The blur's cost cap: the same as the popups' (GlassBackdrop.blurTaps), from the blur radius.
+    maxTaps: Math.round(Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, blurRadius)), Theme.blurTapsFalloff)))
+
     property color highlightColor: Theme.surfaceAlt
     property real fieldStrength: 0.55
     property real selectedStrength: 0.7
@@ -71,13 +74,12 @@ LucentGlassPanel {
     hlRect2: hoveredRect
     hlColor2: highlight(hoveredStrength)
 
-    // The look of the popups, with the rounding of a Hyprland window (decoration.rounding): the
-    // window rounds its own content only, the glass rounds itself. Override `style` for another look.
-    style: GlassStyle {
+    // The look of the panels (Settings > Glass > Panels), with the rounding of a Hyprland window
+    // (decoration.rounding): the window rounds its own content only, the glass rounds itself.
+    // Override `style` for another look.
+    style: PanelGlassStyle {
         cornerRadius: 6
         edges: Qt.vector4d(1, 1, 1, 1)
         tint: Theme.background
-        tintStrength: 0.65
-        frost: 1.0
     }
 }

@@ -153,6 +153,20 @@ GlassPopup {
                         event.accepted = true
                     }
 
+                    // Tab: for an app that can be opened as an overlay or as a normal window, switch which.
+                    else if (event.key === Qt.Key_Tab) {
+                        if (appList.currentIndex >= 0 &&
+                        appList.currentIndex < appList.count) {
+                            LauncherModes.toggle(
+                                launcherModel.filteredApplications[
+                                    appList.currentIndex
+                                ]
+                            )
+                        }
+
+                        event.accepted = true
+                    }
+
                     else if (event.key === Qt.Key_Return ||
                     event.key === Qt.Key_Enter) {
                         if (appList.currentIndex >= 0 &&

@@ -594,3 +594,19 @@ end
 -- hl.on("window.destroy", set_single_window_mode)
 -- hl.on("workspace.active", set_single_window_mode)
 
+
+-----------------------------------
+---- SETTINGS APP (Hyprland) ------
+-----------------------------------
+
+-- Window rules (with the Lucent glass parameters) that are made in the settings app, Settings > Hyprland.
+-- The app writes them to hyprland-settings.lua next to this file's source (like hyprmod's
+-- hyprland-gui.lua; it is in .gitignore, so it never goes to GitHub) and runs `hyprctl reload`, so they
+-- apply at once, without hms. It is loaded LAST on purpose: a later rule wins, so a rule there overrides
+-- one above for the same windows, and the base config above stays untouched.
+local settingsFile = home .. "/src/nix-config/home-manager/gui/hyprland/hyprland-settings.lua"
+local sf = io.open(settingsFile, "r")
+if sf then
+    sf:close()
+    dofile(settingsFile)
+end

@@ -1,5 +1,53 @@
 import Quickshell
+import Quickshell.Io
 
+// The settings app, in two forms that share SettingsView.qml: the full-screen overlay with the veil
+// (Settings.qml, the default) and a normal window (SettingsWindow.qml). Only one is open at a time.
 ShellRoot {
-    Settings {}
+    Settings {
+        id: overlay
+    }
+
+    SettingsWindow {
+        id: window
+    }
+
+    IpcHandler {
+        target: "settings"
+
+        // Asked by the Super+C bind (hyprland.lua): close the overlay instead of the focused window.
+        // The OVERLAY only: the window is a normal window, which Super+C closes like any other.
+        // (A function and not a property: a property logs a warning at every change.)
+        function isOpen(): bool {
+            return overlay.shown
+        }
+
+        // The overlay.
+        function toggle() {
+            window.shown = false
+            overlay.shown = !overlay.shown
+        }
+
+        function show() {
+            window.shown = false
+            overlay.shown = true
+        }
+
+        // The normal window.
+        function toggleWindow() {
+            overlay.shown = false
+            window.shown = !window.shown
+        }
+
+        function showWindow() {
+            overlay.shown = false
+            window.shown = true
+        }
+
+        // Both.
+        function hide() {
+            overlay.shown = false
+            window.shown = false
+        }
+    }
 }

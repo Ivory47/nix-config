@@ -122,7 +122,7 @@ PanelWindow {
             anchors.fill: parent
             visible: glassBackdrop.glassEnabled
             backdrop: glassBackdrop
-            style: GlassStyle { id: barGlassStyle }
+            style: BarGlassStyle { id: barGlassStyle }
         }
 
         // One opaque pixel at the top left: says which version of the bar a capture holds.
