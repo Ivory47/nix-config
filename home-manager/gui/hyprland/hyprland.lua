@@ -474,6 +474,29 @@ hl.window_rule({
     opacity = "1.0 override 0.9 override 1.0 override",
 })
 
+-- Lucent glass behind normal windows. `lucent_glass` is a window rule effect that the Lucent plugin
+-- registers when it loads (the plugin draws blurred, tinted glass behind the whole window, in the
+-- compositor's own frame, and switches Hyprland's own blur off for that window). The value is
+-- "key=value ..." (radius, tint, tint_strength, bevel, refraction, shine, corner_radius, ...; see
+-- the Lucent README), "true" for the plain look, "false" for none. It only shows where the window's
+-- own content is translucent: kitty has background_opacity 0.73 (gui/applications/kitty).
+-- The rule exists only when the plugin is installed: without it the key is unknown and Hyprland
+-- reports a config error. SUPER+ALT+G switches the glass on and off for all windows this rule
+-- matches (it starts on again after a config reload). Add more rules (other classes) the same way.
+if lucentFile then
+    local lucentGlassOn   = true
+    local lucentGlassRule = hl.window_rule({
+        name         = "lucent-glass-kitty",
+        match        = { class = "^kitty$" },
+        lucent_glass = "radius=14 tint=#202830 tint_strength=0.25",
+    })
+
+    hl.bind(mainMod .. " + ALT + G", function()
+        lucentGlassOn = not lucentGlassOn
+        lucentGlassRule:set_enabled(lucentGlassOn)
+    end)
+end
+
 hl.window_rule({
     name   = "video-editor",
     match  = { class = "^video-editor$" },
