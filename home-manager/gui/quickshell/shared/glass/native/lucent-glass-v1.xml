@@ -16,7 +16,7 @@
     Warning: this protocol is experimental and may change in incompatible ways.
   </description>
 
-  <interface name="lucent_glass_manager_v1" version="3">
+  <interface name="lucent_glass_manager_v1" version="4">
     <description summary="makes glass objects for surfaces"/>
 
     <request name="destroy" type="destructor">
@@ -30,13 +30,19 @@
         Makes a piece of glass behind the given surface. A surface may have several; they are
         drawn in the order they were made. A new piece has no region and is not drawn until one
         is set and the surface is committed.
+
+        Since version 4 the surface may also be the surface of an xdg_toplevel (a window that the
+        compositor manages; not its popups or subsurfaces). A compositor that offers only version
+        3 or lower draws glass behind layer surfaces only, so a client that wants glass behind a
+        window must bind version 4. While a window has glass, the compositor does not apply its own
+        background blur to it.
       </description>
       <arg name="id" type="new_id" interface="lucent_glass_v1"/>
       <arg name="surface" type="object" interface="wl_surface"/>
     </request>
   </interface>
 
-  <interface name="lucent_glass_v1" version="3">
+  <interface name="lucent_glass_v1" version="4">
     <description summary="one piece of glass behind a surface">
       All state set here is double-buffered: it takes effect with the next wl_surface.commit
       of the surface, together with that commit's buffer.
@@ -183,5 +189,9 @@
       <arg name="width" type="fixed"/>
       <arg name="height" type="fixed"/>
     </request>
+
+    <!-- Version 4: no new requests. The manager accepts the surface of an xdg_toplevel
+         (see get_glass). -->
+
   </interface>
 </protocol>
