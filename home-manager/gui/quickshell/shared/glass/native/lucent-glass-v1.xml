@@ -16,7 +16,7 @@
     Warning: this protocol is experimental and may change in incompatible ways.
   </description>
 
-  <interface name="lucent_glass_manager_v1" version="4">
+  <interface name="lucent_glass_manager_v1" version="5">
     <description summary="makes glass objects for surfaces"/>
 
     <request name="destroy" type="destructor">
@@ -42,7 +42,7 @@
     </request>
   </interface>
 
-  <interface name="lucent_glass_v1" version="4">
+  <interface name="lucent_glass_v1" version="5">
     <description summary="one piece of glass behind a surface">
       All state set here is double-buffered: it takes effect with the next wl_surface.commit
       of the surface, together with that commit's buffer.
@@ -193,5 +193,18 @@
     <!-- Version 4: no new requests. The manager accepts the surface of an xdg_toplevel
          (see get_glass). -->
 
+    <!-- Version 5 -->
+
+    <request name="set_bevel_profile" since="5">
+      <description summary="the curve of the bevelled rim">
+        The rim is the curve (1 - u^n)^(1/n) from its outer edge (u = 1) to the flat middle
+        (u = 0), n being `profile`. 2 is a quarter circle: the bending of the background then ends
+        in a visible edge where the rim meets the flat middle, most noticeably with a high
+        thickness. 3 (the default) fades the bending out smoothly, 4 does so more and pulls the
+        bending into the outer part of the rim. Values are clamped to 1.01..8. Only matters where
+        there is a bevel (set_shape).
+      </description>
+      <arg name="profile" type="fixed"/>
+    </request>
   </interface>
 </protocol>

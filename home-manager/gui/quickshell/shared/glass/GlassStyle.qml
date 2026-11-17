@@ -12,6 +12,10 @@ QtObject {
     // Rim geometry (logical pixels): width of the curved edge, and its relative height.
     property real bevel: 14
     property real thickness: 0.7
+    // The curve of the rim, (1 - u^n)^(1/n), for the compositor glass (LucentGlassPanel; the captured
+    // GlassPanel always has the quarter circle, n = 2): 3 fades the bending out smoothly where the
+    // rim meets the flat middle, 4 more so.
+    property real bevelProfile: 3
     property real cornerRadius: 0
     // Which edges are bevelled: left, top, right, bottom. The bar sits against the screen
     // edges, so only its lower edge curves.

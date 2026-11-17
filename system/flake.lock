@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794846097,
-        "narHash": "sha256-eUJcOAAs7fSLnTsaRLeuC24QUxj+E8HNBbY3C47ra3M=",
-        "ref": "refs/heads/feature/compositor-glass",
-        "rev": "80b3d4ca03a9ffcc6e796079f772647e7424d5b9",
-        "revCount": 6,
+        "lastModified": 1794950186,
+        "narHash": "sha256-yoXLFO+DRWQjE0fwDyxalSgnk5QgtOqgFUY25uHS6F4=",
+        "ref": "refs/heads/main",
+        "rev": "a73bcc13d0ece9c083c089e7654bc67191ccc00b",
+        "revCount": 12,
         "type": "git",
         "url": "file:///home/user/Documents/Code/Lucent"
       },

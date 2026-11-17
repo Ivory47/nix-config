@@ -15,6 +15,7 @@ LucentGlass {
     frost: style.frost
     bevel: style.bevel
     thickness: style.thickness
+    bevelProfile: style.bevelProfile
     cornerRadius: style.cornerRadius
     edges: style.edges
     refraction: style.refraction

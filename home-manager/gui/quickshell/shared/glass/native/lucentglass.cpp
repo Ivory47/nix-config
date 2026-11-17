@@ -12,7 +12,7 @@
 
 namespace {
 // The newest version of the protocol this code speaks.
-constexpr int kGlassVersion = 4;
+constexpr int kGlassVersion = 5;
 // The oldest that does the job: regions with fractions and the whole look (layer surfaces), and
 // glass behind the toplevel surface of a window (version 4; a plugin build that offers 3 only
 // draws it behind layers, and would silently show a window nothing).
@@ -220,6 +220,8 @@ void LucentGlass::sendLook() {
 	if (this->mEdges.w() > 0.5F) edges |= LUCENT_GLASS_V1_EDGE_BOTTOM;
 
 	lucent_glass_v1_set_shape(g, fx(this->mCornerRadius), edges, fx(this->mBevel), fx(this->mThickness));
+	// (A request newer than the object's version is a protocol error: an older plugin keeps its curve.)
+	if (wl_proxy_get_version(reinterpret_cast<wl_proxy*>(g)) >= 5) lucent_glass_v1_set_bevel_profile(g, fx(this->mBevelProfile));
 	lucent_glass_v1_set_refraction(g, fx(this->mRefraction), fx(this->mIor), fx(this->mDispersion));
 	lucent_glass_v1_set_tone(g, fx(this->mFrost), fx(this->mBrightness), fx(this->mContrast), fx(this->mSaturation));
 	lucent_glass_v1_set_tint(g, fx(this->mTint.redF()), fx(this->mTint.greenF()), fx(this->mTint.blueF()), fx(this->mTintStrength));

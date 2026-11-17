@@ -31,6 +31,7 @@ class QWaylandWindow;
 // Version 2 has the look of the glass (shape, refraction, tone, tint, light, highlights, hole);
 // version 1 only blurred a rectangle. Version 3 takes regions with fractions. Version 4 also draws
 // glass behind the surface of a window (an xdg_toplevel); layer surfaces need 3, windows 4.
+// Version 5 has the curve of the rim (bevelProfile).
 class LucentGlassManager
     : public QWaylandClientExtensionTemplate<LucentGlassManager>
     , public QtWayland::lucent_glass_manager_v1 {
@@ -62,6 +63,10 @@ class LucentGlass: public QQuickItem {
 	Q_PROPERTY(qreal frost MEMBER mFrost NOTIFY lookChanged)
 	Q_PROPERTY(qreal bevel MEMBER mBevel NOTIFY lookChanged)
 	Q_PROPERTY(qreal thickness MEMBER mThickness NOTIFY lookChanged)
+	// The curve of the rim, (1 - u^n)^(1/n): 2 is a quarter circle (the bending ends in a visible
+	// edge where the rim meets the flat middle), 3 fades it out smoothly, 4 more so. Needs a
+	// compositor with protocol version 5; with an older one the compositor's own curve is used.
+	Q_PROPERTY(qreal bevelProfile MEMBER mBevelProfile NOTIFY lookChanged)
 	Q_PROPERTY(qreal cornerRadius MEMBER mCornerRadius NOTIFY lookChanged)
 	// 1 where the edge is bevelled: left, top, right, bottom.
 	Q_PROPERTY(QVector4D edges MEMBER mEdges NOTIFY lookChanged)
@@ -133,6 +138,7 @@ private:
 	qreal mFrost = 1;
 	qreal mBevel = 0;
 	qreal mThickness = 0;
+	qreal mBevelProfile = 3;
 	qreal mCornerRadius = 0;
 	QVector4D mEdges;
 	qreal mRefraction = 0;

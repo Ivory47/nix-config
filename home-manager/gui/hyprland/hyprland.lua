@@ -487,8 +487,26 @@ if lucentFile then
     local lucentGlassOn   = true
     local lucentGlassRule = hl.window_rule({
         name         = "lucent-glass-kitty",
-        match        = { class = "^kitty$" },
-        lucent_glass = "radius=14 tint=#202830 tint_strength=0.25",
+        match        = { class = "^(kitty|HeadlessKitty)$" },
+        lucent_glass = table.concat({
+            "radius=4",          -- blur strength
+            "taps=32",            -- blur quality / cost
+            "frost=1",            -- fully blurred background
+            "corner_radius=6",    -- left out: the window's own rounding
+            "bevel=14",            -- no glass rim
+            "thickness=10",        -- flat glass
+            "bevel_profile=4",    -- rim curve: 2 quarter circle, 3 smoother, 4 smoothest
+            "refraction=1",       -- the rim does not bend the background
+            "ior=1.45",           -- index of refraction (glass)
+            "dispersion=0.1",       -- no coloured fringes
+            "shine=0.6",            -- no light on the rim
+            "brightness=0",       -- background brightness unchanged
+            "contrast=1",         -- contrast unchanged
+            "saturation=1",       -- saturation unchanged
+            "tint=#000000",       -- tint colour ...
+            "tint_strength=0",    -- ... mixed in with this strength: no tint
+            "opacity=1",          -- fully opaque glass
+        }, " "),
     })
 
     hl.bind(mainMod .. " + ALT + G", function()
