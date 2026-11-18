@@ -12,4 +12,8 @@ output_path = '~/.config/hypr/colors.lua'
 [templates.kitty]
 input_path = "~/.config/matugen/templates/kitty.conf"
 output_path = "~/.config/kitty/colors.conf"
-post_hook = "kitty @ set-colors --all ~/.config/kitty/colors.conf"
+# --configured: also change the colours kitty gives NEW windows. Without it only the windows that are already
+# open change, and a window opened later (Super+Q opens one in the headless instance) has the colours of
+# the time that instance started. --to: matugen is started by Quickshell, which has no terminal and (when it
+# was started by Hyprland at login) no KITTY_LISTEN_ON, and then `kitty @` fails with "open /dev/tty".
+post_hook = "kitty @ --to unix:/tmp/kitty-socket set-colors --all --configured ~/.config/kitty/colors.conf"

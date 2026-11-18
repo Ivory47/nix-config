@@ -253,7 +253,7 @@ Item {
                                     radius: 10
                                     color: Theme.accent
 
-                                    Text {
+                                    CenteredText {
                                         id: badgeText
                                         anchors.centerIn: parent
                                         text: group.changed + " changed"
@@ -339,7 +339,7 @@ Item {
                             border.color: !root.restarting && buttonArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
                             opacity: root.restarting ? 0.6 : 1
 
-                            Text {
+                            CenteredText {
                                 id: buttonText
                                 anchors.centerIn: parent
                                 text: root.restarting ? "Restarting\u2026" : "\u21BB " + (actionRow.action?.label ?? "")
@@ -372,7 +372,7 @@ Item {
                 border.color: resetAllArea.containsMouse ? Theme.red : Theme.surfaceAlt
                 opacity: Object.keys(ThemeStore.values).length > 0 ? 1 : 0.4
 
-                Text {
+                CenteredText {
                     anchors.centerIn: parent
                     text: "Reset all to defaults"
                     color: Theme.text

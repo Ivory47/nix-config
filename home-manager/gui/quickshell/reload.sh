@@ -41,6 +41,10 @@ qs -c settings >/dev/null 2>&1 & disown
 pkill -f "quickshell -c wallpapers"
 qs -c wallpapers >/dev/null 2>&1 & disown
 
+# The notification server: it owns org.freedesktop.Notifications, so there is a moment without one
+pkill -f "quickshell -c notifications"
+qs -c notifications >/dev/null 2>&1 & disown
+
 pkill -f "quickshell -c clipboard"
 
 # Stop old clipboard watchers (text and image) so reloads don't stack them up

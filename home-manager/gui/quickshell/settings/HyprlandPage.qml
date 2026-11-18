@@ -104,7 +104,7 @@ Item {
                     radius: Theme.radiusSmall
                     color: addArea.pressed ? Theme.textSecondary : Theme.accent
 
-                    Text {
+                    CenteredText {
                         id: addText
                         anchors.centerIn: parent
                         text: "+ Add rule"
@@ -130,7 +130,7 @@ Item {
                     border.width: 1
                     border.color: reloadArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
 
-                    Text {
+                    CenteredText {
                         id: reloadText
                         anchors.centerIn: parent
                         text: "↻ Reload Hyprland"
@@ -305,7 +305,7 @@ Item {
                                 border.width: 1
                                 border.color: overrideArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
 
-                                Text {
+                                CenteredText {
                                     id: overrideText
                                     anchors.centerIn: parent
                                     text: "Override"

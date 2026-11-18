@@ -70,6 +70,11 @@ QtObject {
     readonly property real popupShadowBlur: 24      // how far it fades out, logical pixels
     readonly property real popupShadowOffset: 8     // how far it falls downwards
 
+    // How long a notification stays on the screen, in seconds (one with actions stays 1.6 times as
+    // long; a notification that sets its own timeout keeps it; critical ones stay until closed).
+    // 0 = until it is clicked away.
+    readonly property real notificationTimeout: 5
+
     // Blur strength of the settings app, which blurs the whole desktop while it is open (the
     // blurred picture is shared by that veil and the settings panel). Sigma in logical pixels.
     readonly property real scrimBlurRadius: 10.5

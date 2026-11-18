@@ -130,7 +130,7 @@ Item {
                     radius: 13
                     color: on ? Theme.accent : "transparent"
 
-                    Text {
+                    CenteredText {
                         anchors.centerIn: parent
                         text: parent.modelData.label
                         font.pixelSize: Theme.textSmall - 1

@@ -44,6 +44,7 @@ QtObject {
     readonly property real popupShadowOpacity: ThemeFromSettingsApp.real("popupShadowOpacity", ThemeDefaults.popupShadowOpacity)
     readonly property real popupShadowBlur: ThemeFromSettingsApp.real("popupShadowBlur", ThemeDefaults.popupShadowBlur)
     readonly property real popupShadowOffset: ThemeFromSettingsApp.real("popupShadowOffset", ThemeDefaults.popupShadowOffset)
+    readonly property real notificationTimeout: ThemeFromSettingsApp.real("notificationTimeout", ThemeDefaults.notificationTimeout)
     readonly property real scrimBlurRadius: ThemeFromSettingsApp.real("scrimBlurRadius", ThemeDefaults.scrimBlurRadius)
     // The look of the glass (see ThemeDefaults.qml)
     readonly property real glassPanelFrost: ThemeFromSettingsApp.real("glassPanelFrost", ThemeDefaults.glassPanelFrost)

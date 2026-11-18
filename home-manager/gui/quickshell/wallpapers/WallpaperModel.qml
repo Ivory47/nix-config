@@ -77,8 +77,11 @@ QtObject {
     // ---- what awww shows now ----------------------------------------------------------------
 
     property string current: ""
+    // False from the moment a refresh starts until `awww query` has answered (also when it fails).
+    property bool currentKnown: false
 
     function refreshCurrent() {
+        currentKnown = false
         if (!query_.running)
             query_.running = true
     }
@@ -93,6 +96,7 @@ QtObject {
         onExited: (code, status) => {
             const m = /currently displaying: image: (.+)/.exec(queryOut.text)
             root.current = m ? m[1].trim().replace(/^.*\//, "") : ""
+            root.currentKnown = true
         }
     }
 

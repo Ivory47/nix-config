@@ -71,6 +71,42 @@ Singleton {
         commit()
     }
 
+    // The built-in tag that means "favourite": a star on the cards, a pinned filter, and the overlay shows
+    // the favourites first. (An ordinary tag: it is in the file like any other.)
+    readonly property string favouriteTag: "favourite"
+
+    function isFavourite(name) {
+        return tagsOf(name).indexOf(favouriteTag) >= 0
+    }
+
+    function toggleFavourite(name) {
+        if (isFavourite(name))
+            removeTag(name, favouriteTag)
+        else
+            addTags(name, favouriteTag)
+    }
+
+    function favouriteCount(names) {
+        let n = 0
+        for (const name of names)
+            if (isFavourite(name))
+                n++
+        return n
+    }
+
+    // Existing tags to offer while a tag is typed. `known` is [{tag, count}] (all wallpapers), `have` the
+    // tags the wallpaper has already, `typed` what is in the field: only its last comma-separated part
+    // counts ("calm, wa" looks for "wa"). The built-in favourite tag is left out (it has its star).
+    // Tags that START with what is typed come first, then the most used.
+    function suggestTags(known, have, typed, limit) {
+        const token = String(typed).split(",").pop().trim().toLowerCase().replace(/^#+/, "")
+        const out = known.filter(t => t.tag !== favouriteTag && have.indexOf(t.tag) < 0
+                                  && (token === "" || t.tag.indexOf(token) >= 0))
+        out.sort((a, b) => ((b.tag.startsWith(token) ? 1 : 0) - (a.tag.startsWith(token) ? 1 : 0))
+                           || (b.count - a.count) || a.tag.localeCompare(b.tag))
+        return out.slice(0, limit)
+    }
+
     // Every tag in use with the number of wallpapers that have it (for the files in `names`, so a
     // tag of a file that is gone does not show), most used first, then alphabetical.
     function allTags(names) {
