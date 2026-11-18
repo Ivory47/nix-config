@@ -266,7 +266,7 @@ FocusScope {
             border.width: 1
             border.color: root.onlyThis ? Theme.accent : Theme.surfaceAlt
 
-            Text {
+            CenteredText {
                 id: chipText
                 anchors.centerIn: parent
                 text: "Only in " + (SettingsIndex.categories[categoryList.currentIndex]?.name ?? "")

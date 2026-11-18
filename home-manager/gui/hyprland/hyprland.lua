@@ -78,6 +78,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("qs -c clipboard")
     hl.exec_cmd("qs -c settings")
     hl.exec_cmd("qs -c wallpapers")
+    hl.exec_cmd("qs -c notifications")
     hl.exec_cmd("rm -f /tmp/kitty-socket && kitty --class HeadlessKitty --single-instance --listen-on unix:/tmp/kitty-socket --start-as=hidden tail -f /dev/null")
 end)
 
@@ -341,7 +342,9 @@ hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", actio
 
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("qs -c app-launcher ipc call launcher toggle"))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("qs -c clipboard ipc call clipboard toggle"))
-hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -c wallpapers ipc call wallpapers toggle"))
+-- The wallpaper picker as the full-screen overlay. (Its window form has no bind: it is in the app
+-- launcher, as "Open as window" on the Wallpapers entry.)
+hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -c wallpapers ipc call wallpapers toggleOverlay"))
 hl.bind("print", hl.dsp.exec_cmd([[
     mkdir -p ~/Pictures/Screenshots &&
     grimblast --freeze --cursor copysave area ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png

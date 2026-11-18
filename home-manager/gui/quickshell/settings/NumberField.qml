@@ -124,7 +124,7 @@ SettingsRow {
                     }
                 }
 
-                Text {
+                CenteredText {
                     visible: cell.modelData === 0
                     anchors.centerIn: parent
                     text: root.text(root.value)

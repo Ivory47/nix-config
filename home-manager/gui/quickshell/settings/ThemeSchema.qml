@@ -55,6 +55,9 @@ QtObject {
             { key: "barFillOpacity", keywords: ["bar", "transparency", "alpha", "translucent"], label: "Fill opacity", type: "number", kind: "real", min: 0, max: 1, note: "Only visible with the glass off" },
             { key: "osdIndicatorWidth", keywords: ["volume", "brightness", "popup", "on-screen display", "size"], label: "OSD width", type: "number", kind: "int", min: 60, max: 400, step: 10 }
         ]},
+        { title: "Notifications", items: [
+            { key: "notificationTimeout", keywords: ["notification", "notify", "popup", "toast", "timeout", "duration", "dismiss", "disappear", "how long"], label: "Show for", type: "number", kind: "real", min: 0, max: 60, step: 1, note: "Seconds. 0: until clicked away. Critical ones always stay" }
+        ]},
         { title: "Glass", items: [
             { key: "glass", keywords: ["blur", "transparency", "liquid", "frosted", "capture", "effects", "acrylic"], label: "Live glass", type: "bool", note: "Off: no screen capture. May need a restart of the shells" },
             { key: "compositorGlass", keywords: ["blur", "lag", "latency", "lucent", "plugin", "hyprland", "compositor", "bar", "fast", "window"], label: "Compositor glass", type: "bool", note: "Drawn by the Lucent plugin, with no lag. Off, or without the plugin: blurred from screen captures" },

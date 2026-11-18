@@ -35,7 +35,7 @@ Item {
                 border.width: 1
                 border.color: on ? Theme.accent : (area.containsMouse ? Theme.textMuted : Theme.surfaceAlt)
 
-                Text {
+                CenteredText {
                     id: label
                     anchors.centerIn: parent
                     text: seg.modelData.label

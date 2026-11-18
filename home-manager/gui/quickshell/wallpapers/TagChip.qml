@@ -2,7 +2,8 @@ import QtQuick
 import qs.shared
 
 // A tag as a pill: a filter (toggles), a removable tag of the selected wallpaper, or a suggestion.
-// Nothing translucent: it sits over the glass (selected = filled, otherwise an outline).
+// Nothing translucent: it sits over the glass (selected = filled, otherwise an outline). The texts are
+// CenteredText: centred on the capital letters, so the pill looks right with any font.
 Rectangle {
     id: root
 
@@ -31,7 +32,7 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 6
 
-        Text {
+        CenteredText {
             id: label
             anchors.verticalCenter: parent.verticalCenter
             text: root.text
@@ -39,7 +40,7 @@ Rectangle {
             color: root.selected ? Theme.background : Theme.textSecondary
         }
 
-        Text {
+        CenteredText {
             id: countText
             visible: root.count >= 0
             anchors.verticalCenter: parent.verticalCenter

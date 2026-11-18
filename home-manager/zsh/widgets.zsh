@@ -1,4 +1,12 @@
 
+# persistent recent directories, shared by all shells and kept across restarts
+autoload -Uz add-zsh-hook chpwd_recent_dirs chpwd_recent_filehandler
+add-zsh-hook chpwd chpwd_recent_dirs
+mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/zsh"
+zstyle ':chpwd:*' recent-dirs-file "${XDG_STATE_HOME:-$HOME/.local/state}/zsh/recent-dirs"
+zstyle ':chpwd:*' recent-dirs-max 100
+zstyle ':chpwd:*' recent-dirs-prune 'pattern:/nix/store(|/*)'
+
 fzf_history_widget() {
     # -n <number> outputs all commands since command <number>
     # importantly it removes the numbers from the output as well
@@ -12,14 +20,21 @@ fzf_history_widget() {
 }
 
 fzf_zoxide_widget() {
-    local selected=$(dirs -p | awk '!seen[$0]++' | fzf --nth=-1 --height 40% --prompt="📂 Last directories> ")
-
+    local reply dir
+    # loads the shared recent-dirs file into $reply, newest first, full paths
+    chpwd_recent_filehandler
+    local selected=$(
+        for dir in $reply; do
+            # show with ~, skip deleted dirs and the current dir
+            [[ $dir != $PWD && -d $dir ]] && print -r -- "${(D)dir}"
+        done | fzf --no-sort --height 40% --prompt="📂 Last directories> "
+    )
 
     if [ -n "$selected" ]; then
         selected=$(sed "s|^~|$HOME|" <<< "$selected")
         z "$selected"
-        zle reset-prompt
     fi
+    zle reset-prompt
 }
 
 # register function

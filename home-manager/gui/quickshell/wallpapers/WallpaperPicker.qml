@@ -11,12 +11,12 @@ import qs.shared.glass
 //
 // It is a normal window (a Quickshell FloatingWindow, placed and floated by the window rule in
 // hyprland.lua) with the compositor's glass behind it: see shared/glass/GLASS-WINDOWS.md. Open and
-// close it with `shown` (IPC: toggle/show/hide/isOpen); closing the window (Super+C) hides it too.
+// close it with `shown` (IPC in shell.qml: toggle/hide/isOpen); closing the window (Super+C) hides it too.
 // Without the Lucent plugin (or with Theme.glass / Theme.compositorGlass off) it is a plain opaque
 // panel.
 //
 // Keys (typed in the search field, which has the keyboard): arrows move in the grid, Enter applies
-// and closes, Alt+1..5 picks a colour, Alt+Left/Right the scheme type, Alt+M light/dark, Ctrl+T goes to the tag field (Esc comes back), Esc clears the
+// and closes, Alt+1..5 picks a colour, Alt+Left/Right the scheme type, Alt+M light/dark, Ctrl+F favourite, Ctrl+T goes to the tag field (Esc comes back), Esc clears the
 // search and the tag filters and then closes, Ctrl+C closes.
 FloatingWindow {
     id: root
@@ -184,28 +184,20 @@ FloatingWindow {
         onTriggered: if (root.shown) searchField.forceActiveFocus()
     }
 
-    function closePicker() {
-        root.shown = false
+    // Adds the tag to the filters, or takes it off.
+    function toggleFilter(tag) {
+        const on = wpModel.activeTags
+        wpModel.activeTags = on.indexOf(tag) >= 0 ? on.filter(t => t !== tag) : on.concat([tag])
     }
 
-    IpcHandler {
-        target: "wallpapers"
+    // The selected wallpaper's star.
+    function toggleFavourite() {
+        if (currentEntry)
+            WallpaperStore.toggleFavourite(currentEntry.name)
+    }
 
-        function isOpen(): bool {
-            return root.shown
-        }
-
-        function toggle() {
-            root.shown = !root.shown
-        }
-
-        function show() {
-            root.shown = true
-        }
-
-        function hide() {
-            root.shown = false
-        }
+    function closePicker() {
+        root.shown = false
     }
 
     WallpaperModel {
@@ -294,6 +286,9 @@ FloatingWindow {
                     } else if (event.key === Qt.Key_C && ctrl) {
                         root.closePicker()
                         event.accepted = true
+                    } else if (event.key === Qt.Key_F && ctrl) {
+                        root.toggleFavourite()
+                        event.accepted = true
                     } else if (event.key === Qt.Key_T && ctrl) {
                         detail.tagField.forceActiveFocus()
                         event.accepted = true
@@ -325,28 +320,46 @@ FloatingWindow {
                 }
             }
 
-            // Tag filters: a row of chips (scrolls sideways), all must match.
+            // Tag filters: the favourites chip (always there), then a row of the other tags (scrolls
+            // sideways). All the chosen ones must match.
             Item {
                 id: tagBar
                 y: searchField.height + Theme.spacingMedium
                 width: parent.width
                 height: 28
 
+                readonly property var otherTags: wpModel.tagList.filter(t => t.tag !== WallpaperStore.favouriteTag)
+                readonly property int favouriteCount: WallpaperStore.favouriteCount(wpModel.entries.map(e => e.name))
+
+                TagChip {
+                    id: favChip
+                    y: 1
+                    text: "\u2605 Favourites"
+                    count: tagBar.favouriteCount
+                    selected: wpModel.activeTags.indexOf(WallpaperStore.favouriteTag) >= 0
+                    onClicked: root.toggleFilter(WallpaperStore.favouriteTag)
+                }
+
                 Text {
-                    visible: wpModel.tagList.length === 0
+                    visible: tagBar.otherTags.length === 0
+                    anchors.left: favChip.right
+                    anchors.leftMargin: 10
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "No tags yet. Select a wallpaper and add some on the right."
+                    text: "No other tags yet. Select a wallpaper and add some on the right."
                     font.pixelSize: Theme.textSmall
                     color: Theme.textMuted
                 }
 
                 ListView {
-                    anchors.fill: parent
+                    anchors.left: favChip.right
+                    anchors.leftMargin: 6
+                    anchors.right: parent.right
+                    height: parent.height
                     orientation: ListView.Horizontal
                     spacing: 6
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
-                    model: wpModel.tagList
+                    model: tagBar.otherTags
 
                     delegate: TagChip {
                         required property var modelData
@@ -354,10 +367,7 @@ FloatingWindow {
                         text: modelData.tag
                         count: modelData.count
                         selected: wpModel.activeTags.indexOf(modelData.tag) >= 0
-                        onClicked: {
-                            const on = wpModel.activeTags
-                            wpModel.activeTags = selected ? on.filter(t => t !== modelData.tag) : on.concat([modelData.tag])
-                        }
+                        onClicked: root.toggleFilter(modelData.tag)
                     }
                 }
             }
@@ -403,6 +413,8 @@ FloatingWindow {
                     isCurrent: modelData.name === wpModel.current
                     colors: ColorCache.colorsOf(modelData)
                     highlight: !root.glassOn && (index === grid.currentIndex || hovered)
+                    favourite: WallpaperStore.isFavourite(modelData.name)
+                    onFavouriteToggled: WallpaperStore.toggleFavourite(modelData.name)
 
                     // The glass highlights the hovered card (hlRect2) and the selected one (hlRect1).
                     onHoveredChanged: {
@@ -461,6 +473,7 @@ FloatingWindow {
             tags: root.currentEntry ? WallpaperStore.tagsOf(root.currentEntry.name) : []
             knownTags: wpModel.tagList
             isCurrent: !!root.currentEntry && root.currentEntry.name === wpModel.current
+            favourite: !!root.currentEntry && WallpaperStore.isFavourite(root.currentEntry.name)
             applyState: applier.state
             applyMessage: applier.message
 
@@ -470,6 +483,7 @@ FloatingWindow {
             onTagAdded: text => { if (root.currentEntry) WallpaperStore.addTags(root.currentEntry.name, text) }
             onTagRemoved: tag => { if (root.currentEntry) WallpaperStore.removeTag(root.currentEntry.name, tag) }
             onApplyRequested: root.apply(false)
+            onFavouriteToggled: root.toggleFavourite()
             onLeaveToSearch: searchField.forceActiveFocus()
         }
     }

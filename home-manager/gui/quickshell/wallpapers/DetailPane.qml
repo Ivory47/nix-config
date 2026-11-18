@@ -20,16 +20,31 @@ Item {
     property var tags: []                // tags of this wallpaper
     property var knownTags: []           // [{tag, count}] of all wallpapers (for suggestions)
     property bool isCurrent: false
+    property bool favourite: false
     // "idle", "running", "ok" or "error", and the message for the last two.
     property string applyState: "idle"
     property string applyMessage: ""
     readonly property alias tagField: tagInput
+    // The suggestion that is highlighted (Up / Down in the tag field), -1 for none.
+    property int sugIndex: -1
+
+    // Adds the suggestion `i` (and the complete tags typed before it), clears the field, keeps it open.
+    function acceptSuggestion(i) {
+        const s = suggestionFlow.suggestions[i]
+        if (!s)
+            return
+        const done = tagInput.text.split(",").slice(0, -1)
+        root.tagAdded(done.concat([s.tag]).join(","))
+        tagInput.text = ""
+        sugIndex = -1
+    }
 
     signal colorPicked(int index)
     signal schemeStepped(int delta)
     signal modeSet(string mode)
     signal tagAdded(string text)
     signal tagRemoved(string tag)
+    signal favouriteToggled()
     signal applyRequested()
     signal leaveToSearch()
 
@@ -104,13 +119,37 @@ Item {
                 width: parent.width
                 spacing: 2
 
-                Text {
+                Row {
                     width: parent.width
-                    text: root.entry ? root.entry.base : ""
-                    elide: Text.ElideMiddle
-                    font.pixelSize: Theme.textLarge - 2
-                    font.bold: true
-                    color: Theme.text
+                    spacing: 8
+
+                    // Favourite: the star (Ctrl+F in the picker).
+                    Text {
+                        id: star
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.favourite ? "\u2605" : "\u2606"
+                        color: root.favourite ? "#f5c542" : (starArea.containsMouse ? Theme.text : Theme.textMuted)
+                        font.pixelSize: Theme.textLarge + 2
+
+                        MouseArea {
+                            id: starArea
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.favouriteToggled()
+                        }
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - star.width - parent.spacing
+                        text: root.entry ? root.entry.base : ""
+                        elide: Text.ElideMiddle
+                        font.pixelSize: Theme.textLarge - 2
+                        font.bold: true
+                        color: Theme.text
+                    }
                 }
 
                 Text {
@@ -217,7 +256,7 @@ Item {
                                 radius: 13
                                 color: root.roles ? root.roles[modelData.fill] : "transparent"
 
-                                Text {
+                                CenteredText {
                                     id: pillText
                                     anchors.centerIn: parent
                                     text: parent.modelData.label
@@ -268,7 +307,7 @@ Item {
                         }
                     }
 
-                    Text {
+                    CenteredText {
                         anchors.centerIn: parent
                         text: root.schemeNames[root.schemeType] || root.schemeType
                         font.pixelSize: Theme.textMedium
@@ -297,7 +336,7 @@ Item {
                             border.width: 1
                             border.color: on ? Theme.accent : Theme.surfaceAlt
 
-                            Text {
+                            CenteredText {
                                 anchors.centerIn: parent
                                 text: parent.modelData.label
                                 font.pixelSize: Theme.textMedium
@@ -324,10 +363,10 @@ Item {
                 Flow {
                     width: parent.width
                     spacing: 6
-                    visible: root.tags.length > 0
+                    visible: root.tags.filter(t => t !== WallpaperStore.favouriteTag).length > 0
 
                     Repeater {
-                        model: root.tags
+                        model: root.tags.filter(t => t !== WallpaperStore.favouriteTag)
                         TagChip {
                             required property string modelData
                             text: modelData
@@ -343,7 +382,7 @@ Item {
                     height: 34
                     leftPadding: 10
                     rightPadding: 10
-                    placeholderText: "Add a tag (Enter), several with commas"
+                    placeholderText: "Add a tag, or pick one below (\u2193 Enter)"
                     placeholderTextColor: Theme.textMuted
                     font.pixelSize: Theme.textSmall + 1
                     color: Theme.text
@@ -356,14 +395,33 @@ Item {
                         border.color: tagInput.activeFocus ? Theme.accent : Theme.surfaceAlt
                     }
 
+                    onTextChanged: root.sugIndex = -1
+
+                    // Down / Up highlight an existing tag, Enter adds the highlighted one (or what is typed),
+                    // Tab adds the highlighted one, or the first.
                     Keys.onPressed: event => {
+                        const n = suggestionFlow.suggestions.length
                         if (event.key === Qt.Key_Escape) {
                             root.leaveToSearch()
                             event.accepted = true
+                        } else if (event.key === Qt.Key_Down) {
+                            root.sugIndex = Math.min(root.sugIndex + 1, n - 1)
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Up) {
+                            root.sugIndex = Math.max(root.sugIndex - 1, -1)
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Tab) {
+                            if (n > 0)
+                                root.acceptSuggestion(root.sugIndex >= 0 ? root.sugIndex : 0)
+                            event.accepted = true
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (text.trim().length > 0)
-                                root.tagAdded(text)
-                            text = ""
+                            if (root.sugIndex >= 0) {
+                                root.acceptSuggestion(root.sugIndex)
+                            } else {
+                                if (text.trim().length > 0)
+                                    root.tagAdded(text)
+                                text = ""
+                            }
                             event.accepted = true
                         }
                     }
@@ -375,20 +433,17 @@ Item {
                     width: parent.width
                     spacing: 6
 
-                    readonly property var suggestions: {
-                        const typed = tagInput.text.trim().toLowerCase().replace(/^#+/, "")
-                        return root.knownTags
-                            .filter(t => root.tags.indexOf(t.tag) < 0 && (typed === "" || t.tag.indexOf(typed) >= 0))
-                            .slice(0, 8)
-                    }
+                    readonly property var suggestions: WallpaperStore.suggestTags(root.knownTags, root.tags, tagInput.text, 8)
                     visible: suggestions.length > 0
 
                     Repeater {
                         model: suggestionFlow.suggestions
                         TagChip {
                             required property var modelData
+                            required property int index
                             text: "+ " + modelData.tag
-                            onClicked: root.tagAdded(modelData.tag)
+                            selected: index === root.sugIndex
+                            onClicked: root.acceptSuggestion(index)
                         }
                     }
                 }
@@ -426,7 +481,7 @@ Item {
             color: root.applyState === "running" ? Theme.surfaceAlt
                  : (applyMouse.pressed ? Theme.textSecondary : Theme.accent)
 
-            Text {
+            CenteredText {
                 anchors.centerIn: parent
                 text: "Apply wallpaper     ↵"
                 font.pixelSize: Theme.textMedium

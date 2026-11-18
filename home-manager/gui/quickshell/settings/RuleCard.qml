@@ -322,7 +322,7 @@ Rectangle {
                 border.width: 1
                 border.color: resetArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
 
-                Text {
+                CenteredText {
                     id: resetText
                     anchors.centerIn: parent
                     text: "Reset all parameters"

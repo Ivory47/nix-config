@@ -55,16 +55,22 @@ let
         cp ${glassShaders}/*.qsb $out/shared/glass/shaders/
     '';
 
-    # Opens (or starts, if it is not running) the wallpaper picker: what the desktop entry runs.
-    # `ipc call` fails when no `qs -c wallpapers` instance is there, then one is started and asked to show.
+    # Opens (or starts, if it is not running) the wallpaper picker: what the desktop entry runs. The
+    # argument says which form: `overlay` (the full-screen picker) or `window` (the normal window).
+    # `ipc call` fails when no `qs -c wallpapers` instance is there; then one is started and, once it
+    # answers, asked to open (`ipc call ... show` only prints the IPC listing here, so it toggles).
     wallpapersToggle = pkgs.writeShellScript "quickshell-wallpapers-toggle" ''
         qs=${quickshellWithGlass}/bin/qs
-        if ! $qs -c wallpapers ipc call wallpapers toggle >/dev/null 2>&1; then
+        case "$1" in
+            overlay) toggle=toggleOverlay ;;
+            *) toggle=toggle ;;
+        esac
+        if ! $qs -c wallpapers ipc call wallpapers $toggle >/dev/null 2>&1; then
             ${pkgs.util-linux}/bin/setsid -f $qs -c wallpapers >/dev/null 2>&1
             for _ in $(${pkgs.coreutils}/bin/seq 1 30); do
                 ${pkgs.coreutils}/bin/sleep 0.1
-                if $qs -c wallpapers ipc call wallpapers show >/dev/null 2>&1; then
-                    exit 0
+                if $qs -c wallpapers ipc call wallpapers isOpen >/dev/null 2>&1; then
+                    exec $qs -c wallpapers ipc call wallpapers $toggle >/dev/null 2>&1
                 fi
             done
             exit 1
@@ -86,6 +92,7 @@ in
     xdg.configFile."quickshell/clipboard".source = mkConfig "clipboard" ./clipboard;
     xdg.configFile."quickshell/settings".source = mkConfig "settings" ./settings;
     xdg.configFile."quickshell/wallpapers".source = mkConfig "wallpapers" ./wallpapers;
+    xdg.configFile."quickshell/notifications".source = mkConfig "notifications" ./notifications;
 
     # The icon of that entry: Quickshell's icon lookup does not find the generic theme icons
     # (preferences-system and the like), only app icons, so the app brings its own: an outlined eight-tooth gear.
@@ -134,9 +141,16 @@ in
         name = "Wallpapers";
         genericName = "Wallpaper picker";
         comment = "Browse wallpapers, pick matugen colours and tag them";
-        exec = "${wallpapersToggle}";
+        # The overlay is the entry's own way, the window the `window` action: the launcher shows an
+        # Overlay | Window toggle for it (app-launcher/LauncherModes.qml).
+        exec = "${wallpapersToggle} overlay";
         icon = "quickshell-wallpapers";
         terminal = false;
         categories = [ "Settings" "Utility" ];
+
+        actions.window = {
+            name = "Open as window";
+            exec = "${wallpapersToggle} window";
+        };
     };
 }

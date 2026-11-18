@@ -9,7 +9,8 @@
     home.packages = with pkgs; [
         awww
 
-        mako # notification service
+        libnotify # notify-send, to test notifications
+
         inkscape
 
         nautilus    # file explorer

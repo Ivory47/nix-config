@@ -17,11 +17,13 @@ Item {
     property var colors: undefined
     // Pixels the thumbnail is decoded at (the cell size times the screen's scale).
     property real decodeWidth: 400
+    property bool favourite: false
 
     readonly property bool hovered: mouseArea.containsMouse
 
     signal activated()   // clicked
     signal applied()     // double-clicked
+    signal favouriteToggled()
 
     readonly property int pad: 8
 
@@ -33,6 +35,9 @@ Item {
 
     ClippingRectangle {
         id: frame
+        // Above the card's MouseArea (declared last), so that the star gets its clicks; the picture itself
+        // takes none, they go on to the card.
+        z: 1
         x: root.pad
         y: root.pad
         width: root.width - 2 * root.pad
@@ -78,6 +83,34 @@ Item {
             }
         }
 
+        // The favourite star, top left: always there when it is a favourite, otherwise while the mouse is
+        // over the card. A solid dark plate, so that it reads on any picture.
+        Rectangle {
+            visible: root.favourite || root.hovered
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.margins: 6
+            width: 28
+            height: 28
+            radius: 14
+            color: "#262626"
+            z: 2
+
+            Text {
+                anchors.centerIn: parent
+                anchors.verticalCenterOffset: -1
+                text: root.favourite ? "\u2605" : "\u2606"
+                color: root.favourite ? "#f5c542" : "#cccccc"
+                font.pixelSize: 17
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.favouriteToggled()
+            }
+        }
+
         // "On the screen now".
         Rectangle {
             visible: root.isCurrent
@@ -89,7 +122,7 @@ Item {
             radius: 10
             color: Theme.accent
 
-            Text {
+            CenteredText {
                 id: nowLabel
                 anchors.centerIn: parent
                 text: "✓ Current"
