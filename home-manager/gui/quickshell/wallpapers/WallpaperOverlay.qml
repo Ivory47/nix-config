@@ -453,7 +453,7 @@ PanelWindow {
     readonly property bool sideGlass: true
     readonly property real sideBlur: 7
     // The backing of the bar and the hints over the desktop (so that they read over any window).
-    readonly property color plateColor: Qt.rgba(0, 0, 0, 0.82)
+    readonly property color plateColor: OnImage.shadeA(0.82)
 
     FocusScope {
         id: keys
@@ -507,7 +507,7 @@ PanelWindow {
         Rectangle {
             id: fade
             anchors.fill: parent
-            color: "black"
+            color: OnImage.shade
             opacity: root.shown ? root.dim : 0
             Behavior on opacity {
                 NumberAnimation { duration: 180 }
@@ -607,7 +607,7 @@ PanelWindow {
                         radius: root.cornerRadius
                         color: "transparent"
                         border.width: card.a < 0.5 ? 2 : 1
-                        border.color: card.a < 0.5 ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(1, 1, 1, 0.25)
+                        border.color: card.a < 0.5 ? OnImage.inkA(0.55) : OnImage.inkA(0.25)
                     }
 
                     // The one on the desktop now.
@@ -667,8 +667,8 @@ PanelWindow {
                     anchors.top: parent.top
                     height: root.addingTag ? 140 : 90
                     gradient: Gradient {
-                        GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.66) }
-                        GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0) }
+                        GradientStop { position: 0.0; color: OnImage.shadeA(0.66) }
+                        GradientStop { position: 1.0; color: OnImage.shadeA(0) }
                     }
                 }
 
@@ -692,7 +692,7 @@ PanelWindow {
                         Text {
                             anchors.centerIn: parent
                             text: root.favourite ? "★" : "☆"
-                            color: root.favourite ? "#f5c542" : (starArea.containsMouse ? "white" : Qt.rgba(1, 1, 1, 0.75))
+                            color: root.favourite ? Theme.orange : (starArea.containsMouse ? OnImage.ink : OnImage.inkA(0.75))
                             font.pixelSize: 26
                         }
 
@@ -749,7 +749,7 @@ PanelWindow {
 
                             background: Rectangle {
                                 radius: 14
-                                color: Qt.rgba(0, 0, 0, 0.6)
+                                color: OnImage.shadeA(0.6)
                                 border.width: 2
                                 border.color: Theme.accent
                             }
@@ -803,7 +803,7 @@ PanelWindow {
                     radius: height / 2
                     color: root.plateColor
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.14)
+                    border.color: OnImage.inkA(0.14)
                     clip: true
 
                     Row {
@@ -816,7 +816,7 @@ PanelWindow {
                         CenteredText {
                             anchors.verticalCenter: parent.verticalCenter
                             text: "existing"
-                            color: Qt.rgba(1, 1, 1, 0.6)
+                            color: OnImage.inkA(0.6)
                             font.pixelSize: Theme.textSmall
                         }
 
@@ -844,8 +844,8 @@ PanelWindow {
                     anchors.bottom: parent.bottom
                     height: 140
                     gradient: Gradient {
-                        GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
-                        GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.78) }
+                        GradientStop { position: 0.0; color: OnImage.shadeA(0) }
+                        GradientStop { position: 1.0; color: OnImage.shadeA(0.78) }
                     }
                 }
 
@@ -862,7 +862,7 @@ PanelWindow {
                         width: parent.width
                         elide: Text.ElideRight
                         text: root.entry ? root.entry.base : ""
-                        color: "white"
+                        color: OnImage.ink
                         font.pixelSize: Theme.textLarge + 4
                         font.bold: true
                     }
@@ -878,7 +878,7 @@ PanelWindow {
                                  : (applier.running || root.pending || wallpaperTimer.running ? "  ·  applying…"
                                     : (!root.applied ? "  ·  not applied: Space" : "")))
                             : ""
-                        color: root.applyError ? Theme.red : Qt.rgba(1, 1, 1, 0.72)
+                        color: root.applyError ? Theme.red : OnImage.inkA(0.72)
                         font.pixelSize: Theme.textMedium
                     }
                 }
@@ -895,7 +895,7 @@ PanelWindow {
                         visible: !root.colors
                         anchors.verticalCenter: parent.verticalCenter
                         text: "reading colours…"
-                        color: Qt.rgba(1, 1, 1, 0.6)
+                        color: OnImage.inkA(0.6)
                         font.pixelSize: Theme.textSmall
                     }
 
@@ -918,7 +918,7 @@ PanelWindow {
                                 radius: width / 2
                                 color: sw.modelData
                                 border.width: sw.chosen ? 3 : 1
-                                border.color: sw.chosen ? "white" : Qt.rgba(1, 1, 1, 0.35)
+                                border.color: sw.chosen ? OnImage.ink : OnImage.inkA(0.35)
                                 Behavior on width {
                                     NumberAnimation { duration: 90 }
                                 }
@@ -944,7 +944,7 @@ PanelWindow {
                 text: root.filterTag === WallpaperStore.favouriteTag
                     ? "No favourites yet.\nPress Tab for all wallpapers, then F on one you like."
                     : "No wallpapers with this tag.\nPress Tab for another list."
-                color: Qt.rgba(1, 1, 1, 0.8)
+                color: OnImage.inkA(0.8)
                 font.pixelSize: Theme.textLarge
             }
         }
@@ -963,7 +963,7 @@ PanelWindow {
             radius: height / 2
             color: root.plateColor
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.14)
+            border.color: OnImage.inkA(0.14)
             Behavior on opacity {
                 NumberAnimation { duration: 180 }
             }
@@ -1005,13 +1005,13 @@ PanelWindow {
             radius: height / 2
             color: root.plateColor
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.14)
+            border.color: OnImage.inkA(0.14)
 
             CenteredText {
                 id: hints
                 anchors.centerIn: parent
                 text: "\u2190 \u2192 wallpaper     \u21E7\u2190 \u21E7\u2192 colour     Tab list     F favourite     T tag     Esc close"
-                color: Qt.rgba(1, 1, 1, 0.85)
+                color: OnImage.inkA(0.85)
                 font.pixelSize: Theme.textSmall
             }
         }

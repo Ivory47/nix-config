@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Io
+import qs.shared
 
 // The wallpaper picker in two forms: a normal window with glass (WallpaperPicker.qml, from the app
 // launcher) and a full-screen overlay with a big picture you scroll through (WallpaperOverlay.qml, Super+W).
@@ -13,6 +14,11 @@ ShellRoot {
 
     WallpaperOverlay {
         id: overlay
+    }
+
+    ExclusiveShown {
+        a: overlay
+        b: window
     }
 
     // The close-window key closes the overlay (not the window form, which is an ordinary window).
@@ -42,23 +48,19 @@ ShellRoot {
 
         // The window.
         function toggle() {
-            overlay.shown = false
             window.shown = !window.shown
         }
 
         function show() {
-            overlay.shown = false
             window.shown = true
         }
 
         // The overlay.
         function toggleOverlay() {
-            window.shown = false
             overlay.shown = !overlay.shown
         }
 
         function showOverlay() {
-            window.shown = false
             overlay.shown = true
         }
 

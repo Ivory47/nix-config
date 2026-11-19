@@ -128,7 +128,7 @@ Item {
                         id: star
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.favourite ? "\u2605" : "\u2606"
-                        color: root.favourite ? "#f5c542" : (starArea.containsMouse ? Theme.text : Theme.textMuted)
+                        color: root.favourite ? Theme.orange : (starArea.containsMouse ? Theme.text : Theme.textMuted)
                         font.pixelSize: Theme.textLarge + 2
 
                         MouseArea {

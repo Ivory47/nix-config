@@ -15,7 +15,7 @@ Rectangle {
 
     width: row.implicitWidth + 32
     radius: height / 2
-    color: chosen ? Theme.accent : (area.containsMouse ? Qt.rgba(1, 1, 1, 0.14) : "transparent")
+    color: chosen ? Theme.accent : (area.containsMouse ? OnImage.inkA(0.14) : "transparent")
 
     Row {
         id: row
@@ -27,7 +27,7 @@ Rectangle {
             text: root.text
             font.pixelSize: Theme.textMedium
             font.bold: root.chosen
-            color: root.chosen ? Theme.background : "white"
+            color: root.chosen ? Theme.background : OnImage.ink
         }
 
         CenteredText {
@@ -35,7 +35,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: root.count
             font.pixelSize: Theme.textSmall
-            color: root.chosen ? Qt.rgba(0, 0, 0, 0.55) : Qt.rgba(1, 1, 1, 0.55)
+            color: root.chosen ? OnImage.shadeA(0.55) : OnImage.inkA(0.55)
         }
     }
 

@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Io
+import qs.shared
 
 // The settings app, in two forms that share SettingsView.qml: the full-screen overlay with the veil
 // (Settings.qml, the default) and a normal window (SettingsWindow.qml). Only one is open at a time.
@@ -10,6 +11,11 @@ ShellRoot {
 
     SettingsWindow {
         id: window
+    }
+
+    ExclusiveShown {
+        a: overlay
+        b: window
     }
 
     IpcHandler {
@@ -24,23 +30,19 @@ ShellRoot {
 
         // The overlay.
         function toggle() {
-            window.shown = false
             overlay.shown = !overlay.shown
         }
 
         function show() {
-            window.shown = false
             overlay.shown = true
         }
 
         // The normal window.
         function toggleWindow() {
-            overlay.shown = false
             window.shown = !window.shown
         }
 
         function showWindow() {
-            overlay.shown = false
             window.shown = true
         }
 

@@ -89,7 +89,7 @@ Item {
                         width: 10
                         height: 10
                         radius: 5
-                        color: "white"
+                        color: Theme.text
                     }
                 }
             }
