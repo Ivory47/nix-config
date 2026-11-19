@@ -43,45 +43,16 @@ Singleton {
         return typeof v === "boolean" ? v : fallback
     }
 
-    // Texts the settings app wrote itself (it keeps the last few). Reading one of them back would
-    // replace newer changes it holds in memory with an older state, so parse() skips them.
-    property var ownWrites: []
-    function noteOwnWrite(text) {
-        ownWrites = ownWrites.concat([text]).slice(-8)
-    }
-
-    function parse(text) {
-        if (ownWrites.indexOf(text) >= 0)
-            return
-        try {
-            const obj = JSON.parse(text)
-            values = (obj !== null && typeof obj === "object" && !Array.isArray(obj)) ? obj : ({})
-        } catch (e) {
-            console.warn("settings-app-theme.json is not valid JSON, using the defaults:", e)
-            values = ({})
-        }
-    }
-
-    FileView {
+    // The file. The settings app writes it through `file.save()` / `file.write()` (ThemeStore); what it
+    // wrote itself is not read back, so a late watcher event cannot undo newer changes it holds in memory.
+    // (A file that does not exist yet is looked for every 2 s: the settings app creates it on first save.)
+    readonly property alias file: file
+    JsonFile {
         id: file
         path: root.path
-        // Loaded at construction, so there is no flash of the defaults.
-        blockLoading: true
-        watchChanges: true
-        printErrors: false
-
-        onFileChanged: reload()
-        onLoaded: root.parse(text())
-        onLoadFailed: root.values = ({})
-        Component.onCompleted: if (loaded) root.parse(text())
-    }
-
-    // A file that does not exist yet is not watched (Quickshell cannot watch a missing file):
-    // look for it every two seconds until it appears (the settings app creates it on first save).
-    Timer {
-        running: !file.loaded
-        interval: 2000
-        repeat: true
-        onTriggered: file.reload()
+        name: "settings-app-theme.json"
+        onParsed: value => root.values = (value !== null && typeof value === "object" && !Array.isArray(value)) ? value : ({})
+        onMissing: root.values = ({})
+        onInvalid: root.values = ({})   // the defaults
     }
 }

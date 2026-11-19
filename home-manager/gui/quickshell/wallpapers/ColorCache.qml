@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.shared
 
 // Everything that needs matugen.
 //
@@ -83,7 +84,7 @@ Singleton {
                 const next = Object.assign({}, root.sources)
                 next[e.name] = { mtime: e.modified, colors: colors }
                 root.sources = next
-                saveTimer.restart()
+                file.save(root.sources)
             } else {
                 // Not retried (it would loop on a file matugen cannot read); the card just shows no colours.
                 console.warn("matugen could not read the colours of", e.name, "(exit", code + ")")
@@ -154,30 +155,18 @@ Singleton {
 
     // ---- disk cache -------------------------------------------------------------------------
 
-    Timer {
-        id: saveTimer
-        interval: 400
-        onTriggered: file.setText(JSON.stringify(root.sources) + "\n")
-    }
-
-    FileView {
+    // Read once at start, written 400 ms after the last change (nothing else writes it).
+    JsonFile {
         id: file
         path: root.path
-        blockLoading: true
-        printErrors: false
-        onLoaded: {
-            try {
-                const obj = JSON.parse(text())
-                if (obj && typeof obj === "object" && !Array.isArray(obj))
-                    root.sources = obj
-            } catch (e) {
-                console.warn("colour cache is not valid JSON, starting over:", e)
-            }
+        name: "colour cache"
+        watch: false
+        retryInterval: 0
+        writeDelay: 400
+        indent: 0
+        onParsed: value => {
+            if (value && typeof value === "object" && !Array.isArray(value))
+                root.sources = value
         }
-    }
-
-    Process {
-        running: true
-        command: ["mkdir", "-p", root.dir]
     }
 }

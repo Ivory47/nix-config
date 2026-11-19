@@ -66,7 +66,7 @@ QtObject {
 
     // Drop shadow around the app launcher and the clipboard popup (outside the panel only; under
     // the glass it would break the background recovery). Opacity 0 turns it off.
-    readonly property real popupShadowOpacity: 0.3
+    readonly property real popupShadowOpacity: 0.4
     readonly property real popupShadowBlur: 24      // how far it fades out, logical pixels
     readonly property real popupShadowOffset: 8     // how far it falls downwards
 

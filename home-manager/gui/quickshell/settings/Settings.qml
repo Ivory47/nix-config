@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import qs.shared
 import qs.shared.glass
 
@@ -21,19 +20,7 @@ GlassPopup {
     // blurred picture is shared by the veil and the panel.)
     blurRadius: Math.max(0.1, Theme.scrimBlurRadius)
 
-    function close() {
-        root.shown = false
-    }
-
     onPopupClosed: view.reset()
-
-    Connections {
-        target: Hyprland
-
-        function onFocusedWorkspaceChanged() {
-            root.shown = false
-        }
-    }
 
     // The glass highlights the category row under the mouse (GlassListPanel reads popup.hoveredItem).
     Binding {
@@ -92,7 +79,7 @@ GlassPopup {
         SettingsView {
             id: view
             anchors.fill: parent
-            onCloseRequested: root.close()
+            onCloseRequested: root.closePopup()
         }
     }
 }

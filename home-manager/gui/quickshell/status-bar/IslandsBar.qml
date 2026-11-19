@@ -8,51 +8,17 @@ import qs.shared.glass
 //   left: workspaces; centre: the clock (and what plays); right: the status icons and the bell.
 // The centre pill morphs for the brightness / volume indicator and shows a new notification for a
 // moment; the right pill grows downward into the notification history when the bell is clicked.
-PanelWindow {
+BarWindow {
     id: win
 
-    WlrLayershell.namespace: "statusbar"
-    anchors { top: true; left: true; right: true }
 
-    readonly property int barH: GlassGeometry.alignedSize(Theme.statusBarHeight, win.devicePixelRatio)
-    readonly property int gap: 6
-    readonly property int pillH: barH - 2 * gap
-    readonly property int panelH: 420
-    readonly property int shadowRoom: Math.ceil(Theme.notificationShadowBlur + Math.abs(Theme.notificationShadowOffset)) + 4
-    property bool panelOpen: false
-
-    implicitHeight: barH + panelH + shadowRoom
-    exclusionMode: ExclusionMode.Normal
-    exclusiveZone: barH
-    color: "transparent"
 
     onPanelOpenChanged: if (panelOpen) NotificationHistory.markRead()
 
     // What the centre pill shows: the indicator, a new notification, or the clock.
     // The newest one when this bar started is not news.
-    property int toastSeq: NotificationHistory.items.length > 0 ? NotificationHistory.items[0].seq : -1
-    Component.onCompleted: toastSeq = toastSeq
-    property var toast: null
+    toastDuration: 3500
     readonly property string centreMode: OsdSource.active ? "osd" : (toast ? "toast" : "clock")
-
-    Connections {
-        target: NotificationHistory
-        function onItemsChanged() {
-            const first = NotificationHistory.items[0]
-            if (!first)
-                return
-            if (first.seq !== win.toastSeq) {
-                win.toastSeq = first.seq
-                win.toast = first
-                toastTimer.restart()
-            }
-        }
-    }
-    Timer {
-        id: toastTimer
-        interval: 3500
-        onTriggered: win.toast = null
-    }
 
     mask: Region {
         Region { item: left }
@@ -65,14 +31,10 @@ PanelWindow {
         id: stage
         anchors.fill: parent
 
-        Item {
+        BarCatcher {
             id: catcher
-            width: parent.width
-            height: win.panelOpen ? parent.height : 0
-            MouseArea {
-                anchors.fill: parent
-                onClicked: win.panelOpen = false
-            }
+            open: win.panelOpen
+            onDismissed: win.panelOpen = false
         }
 
         BarPill {

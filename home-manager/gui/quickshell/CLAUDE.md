@@ -17,6 +17,10 @@ Since the Lucent plugin (section 11) the glass can use clean captures from Hyprl
 - `default.nix` `mkConfig` copies each config folder into the store and copies `./shared` into it (a config can only import files in its own folder; imported as `qs.shared`). The glass C++/GLSL/tools sources are removed; only compiled `.qsb` shaders ship. `quickshell`/`qs` are wrapped so `QML_IMPORT_PATH` includes the `Glass.Native` module.
 - `app-launcher/` and `clipboard/` are full-screen overlay popups with the glass; out of scope for status-bar work. `Test.qml` and the empty `LauncherSearch.qml` in the launcher are unused.
 
+## Shared building blocks (read before writing a store, a popup or a bar layout)
+- `shared/JsonFile.qml`: a JSON file for a store (load, watch from any process, retry while missing, debounced `save()`, `write()`, folder creation, own writes not read back). Used by `ThemeFromSettingsApp`, `NotificationHistory`, `WallpaperStore`, `LauncherModes`, `ColorCache`; use it for any new store.
+- Popups: `shared/glass/GlassPopup`, `GlassSearchPopup` + `GlassListRow`; windows: `GlassWindow` + `GlassWindowPanel`; scrolling: `shared/KineticScroll`; one-widget-at-a-time and the close key: `shared/Widgets.qml`, `close-widget.sh` (details in `shared/glass/CLAUDE.md`). Bar: `status-bar/BarWindow`, `BarCatcher`, `BarMenu` (see `status-bar/CLAUDE.md`).
+
 ## Detail docs (load automatically when you work in these folders; read them first when a task touches them)
 - `shared/glass/CLAUDE.md`: section 8 (status bar and background blur, clean mode, lessons), section 9 (glass on launcher and clipboard, testing without touching the real config, IPC and restarting) and section 11 (the Lucent plugin). Also `shared/glass/GLASS-WINDOWS.md`.
 - `settings/CLAUDE.md`: section 10 (theme overrides, the settings app, Hyprland window rules page).

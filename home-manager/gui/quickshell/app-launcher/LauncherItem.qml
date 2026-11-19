@@ -1,30 +1,15 @@
 import Quickshell
 import QtQuick
 import qs.shared
+import qs.shared.glass
 
-Item {
+GlassListRow {
     id: root
 
     required property var app
 
-    signal launched()
-
-    property bool selected: false
-    property bool hovered: mouseArea.containsMouse
-
     width: 420
     height: 64
-
-    Rectangle {
-        anchors.fill: parent
-
-        radius: Theme.radiusMedium
-
-        // Always transparent: the highlight is drawn by the glass (see Launcher.qml). A translucent
-        // item over the glass would cost the blur under it.
-        color: "transparent"
-
-    }
 
     Image {
         id: icon
@@ -79,20 +64,6 @@ Item {
             elide: Text.ElideRight
 
             visible: text.length > 0
-        }
-    }
-
-    MouseArea {
-        id: mouseArea
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-
-        onClicked: {
-            LauncherModes.launch(root.app)
-            root.launched()
         }
     }
 

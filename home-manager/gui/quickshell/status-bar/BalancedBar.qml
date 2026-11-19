@@ -13,18 +13,11 @@ import qs.shared.glass
 // bar barely changes, it gets a cut-out of exactly the indicator's shape (a bite from its bottom edge
 // for "dock") and the indicator sits in it with a hair of
 // space around it, so that the two almost fit together.
-PanelWindow {
+BarWindow {
     id: win
 
-    WlrLayershell.namespace: "statusbar"
-    anchors { top: true; left: true; right: true }
-
-    readonly property int barH: GlassGeometry.alignedSize(Theme.statusBarHeight, win.devicePixelRatio)
-    readonly property int panelH: 420
-    readonly property int shadowRoom: Math.ceil(Theme.notificationShadowBlur + Math.abs(Theme.notificationShadowOffset)) + 4
-    // The panel under the bar: "history" (the notification centre), "wifi" or "audio". It opens with a
+    // The panel under the bar: "history" (the notification centre), "wifi", "audio" or "power". It opens with a
     // small gap under the bar, under the clock or under the icon that was clicked.
-    property bool panelOpen: false
     property string panelKind: "history"
     property real panelAnchorX: 0
     readonly property int panelGap: 6
@@ -66,10 +59,6 @@ PanelWindow {
         return none
     }
 
-    implicitHeight: barH + panelH + shadowRoom
-    exclusionMode: ExclusionMode.Normal
-    exclusiveZone: barH
-    color: "transparent"
 
     onPanelOpenChanged: if (panelOpen && panelKind === "history") NotificationHistory.markRead()
     onPanelKindChanged: if (panelOpen && panelKind === "history") NotificationHistory.markRead()
@@ -121,14 +110,10 @@ PanelWindow {
         id: stage
         anchors.fill: parent
 
-        Item {
+        BarCatcher {
             id: catcher
-            width: parent.width
-            height: win.panelOpen ? parent.height : 0
-            MouseArea {
-                anchors.fill: parent
-                onClicked: win.panelOpen = false
-            }
+            open: win.panelOpen
+            onDismissed: win.panelOpen = false
         }
 
         BarPill {
@@ -192,7 +177,12 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     onToggled: win.togglePanel("audio", audioWidget)
                 }
-                Battery { anchors.verticalCenter: parent.verticalCenter }
+                Battery {
+                    id: batteryWidget
+                    embedded: true
+                    anchors.verticalCenter: parent.verticalCenter
+                    onToggled: win.togglePanel("power", batteryWidget)
+                }
                 SettingsButton { anchors.verticalCenter: parent.verticalCenter }
             }
         }
@@ -200,9 +190,9 @@ PanelWindow {
         // The panel: grows down under the bar (with a small gap), under the clock or the icon that opened it.
         BarPill {
             id: panel
-            readonly property real wantW: win.panelKind === "wifi" ? 316 : win.panelKind === "audio" ? 40 : 380
+            readonly property real wantW: win.panelKind === "wifi" ? 316 : win.panelKind === "audio" ? 40 : win.panelKind === "power" ? 196 : 380
             readonly property real wantH: win.panelKind === "wifi" ? 336
-                : win.panelKind === "audio" ? 140 : Math.min(win.panelH - 8, history.implicitHeight + 32)
+                : win.panelKind === "audio" ? 140 : win.panelKind === "power" ? 176 : Math.min(win.panelH - 8, history.implicitHeight + 32)
             x: Math.max(8, Math.min(stage.width - width - 8, win.panelAnchorX - width / 2))
             y: win.barH + win.panelGap
             width: wantW
@@ -234,13 +224,19 @@ PanelWindow {
                 width: parent.width - 2 * inset
                 height: parent.height - 2 * inset
                 active: (win.panelOpen || panel.height > 1) && win.panelKind !== "history"
-                sourceComponent: win.panelKind === "wifi" ? wifiC : audioC
+                sourceComponent: win.panelKind === "wifi" ? wifiC : win.panelKind === "power" ? powerC : audioC
             }
         }
 
         Component {
             id: wifiC
             WifiPanel {
+                onCloseRequested: win.panelOpen = false
+            }
+        }
+        Component {
+            id: powerC
+            PowerPanel {
                 onCloseRequested: win.panelOpen = false
             }
         }

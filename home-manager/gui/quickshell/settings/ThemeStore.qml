@@ -78,29 +78,12 @@ Singleton {
     Timer {
         id: writeTimer
         interval: 30
-        onTriggered: {
-            const text = JSON.stringify(ThemeFromSettingsApp.values, null, 2) + "\n"
-            ThemeFromSettingsApp.noteOwnWrite(text)
-            out.setText(text)
-        }
+        onTriggered: ThemeFromSettingsApp.file.write(ThemeFromSettingsApp.values)
     }
 
     Timer {
         id: liveTimer
         interval: 50
         onTriggered: writeTimer.restart()
-    }
-
-    FileView {
-        id: out
-        path: ThemeFromSettingsApp.path
-        printErrors: false
-        onSaveFailed: error => console.warn("settings-app-theme.json could not be saved:", error)
-    }
-
-    // The folder has to exist for the first write.
-    Process {
-        running: true
-        command: ["mkdir", "-p", ThemeFromSettingsApp.path.replace(/\/[^\/]*$/, "")]
     }
 }

@@ -374,6 +374,7 @@ PanelWindow {
         if (shown) {
             // One widget at a time: the others (and the bar's menus) close when this takes over.
             Widgets.closeOthers("wallpapers")
+            Widgets.noteOpened(true)
             followCurrent = true
             appliedName = wpModel.current
             addingTag = false
@@ -389,6 +390,7 @@ PanelWindow {
         } else {
             wheelCarry = 0
             addingTag = false
+            Widgets.noteOpened(false)
         }
     }
 

@@ -39,35 +39,18 @@ Singleton {
         return Math.round(s / 86400) + " d"
     }
 
-    function parse(text) {
-        try {
-            const o = JSON.parse(text)
-            items = Array.isArray(o.items) ? o.items : []
-            unread = typeof o.unread === "number" ? o.unread : 0
-        } catch (e) {
-            items = []
-            unread = 0
-        }
-    }
-
-    FileView {
+    // The server (notifications/shell.qml) writes the file; every process reads it. (Looked for every 3 s
+    // until it is there.)
+    JsonFile {
         id: file
         path: root.path
-        blockLoading: true
-        watchChanges: true
-        printErrors: false
-        onFileChanged: reload()
-        onLoaded: root.parse(text())
-        onLoadFailed: { root.items = []; root.unread = 0 }
-        Component.onCompleted: if (loaded) root.parse(text())
-    }
-
-    // A file that does not exist yet is not watched (the server writes it when it starts):
-    // look every 3 s until it is there.
-    Timer {
-        interval: 3000
-        running: !file.loaded
-        repeat: true
-        onTriggered: file.reload()
+        name: "notification history"
+        retryInterval: 3000
+        onParsed: o => {
+            root.items = Array.isArray(o.items) ? o.items : []
+            root.unread = typeof o.unread === "number" ? o.unread : 0
+        }
+        onMissing: { root.items = []; root.unread = 0 }
+        onInvalid: { root.items = []; root.unread = 0 }
     }
 }

@@ -18,23 +18,16 @@ import qs.shared.glass
 // Keys (typed in the search field, which has the keyboard): arrows move in the grid, Enter applies
 // and closes, Alt+1..5 picks a colour, Alt+Left/Right the scheme type, Alt+M light/dark, Ctrl+F favourite, Ctrl+T goes to the tag field (Esc comes back), Esc clears the
 // search and the tag filters and then closes, Ctrl+C closes.
-FloatingWindow {
+GlassWindow {
     id: root
 
     title: "Wallpapers"
-    color: "transparent"    // the glass shows through the window
     implicitWidth: 1120
     implicitHeight: 700
     minimumSize: Qt.size(780, 520)
 
-    // Open / closed. (The window only exists while this is true.)
-    property bool shown: false
-    visible: shown
-    onClosed: shown = false
-
-    // The card under the mouse, if any: set by the cards, highlighted by the glass.
-    property Item hoveredItem: null
-    readonly property bool glassOn: glass.active && glass.available
+    focusItem: searchField
+    readonly property bool glassOn: glass.glassOn
 
     // ---- what is selected -----------------------------------------------------------------------
 
@@ -167,7 +160,7 @@ FloatingWindow {
             if (wpModel.current !== "" && wpModel.indexOfName(wpModel.current) >= 0)
                 selectedName = wpModel.current
             Qt.callLater(() => { root.restoreSelection(); root.showSelected(); searchField.forceActiveFocus() })
-            focusTimer.restart()
+            focusSoon()
         } else {
             // A fresh start the next time: no search, no tag filters.
             searchField.text = ""
@@ -175,13 +168,6 @@ FloatingWindow {
             wpModel.activeTags = []
             hoveredItem = null
         }
-    }
-
-    // The compositor may give the new window the keyboard a moment after it is mapped.
-    Timer {
-        id: focusTimer
-        interval: 80
-        onTriggered: if (root.shown) searchField.forceActiveFocus()
     }
 
     // Adds the tag to the filters, or takes it off.
@@ -219,21 +205,10 @@ FloatingWindow {
     readonly property int margin: Theme.spacingLarge
     readonly property int detailWidth: 340
 
-    // Plain panel when there is no compositor glass.
-    Rectangle {
-        anchors.fill: parent
-        visible: !root.glassOn
-        color: Theme.background
-        radius: 6
-    }
-
-    // The glass: fills the window; Hyprland draws the border and the shadow.
-    LucentListPanel {
+    // The glass (or a plain panel without it): fills the window.
+    GlassWindowPanel {
         id: glass
         anchors.fill: parent
-        active: Theme.glass && Theme.compositorGlass
-        blurRadius: Theme.glassBlurRadius
-        maxTaps: Math.round(Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, Theme.glassBlurRadius)), Theme.blurTapsFalloff)))
         field: searchField
         listView: grid
         hoveredItem: root.hoveredItem

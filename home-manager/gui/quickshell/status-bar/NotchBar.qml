@@ -8,57 +8,24 @@ import qs.shared.glass
 // shows: the workspaces, the clock and a few status icons at rest; the brightness / volume
 // indicator for a moment; a new notification as a card; and, when it is clicked, a control centre
 // (brightness, volume, what plays, the notification history).
-PanelWindow {
+BarWindow {
     id: win
 
-    WlrLayershell.namespace: "statusbar"
-    anchors { top: true; left: true; right: true }
-
-    readonly property int barH: GlassGeometry.alignedSize(Theme.statusBarHeight, win.devicePixelRatio)
-    readonly property int gap: 6
-    readonly property int pillH: barH - 2 * gap
     readonly property int maxH: 520
-    readonly property int shadowRoom: Math.ceil(Theme.notificationShadowBlur + Math.abs(Theme.notificationShadowOffset)) + 4
-    property bool open: false
 
     // Nothing is reserved for a bar that is only a pill, except its row.
     implicitHeight: maxH + shadowRoom
-    exclusionMode: ExclusionMode.Normal
-    exclusiveZone: barH
-    color: "transparent"
+    toastDuration: 4500
 
-    onOpenChanged: {
-        if (open) {
+    onPanelOpenChanged: {
+        if (panelOpen) {
             NotificationHistory.markRead()
             OsdSource.readBrightness()
         }
     }
 
-    // The newest one when this bar started is not news.
-    property int toastSeq: NotificationHistory.items.length > 0 ? NotificationHistory.items[0].seq : -1
-    Component.onCompleted: toastSeq = toastSeq
-    property var toast: null
     // "osd", "toast", "open" or "rest".
-    readonly property string mode: open ? "open" : OsdSource.active ? "osd" : toast ? "toast" : "rest"
-
-    Connections {
-        target: NotificationHistory
-        function onItemsChanged() {
-            const first = NotificationHistory.items[0]
-            if (!first)
-                return
-            if (first.seq !== win.toastSeq) {
-                win.toastSeq = first.seq
-                win.toast = first
-                toastTimer.restart()
-            }
-        }
-    }
-    Timer {
-        id: toastTimer
-        interval: 4500
-        onTriggered: win.toast = null
-    }
+    readonly property string mode: panelOpen ? "open" : OsdSource.active ? "osd" : toast ? "toast" : "rest"
 
     mask: Region {
         Region { item: notch }
@@ -69,14 +36,10 @@ PanelWindow {
         id: stage
         anchors.fill: parent
 
-        Item {
+        BarCatcher {
             id: catcher
-            width: parent.width
-            height: win.open ? parent.height : 0
-            MouseArea {
-                anchors.fill: parent
-                onClicked: win.open = false
-            }
+            open: win.panelOpen
+            onDismissed: win.panelOpen = false
         }
 
         BarPill {
@@ -112,7 +75,7 @@ PanelWindow {
                 Battery { anchors.verticalCenter: parent.verticalCenter }
                 NotificationBell {
                     anchors.verticalCenter: parent.verticalCenter
-                    onClicked: win.open = !win.open
+                    onClicked: win.panelOpen = !win.panelOpen
                 }
             }
 
@@ -124,7 +87,7 @@ PanelWindow {
                 height: win.pillH
                 z: -1
                 cursorShape: Qt.PointingHandCursor
-                onClicked: win.open = !win.open
+                onClicked: win.panelOpen = !win.panelOpen
             }
 
             OsdBar {

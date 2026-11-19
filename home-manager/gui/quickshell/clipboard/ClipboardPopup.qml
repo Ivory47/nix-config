@@ -1,26 +1,37 @@
 import QtQuick
-import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import qs.shared
 import qs.shared.glass
 
-// The window, the glass and the opening and closing are GlassPopup's; see there.
-GlassPopup {
+// The clipboard history: the model, the rows, picking and deleting. The panel, search, keys, glass and
+// opening and closing are GlassSearchPopup's (and GlassPopup's); see there.
+GlassSearchPopup {
     id: root
     WlrLayershell.namespace: "clipboard"
     // Own tag colour (bar 30, launcher 34 by default), see GlassBackdrop.tagRed.
     tagRed: 38
 
-    focusItem: searchField
-    panelItem: panel
+    ipcTarget: "clipboard"
     // Ignores "one widget at a time" (shared/Widgets.qml): other widgets neither close it nor does it close them.
     exclusive: false
 
-    // A fresh start the next time.
-    onPopupClosed: searchField.text = ""
+    placeholder: "Search clipboard history..."
+    emptyText: "Clipboard history is empty"
+    panelWidth: 480
+    panelHeight: Math.min(560, root.height - 80)
+
+    model: clipboardModel.filteredEntries
+
+    delegate: ClipboardItem {
+        required property var modelData
+        required property int index
+
+        entry: modelData
+        width: ListView.view.width
+        onActivated: root.pick(index)
+    }
 
     // When true, Ctrl+V is also sent to the window you were in after picking an entry (needs wtype).
     // Off by default because terminals use Ctrl+Shift+V.
@@ -29,21 +40,20 @@ GlassPopup {
     // Index to select after the list changes (used to stay in place after deleting).
     property int keepIndex: -1
 
-    function open() {
-        searchField.text = ""
+    // A fresh list every time it opens.
+    onAboutToOpen: {
+        searchText = ""
         clipboardModel.refresh()
-        root.shown = true
     }
 
-    function close() {
-        root.shown = false
-    }
+    onAccepted: index => pick(index)
 
-    function toggle() {
-        if (root.shown)
-            close()
-        else
-            open()
+    // Shift+Delete removes the selected entry from history.
+    onKeyPressed: event => {
+        if (event.key === Qt.Key_Delete && (event.modifiers & Qt.ShiftModifier)) {
+            removeAt(list.currentIndex)
+            event.accepted = true
+        }
     }
 
     function pick(index) {
@@ -53,7 +63,7 @@ GlassPopup {
             return
 
         clipboardModel.copy(entry)
-        close()
+        closePopup()
     }
 
     function removeAt(index) {
@@ -66,36 +76,12 @@ GlassPopup {
         clipboardModel.remove(entry)
     }
 
-    Connections {
-        target: Hyprland
-
-        function onFocusedWorkspaceChanged() {
-            root.close()
-        }
-    }
-
-    IpcHandler {
-        target: "clipboard"
-
-        function toggle(): void {
-            root.toggle()
-        }
-
-        function show(): void {
-            root.open()
-        }
-
-        function hide(): void {
-            root.close()
-        }
-    }
-
     ClipboardWatcher {}
 
     ClipboardModel {
         id: clipboardModel
 
-        searchText: searchField.text
+        searchText: root.searchText
 
         onCopied: {
             if (root.autoPaste)
@@ -115,159 +101,6 @@ GlassPopup {
         id: pasteProcess
 
         command: ["wtype", "-M", "ctrl", "-k", "v", "-m", "ctrl"]
-    }
-
-    GlassListPanel {
-        // Placed in the surface's coordinates (whole pixels, as the glass needs).
-        x: Math.round(panel.x)
-        y: Math.round(panel.y)
-        width: panel.width
-        height: panel.height
-
-        popup: root
-        shadow: true
-        panelOpacity: Theme.popupOpacity
-        field: searchField
-        listView: list
-    }
-
-    Rectangle {
-        id: panel
-
-        anchors.centerIn: parent
-
-        width: 480
-        height: Math.min(560, root.height - 80)
-
-        radius: Theme.radiusLarge
-        color: "transparent"
-
-        border.width: 1
-        border.color: Theme.surfaceAlt
-
-        // Keeps clicks inside the panel from closing it.
-        MouseArea {
-            anchors.fill: parent
-        }
-
-        Column {
-            anchors.fill: parent
-            anchors.margins: Theme.spacingLarge
-
-            spacing: Theme.spacingMedium
-
-            TextField {
-                id: searchField
-
-                width: parent.width
-                height: 50
-
-                leftPadding: Theme.spacingMedium
-                rightPadding: Theme.spacingMedium
-
-                placeholderText: "Search clipboard history..."
-                font.pixelSize: Theme.textMedium
-
-                color: Theme.text
-                placeholderTextColor: Theme.textMuted
-
-                background: Rectangle {
-                    radius: Theme.radiusMedium
-                    color: "transparent" // drawn by the glass (hlRect0)
-                }
-
-                Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Escape) {
-                        root.close()
-                        event.accepted = true
-                    }
-
-                    else if (event.key === Qt.Key_Down) {
-                        if (list.count > 0)
-                            list.currentIndex = Math.min(list.currentIndex + 1, list.count - 1)
-
-                        event.accepted = true
-                    }
-
-                    else if (event.key === Qt.Key_Up) {
-                        if (list.count > 0)
-                            list.currentIndex = Math.max(list.currentIndex - 1, 0)
-
-                        event.accepted = true
-                    }
-
-                    else if (event.key === Qt.Key_Return ||
-                    event.key === Qt.Key_Enter) {
-                        root.pick(list.currentIndex)
-                        event.accepted = true
-                    }
-
-                    // Shift+Delete removes the selected entry from history.
-                    else if (event.key === Qt.Key_Delete &&
-                    (event.modifiers & Qt.ShiftModifier)) {
-                        root.removeAt(list.currentIndex)
-                        event.accepted = true
-                    }
-                }
-            }
-
-            ListView {
-                id: list
-
-                width: parent.width
-                height: parent.height
-                    - searchField.height
-                    - Theme.spacingMedium
-
-                spacing: Theme.spacingSmall
-
-                clip: true
-
-                model: clipboardModel.filteredEntries
-
-                currentIndex: count > 0 ? 0 : -1
-
-                onCurrentIndexChanged: {
-                    if (currentIndex >= 0)
-                        positionViewAtIndex(currentIndex, ListView.Contain)
-                }
-
-                delegate: ClipboardItem {
-                    id: row
-
-                    required property var modelData
-                    required property int index
-
-                    entry: modelData
-                    selected: index === list.currentIndex
-
-                    width: list.width
-
-                    // The glass highlights the row under the mouse (hlRect2).
-                    onHoveredChanged: {
-                        if (hovered)
-                            root.hoveredItem = row
-                        else if (root.hoveredItem === row)
-                            root.hoveredItem = null
-                    }
-
-                    onPicked: root.pick(index)
-                }
-
-                Text {
-                    anchors.centerIn: parent
-
-                    visible: list.count === 0
-
-                    text: searchField.text === ""
-                        ? "Clipboard history is empty"
-                        : "No matches"
-
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.textMedium
-                }
-            }
-        }
     }
 
     Connections {

@@ -1,6 +1,8 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Glass.Native
 import qs.shared
 
@@ -97,6 +99,61 @@ PanelWindow {
             Widgets.closeOthers(WlrLayershell.namespace)
         else
             Widgets.closeBarPanels()
+    }
+
+    // Opening and closing for callers (the instances' own code, the IPC handler below). Use these and
+    // not `shown` directly when something has to be prepared first: `aboutToOpen` is emitted by
+    // openPopup() before `shown` goes true (the clipboard refreshes its list there).
+    signal aboutToOpen()
+    function openPopup() {
+        aboutToOpen()
+        shown = true
+    }
+    function closePopup() {
+        shown = false
+    }
+    function togglePopup() {
+        if (shown)
+            closePopup()
+        else
+            openPopup()
+    }
+
+    // Closes when the workspace changes (the popup would stay over a desktop it was not opened on).
+    property bool closeOnWorkspaceChange: true
+    Connections {
+        target: Hyprland
+        enabled: root.closeOnWorkspaceChange
+
+        function onFocusedWorkspaceChanged() {
+            root.closePopup()
+        }
+    }
+
+    // IPC target with toggle / show / hide (`qs -c <config> ipc call <target> toggle`). Leave empty for
+    // a shell that has its own handler (the settings, the wallpaper picker).
+    property string ipcTarget: ""
+    IpcHandler {
+        target: root.ipcTarget
+        enabled: root.ipcTarget !== ""
+
+        function toggle(): void { root.togglePopup() }
+        function show(): void { root.openPopup() }
+        function hide(): void { root.closePopup() }
+    }
+
+    // The target every widget shell has, whatever its own `ipcTarget`: the "close" key (Hyprland's close
+    // window bind, hyprland.lua) asks all running shells to `closeIfOpen` before it closes a window
+    // (quickshell/close-widget.sh). True when this popup was open and is now closed.
+    IpcHandler {
+        target: "widget"
+
+        function closeIfOpen(): bool {
+            if (!root.shown)
+                return false
+            root.closePopup()
+            return true
+        }
     }
 
     // A click outside `panelItem` closes the popup (the whole surface is the click area, under
@@ -208,8 +265,10 @@ PanelWindow {
                 // nothing to wait for.
                 present(true)
             popupOpened()
+            Widgets.noteOpened(true)
         } else {
             popupClosed()
+            Widgets.noteOpened(false)
         }
     }
 
@@ -235,7 +294,7 @@ PanelWindow {
                     if (m.x >= 0 && m.y >= 0 && m.x <= p.width && m.y <= p.height)
                         return
                 }
-                root.shown = false
+                root.closePopup()
             }
         }
 

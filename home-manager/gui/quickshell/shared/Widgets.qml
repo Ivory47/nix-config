@@ -35,6 +35,13 @@ QtObject {
         }
     }
 
+    // A widget opened (+1) or closed (-1): Hyprland keeps the window under it "active", so hyprland.lua's
+    // widgetFocus() draws its border as inactive while any widget is open (a count, so that widgets
+    // that swap stay right). Call it once per open and once per close.
+    function noteOpened(open) {
+        Quickshell.execDetached(["hyprctl", "eval", "widgetFocus(" + (open ? 1 : -1) + ")"])
+    }
+
     // Only the bar's menus (what a widget that ignores the rule still does, as before).
     function closeBarPanels() {
         Quickshell.execDetached(["qs", "-c", "status-bar", "ipc", "call", "bar", "closePanels"])

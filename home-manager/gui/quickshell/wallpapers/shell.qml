@@ -15,6 +15,19 @@ ShellRoot {
         id: overlay
     }
 
+    // The close-window key closes the overlay (not the window form, which is an ordinary window).
+    // Every widget shell has this target: see shared/glass/GlassPopup.qml and quickshell/close-widget.sh.
+    IpcHandler {
+        target: "widget"
+
+        function closeIfOpen(): bool {
+            if (!overlay.shown)
+                return false
+            overlay.shown = false
+            return true
+        }
+    }
+
     IpcHandler {
         target: "wallpapers"
 
