@@ -15,6 +15,9 @@ GlassPopup {
     tagRed: 38
 
     focusItem: searchField
+    panelItem: panel
+    // Ignores "one widget at a time" (shared/Widgets.qml): other widgets neither close it nor does it close them.
+    exclusive: false
 
     // A fresh start the next time.
     onPopupClosed: searchField.text = ""
@@ -112,13 +115,6 @@ GlassPopup {
         id: pasteProcess
 
         command: ["wtype", "-M", "ctrl", "-k", "v", "-m", "ctrl"]
-    }
-
-    // Click outside the panel to close.
-    MouseArea {
-        anchors.fill: parent
-
-        onClicked: root.close()
     }
 
     GlassListPanel {

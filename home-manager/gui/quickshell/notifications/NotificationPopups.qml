@@ -32,11 +32,14 @@ PanelWindow {
         right: true
         bottom: true
     }
+    // The surface is wider than the cards, on the left, so that their shadow is not cut off; the cards
+    // are `cardWidth` wide with `spacingMedium` to the screen edge and to the bar.
+    readonly property int cardWidth: 380
+    readonly property int shadowRoom: Math.ceil(Theme.notificationShadowBlur + Math.abs(Theme.notificationShadowOffset)) + 4
     margins {
-        top: Theme.statusBarHeight + Theme.spacingMedium
-        right: Theme.spacingMedium
+        top: Theme.statusBarHeight
     }
-    implicitWidth: 380
+    implicitWidth: cardWidth + Theme.spacingMedium + shadowRoom
 
     // Only where the cards are.
     mask: Region {
@@ -82,7 +85,10 @@ PanelWindow {
 
         Column {
             id: column
-            width: parent.width
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.spacingMedium
+            y: Theme.spacingMedium
+            width: win.cardWidth
 
             Repeater {
                 model: cards

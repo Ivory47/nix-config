@@ -87,6 +87,22 @@ PanelWindow {
 
     // Emitted after `shown` changed (Quickshell windows have a `closed` signal of their own).
     signal popupOpened()
+    // One widget at a time (shared/Widgets.qml): opening closes the other widgets (and the bar's menus),
+    // unless `exclusive` is false (the clipboard): that one only closes the bar's menus, and is never
+    // closed by the others. The shell's `qs -c` name is taken from the layer namespace, so set the
+    // namespace to it (Widgets.qml lists them).
+    property bool exclusive: true
+    onPopupOpened: {
+        if (exclusive)
+            Widgets.closeOthers(WlrLayershell.namespace)
+        else
+            Widgets.closeBarPanels()
+    }
+
+    // A click outside `panelItem` closes the popup (the whole surface is the click area, under
+    // everything the popup puts in). Set `panelItem` to the panel's item; unset, every click closes.
+    property bool closeOnOutsideClick: true
+    property Item panelItem: null
     signal popupClosed()
 
     default property alias items: surface.data
@@ -207,6 +223,21 @@ PanelWindow {
         id: surface
         anchors.fill: parent
         visible: root.presented
+
+        // Click outside the panel (below everything the popup adds, which comes after this).
+        MouseArea {
+            anchors.fill: parent
+            enabled: root.closeOnOutsideClick
+            onClicked: mouse => {
+                const p = root.panelItem
+                if (p) {
+                    const m = mapToItem(p, mouse.x, mouse.y)
+                    if (m.x >= 0 && m.y >= 0 && m.x <= p.width && m.y <= p.height)
+                        return
+                }
+                root.shown = false
+            }
+        }
 
         // One opaque pixel at the top left: says which version of the surface a capture holds.
         // (Above everything: a veil over the whole surface, GlassScrim, must not cover it.)

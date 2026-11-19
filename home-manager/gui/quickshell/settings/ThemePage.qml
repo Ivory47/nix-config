@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Shapes
 import Quickshell.Io
 import qs.shared
 
@@ -13,9 +14,34 @@ Item {
 
     // The actions of the section buttons (ThemeSchema: `button`): id -> { label, run() }.
     readonly property var actions: ({
-        restartBar: { title: "Restart status bar", note: "Applies the height and glass changes", label: "Restart", run: () => root.restartBar() }
+        restartBar: { title: "Restart status bar", note: "Applies the height and glass changes", label: "Restart", glyph: "\u21BB ", busy: root.restarting, busyText: "Restarting\u2026", run: () => root.restartBar() },
+        testNotification: { title: "Test notification", note: "Shows a notification with the settings above", label: "Send", icon: "play", busy: root.testSent, busyText: "Sent", run: () => root.sendTest() }
     })
     property bool restarting: false
+    property bool testSent: false
+
+    // Sends a notification over D-Bus (to whatever notification server is running: ours).
+    function sendTest() {
+        if (testSent)
+            return
+        testSent = true
+        testTimer.restart()
+        testProc.running = true
+    }
+
+    Process {
+        id: testProc
+        // ("--" so that the timeout -1 is not taken for an option)
+        command: ["busctl", "--user", "call", "--", "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+            "org.freedesktop.Notifications", "Notify", "susssasa{sv}i", "Settings", "0", "preferences-system",
+            "Test notification", "This is how a notification looks with your settings.", "0", "0", "-1"]
+    }
+
+    Timer {
+        id: testTimer
+        interval: 1500
+        onTriggered: root.testSent = false
+    }
 
     // Restarts the status bar (some values only apply when it starts). Its process is found by
     // the layer it owns (`pkill -f` would also match this command) and started again detached,
@@ -211,6 +237,7 @@ Item {
                                     x: 6
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: 16
+                                    horizontalAlignment: Text.AlignHCenter
                                     text: group.open ? "\u25BE" : "\u25B8"
                                     color: Theme.textSecondary
                                     font.pixelSize: Theme.textMedium
@@ -272,22 +299,59 @@ Item {
                                 }
                             }
 
-                            // The settings, only while open (an invisible Column takes no room).
-                            Column {
+                            // The settings, only while open (an invisible Item takes no room), with a
+                            // line on the left: click it to close the group again.
+                            Item {
                                 visible: group.open
                                 width: parent.width
+                                height: group.open ? groupBody.height : 0
+
+                                MouseArea {
+                                    id: collapseLine
+                                    // Centred under the chevron (x 6, width 16: centre 14).
+                                    x: 14 - width / 2
+                                    width: 12
+                                    height: parent.height
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.setGroupOpen(group.modelData.id, false)
+
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: collapseLine.containsMouse ? 3 : 2
+                                        height: parent.height
+                                        radius: 1
+                                        color: collapseLine.containsMouse ? Theme.accent : Theme.surfaceAlt
+                                    }
+                                }
+
+                                Column {
+                                id: groupBody
+                                // Clear of the collapse line (centre 14).
+                                readonly property int indent: 16 + Theme.spacingMedium
+                                x: groupBody.indent
+                                width: parent.width - indent
 
                                 Repeater {
                                     model: group.modelData.items
 
-                                    delegate: SettingField {
-                                        id: groupField
+                                    delegate: Column {
+                                        id: groupItem
                                         required property var modelData
-                                        width: group.width
-                                        spec: modelData
+                                        width: group.width - groupBody.indent
 
-                                        Component.onCompleted: root.fields[modelData.key] = groupField
+                                        // A gap between clusters of settings (schema `gapBefore`).
+                                        Item { width: 1; height: groupItem.modelData.gapBefore ? Theme.spacingLarge : 0 }
+
+                                        SettingField {
+                                            id: groupField
+                                            width: parent.width
+                                            spec: groupItem.modelData
+
+                                            Component.onCompleted: root.fields[groupItem.modelData.key] = groupField
+                                        }
                                     }
+                                }
                                 }
                             }
                         }
@@ -331,27 +395,53 @@ Item {
                             anchors.right: parent.right
                             anchors.rightMargin: 22 + Theme.spacingSmall
                             anchors.verticalCenter: parent.verticalCenter
-                            width: buttonText.implicitWidth + 24
+                            width: buttonRow.width + 24
                             height: 28
                             radius: Theme.radiusSmall
                             color: "transparent"
                             border.width: 1
-                            border.color: !root.restarting && buttonArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
-                            opacity: root.restarting ? 0.6 : 1
+                            border.color: !actionRow.action?.busy && buttonArea.containsMouse ? Theme.textMuted : Theme.surfaceAlt
+                            opacity: actionRow.action?.busy ? 0.6 : 1
 
-                            CenteredText {
-                                id: buttonText
+                            Row {
+                                id: buttonRow
                                 anchors.centerIn: parent
-                                text: root.restarting ? "Restarting\u2026" : "\u21BB " + (actionRow.action?.label ?? "")
-                                color: Theme.textSecondary
-                                font.pixelSize: Theme.textSmall
+                                spacing: 6
+
+                                // A drawn triangle: the font's one sits low (its box is the line's, not the
+                                // letters'), this one is centred on the middle of the capital letters.
+                                Shape {
+                                    visible: actionRow.action?.icon === "play" && !actionRow.action?.busy
+                                    width: 7
+                                    height: 9
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    // The letters' ink centre is ~0.5 px below the box centre, and the optical centre
+                                    // of "Send" (x-height) lower still: centred on the box it read as too high.
+                                    anchors.verticalCenterOffset: 0.75
+                                    ShapePath {
+                                        fillColor: Theme.textSecondary
+                                        strokeWidth: -1
+                                        startX: 0
+                                        startY: 0
+                                        PathLine { x: 7; y: 4.5 }
+                                        PathLine { x: 0; y: 9 }
+                                    }
+                                }
+
+                                CenteredText {
+                                    id: buttonText
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: actionRow.action?.busy ? (actionRow.action?.busyText ?? "") : (actionRow.action?.glyph ?? "") + (actionRow.action?.label ?? "")
+                                    color: Theme.textSecondary
+                                    font.pixelSize: Theme.textSmall
+                                }
                             }
 
                             MouseArea {
                                 id: buttonArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                enabled: !root.restarting
+                                enabled: !actionRow.action?.busy
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: actionRow.action.run()
                             }

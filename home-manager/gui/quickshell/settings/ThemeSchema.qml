@@ -18,20 +18,24 @@ QtObject {
     function lookItems(prefix, who) {
         const look = ["glass", "blur", "frosted", "lens", "liquid", "style", "appearance"]
         const rim = look.concat(["bevel", "edge", "border", "refraction"])
-        return [
+        const items = [
             { key: prefix + "Frost", keywords: look.concat(["blurred", "sharp", "transparency"]), label: "Frost", type: "number", kind: "real", min: 0, max: 1, step: 0.05, note: "1: only the blurred picture. Lower: some sharp shows" },
             { key: prefix + "TintStrength", keywords: look.concat(["tint", "colour", "color", "background", "dark", "opaque", "opacity", "hide"]), label: "Tint", type: "number", kind: "real", min: 0, max: 1, step: 0.05, note: "How much background colour is mixed in" },
-            { key: prefix + "Brightness", keywords: look.concat(["light", "dark", "lighten", "darken", "tone"]), label: "Brightness", type: "number", kind: "real", min: -0.5, max: 0.5, step: 0.01, note: "Added to what is behind" },
+            { key: prefix + "Brightness", gapBefore: true, keywords: look.concat(["light", "dark", "lighten", "darken", "tone"]), label: "Brightness", type: "number", kind: "real", min: -0.5, max: 0.5, step: 0.01, note: "Added to what is behind" },
             { key: prefix + "Contrast", keywords: look.concat(["tone", "flat", "sharpen"]), label: "Contrast", type: "number", kind: "real", min: 0.5, max: 1.5, step: 0.01 },
             { key: prefix + "Saturation", keywords: look.concat(["colour", "color", "vivid", "grey", "gray", "tone"]), label: "Saturation", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "0 is grey" },
-            { key: prefix + "Bevel", keywords: rim.concat(["rim", "width", "curved"]), label: "Rim width", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "The curved glass edge, in px. 0 is flat" },
+            { key: prefix + "Bevel", gapBefore: true, keywords: rim.concat(["rim", "width", "curved"]), label: "Rim width", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "The curved glass edge, in px. 0 is flat" },
             { key: prefix + "Thickness", keywords: rim.concat(["rim", "height", "depth", "lens"]), label: "Rim height", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "How far the rim bends what is behind" },
             { key: prefix + "BevelProfile", keywords: rim.concat(["rim", "curve", "profile", "smooth", "shape"]), label: "Rim curve", type: "number", kind: "real", min: 2, max: 4, step: 0.5, note: "2 round, 3 smooth, 4 smoothest. Compositor glass" },
-            { key: prefix + "Refraction", keywords: rim.concat(["bend", "lens", "distortion", "magnify"]), label: "Refraction", type: "number", kind: "real", min: 0, max: 4, step: 0.1, note: "How strongly the rim bends the background" },
+            { key: prefix + "Refraction", gapBefore: true, keywords: rim.concat(["bend", "lens", "distortion", "magnify"]), label: "Refraction", type: "number", kind: "real", min: 0, max: 4, step: 0.1, note: "How strongly the rim bends the background" },
             { key: prefix + "Ior", keywords: rim.concat(["index", "refraction", "ior", "bend", "lens"]), label: "Index of refraction", type: "number", kind: "real", min: 1, max: 3, step: 0.05, note: "Higher bends more. 1.45 is glass" },
             { key: prefix + "Dispersion", keywords: rim.concat(["fringe", "rainbow", "chromatic", "colour", "color"]), label: "Dispersion", type: "number", kind: "real", min: 0, max: 0.5, step: 0.01, note: "Coloured fringes along the rim" },
             { key: prefix + "Shine", keywords: rim.concat(["light", "highlight", "gloss", "reflection", "glow"]), label: "Shine", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "Light that catches the rim" }
         ]
+        // The bar glass also has a tint colour (the panels use Background).
+        if (prefix === "glassBar")
+            items.splice(2, 0, { key: "glassBarTint", keywords: look.concat(["tint", "colour", "color", "bar", "background", "hue"]), label: "Tint colour", type: "color", note: "Colour mixed into the bar glass. Follows Background until set" })
+        return items
     }
 
     readonly property var sections: [
@@ -49,14 +53,26 @@ QtObject {
             { key: "shadowColor", keywords: ["colour", "drop shadow", "menu shadow"], label: "Shadow", type: "color", alpha: true }
         ]},
         { title: "Status bar", button: "restartBar", items: [
+            { key: "barCentreStyle", keywords: ["bar", "clock", "date", "time", "balanced", "capsule", "stacked", "rule", "notification", "badge"], label: "Clock style (Balanced)", type: "choice", options: [
+                { id: "capsule", label: "Capsule" }, { id: "stacked", label: "Stacked" }, { id: "rule", label: "Rule" } ],
+                note: "The date and time in the middle of the Balanced bar" },
+            { key: "barOsdStyle", keywords: ["bar", "brightness", "volume", "osd", "indicator", "slider", "balanced", "bubble", "simple", "popup", "dock", "morph"], label: "Indicator style (Balanced)", type: "choice", options: [
+                { id: "simple", label: "Simple" }, { id: "bubble", label: "Bubble" }, { id: "dock", label: "Dock" } ],
+                note: "How brightness and volume changes show in the middle of the Balanced bar" },
+            { key: "barLayout", keywords: ["bar", "layout", "style", "notch", "islands", "balanced", "classic", "notification", "history", "osd", "brightness"], label: "Layout", type: "choice", options: [
+                { id: "classic", label: "Classic" }, { id: "balanced", label: "Balanced" }, { id: "islands", label: "Islands" }, { id: "notch", label: "Notch" } ],
+                note: "Classic: as it was. Balanced: workspaces and window left, clock centre. Islands: three pills. Notch: one pill that grows" },
             { key: "statusBarHeight", keywords: ["bar", "panel height", "size", "taskbar", "top bar"], label: "Height", type: "number", kind: "int", min: 24, max: 120, note: "Needs a restart of the bar's glass to be exact" },
             { key: "barBorderColor", keywords: ["bar", "line", "outline", "edge", "colour"], label: "Border color", type: "color" },
             { key: "barBorderOpacity", keywords: ["bar", "line", "transparency", "alpha"], label: "Border opacity", type: "number", kind: "real", min: 0, max: 1 },
             { key: "barFillOpacity", keywords: ["bar", "transparency", "alpha", "translucent"], label: "Fill opacity", type: "number", kind: "real", min: 0, max: 1, note: "Only visible with the glass off" },
             { key: "osdIndicatorWidth", keywords: ["volume", "brightness", "popup", "on-screen display", "size"], label: "OSD width", type: "number", kind: "int", min: 60, max: 400, step: 10 }
         ]},
-        { title: "Notifications", items: [
-            { key: "notificationTimeout", keywords: ["notification", "notify", "popup", "toast", "timeout", "duration", "dismiss", "disappear", "how long"], label: "Show for", type: "number", kind: "real", min: 0, max: 60, step: 1, note: "Seconds. 0: until clicked away. Critical ones always stay" }
+        { title: "Notifications", button: "testNotification", items: [
+            { key: "notificationTimeout", keywords: ["notification", "notify", "popup", "toast", "timeout", "duration", "dismiss", "disappear", "how long"], label: "Show for", type: "number", kind: "real", min: 0, max: 60, step: 1, note: "Seconds. 0: until clicked away. Critical ones always stay" },
+            { key: "notificationShadowOpacity", keywords: ["shadow", "drop shadow", "depth", "elevation", "notification", "notification centre", "history", "popup", "card"], label: "Shadow", type: "number", kind: "real", min: 0, max: 0.6, step: 0.05, note: "Under the cards and the notification centre. 0 is off" },
+            { key: "notificationShadowBlur", keywords: ["shadow", "soft", "spread", "size", "notification", "notification centre"], label: "Shadow softness", type: "number", kind: "real", min: 4, max: 60, step: 1, note: "How far the shadow fades out" },
+            { key: "notificationShadowOffset", keywords: ["shadow", "distance", "height", "elevation", "notification", "notification centre"], label: "Shadow drop", type: "number", kind: "real", min: 0, max: 30, step: 1, note: "How far it falls below the card" }
         ]},
         { title: "Glass", items: [
             { key: "glass", keywords: ["blur", "transparency", "liquid", "frosted", "capture", "effects", "acrylic"], label: "Live glass", type: "bool", note: "Off: no screen capture. May need a restart of the shells" },

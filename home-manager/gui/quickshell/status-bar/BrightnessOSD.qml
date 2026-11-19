@@ -51,7 +51,8 @@ OSD {
                 color: Theme.surfaceAlt
 
                 Rectangle {
-                    width: parent.width * osd.brightness
+                    // (The round end reads as a circle: its middle is at the value, so 50% looks like 50%.)
+                    width: osd.brightness <= 0 ? 0 : height + osd.brightness * (parent.width - height)
                     height: parent.height
                     radius: height / 2
                     color: Theme.accent

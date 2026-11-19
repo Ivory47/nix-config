@@ -13,6 +13,7 @@ GlassPopup {
     WlrLayershell.namespace: "app-launcher"
 
     focusItem: searchField
+    panelItem: launcher
 
     onPopupClosed: {
         // A fresh start the next time: no search text, first app selected, list at the top.

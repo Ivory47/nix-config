@@ -372,6 +372,8 @@ PanelWindow {
 
     onShownChanged: {
         if (shown) {
+            // One widget at a time: the others (and the bar's menus) close when this takes over.
+            Widgets.closeOthers("wallpapers")
             followCurrent = true
             appliedName = wpModel.current
             addingTag = false

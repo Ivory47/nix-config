@@ -34,6 +34,10 @@ Singleton {
         const v = values[key]
         return (typeof v === "number" && isFinite(v)) ? Math.round(v) : fallback
     }
+    function text(key, fallback) {
+        const v = values[key]
+        return typeof v === "string" ? v : fallback
+    }
     function bool(key, fallback) {
         const v = values[key]
         return typeof v === "boolean" ? v : fallback

@@ -21,7 +21,7 @@ Singleton {
 
     function same(a, b) {
         if (typeof a === "string")
-            return Qt.colorEqual(a, b)
+            return a.charAt(0) === "#" ? Qt.colorEqual(a, b) : a === b
         if (typeof a === "number")
             return Math.abs(a - b) < 1e-9
         return a === b
@@ -40,6 +40,17 @@ Singleton {
         else
             next[key] = value
         ThemeFromSettingsApp.values = next
+    }
+
+    // The colour picker that is open (a Theme key, "" for none): one at a time.
+    property string openColor: ""
+
+    // For values that other processes show (the bar): changes it and writes while the drag goes on,
+    // at most every 50 ms (commit() would wait for the drag to stop).
+    function setLive(key, value) {
+        preview(key, value)
+        if (!liveTimer.running)
+            liveTimer.start()
     }
 
     function commit() {
@@ -72,6 +83,12 @@ Singleton {
             ThemeFromSettingsApp.noteOwnWrite(text)
             out.setText(text)
         }
+    }
+
+    Timer {
+        id: liveTimer
+        interval: 50
+        onTriggered: writeTimer.restart()
     }
 
     FileView {

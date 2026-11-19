@@ -6,6 +6,7 @@ import qs.shared
 // element (corner radius, which edges have a rim, the tint colour) where it is used.
 GlassStyle {
     frost: Theme.glassBarFrost
+    tint: Theme.glassBarTint
     tintStrength: Theme.glassBarTintStrength
     brightness: Theme.glassBarBrightness
     contrast: Theme.glassBarContrast

@@ -6,6 +6,11 @@ import qs.shared
 Item {
     id: root
 
+    // True: no popup menu of its own; a click only emits `toggled()` (the balanced bar shows the menu in
+    // its own glass panel).
+    property bool embedded: false
+    signal toggled()
+
     width: icon.width
     height: icon.height
 
@@ -60,18 +65,25 @@ Item {
         cursorShape: Qt.PointingHandCursor
 
         onClicked: {
-            wifiMenu.visible = !wifiMenu.visible
+            if (root.embedded)
+                root.toggled()
+            else
+                menuLoader.item.visible = !menuLoader.item.visible
         }
     }
 
-    WifiMenu {
-        id: wifiMenu
+    Loader {
+        id: menuLoader
+        active: !root.embedded
+        sourceComponent: WifiMenu {
+            id: wifiMenu
 
-        visible: false
+            visible: false
 
-        anchor.item: root
-        anchor.edges: Edges.Bottom | Edges.HCenter
-        anchor.gravity: Edges.Bottom | Edges.HCenter
-        anchor.margins.top: 24
+            anchor.item: root
+            anchor.edges: Edges.Bottom | Edges.HCenter
+            anchor.gravity: Edges.Bottom | Edges.HCenter
+            anchor.margins.top: 24
+        }
     }
 }
