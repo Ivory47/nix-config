@@ -44,11 +44,6 @@ ShellRoot {
             window.shown = true
         }
 
-        // The overlay only (what Widgets.qml asks when another widget opens; the window stays).
-        function hideOverlay() {
-            overlay.shown = false
-        }
-
         // Both.
         function hide() {
             overlay.shown = false

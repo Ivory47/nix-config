@@ -18,28 +18,10 @@ Item {
     width: parent ? parent.width : 0
     height: 44
 
-    Column {
-        anchors.left: parent.left
+    SettingsLabel {
+        label: root.label
+        note: root.note
         width: 190
-        y: 22 - height / 2
-        spacing: 1
-
-        Text {
-            width: parent.width
-            elide: Text.ElideRight
-            text: root.label
-            color: Theme.text
-            font.pixelSize: Theme.textMedium
-        }
-
-        Text {
-            visible: root.note.length > 0
-            width: parent.width
-            elide: Text.ElideRight
-            text: root.note
-            color: Theme.textMuted
-            font.pixelSize: Theme.textSmall - 1
-        }
     }
 
     TextField {

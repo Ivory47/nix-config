@@ -84,6 +84,16 @@ ShellRoot {
         }
     }
 
+    // Part of "one widget at a time" (shared/Widgets.qml): another widget opened, so the bar's panels close.
+    IpcHandler {
+        target: "widget"
+
+        function closeForOther(): bool {
+            shell.closePanels()
+            return false
+        }
+    }
+
     IpcHandler {
         target: "bar"
 

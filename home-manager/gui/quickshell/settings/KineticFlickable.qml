@@ -11,6 +11,11 @@ Flickable {
         scroll.stopGlide()
     }
 
+    // A contentY inside the content (for scrolling to something).
+    function clampContentY(y) {
+        return scroll._clamp(y)
+    }
+
     KineticScroll {
         id: scroll
         target: root

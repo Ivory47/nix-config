@@ -3,36 +3,23 @@ pragma Singleton
 import QtQuick
 import Quickshell
 
-// "One widget at a time". Each shell runs in its own process, so a widget that opens tells the others
-// to close through their IPC handlers (a `qs ipc call`, fire and forget; a shell that is not running
-// just fails quietly).
-//
-// GlassPopup calls closeOthers() whenever it opens, so every popup built on it follows this by default.
-// A new widget joins in two steps:
-//  1. add its shell here (`config` = the `qs -c` name, `target` = its IpcHandler target, `hide` = the
-//     function there that closes its OVERLAYS: it must not close normal windows or be a toggle);
-//  2. be a GlassPopup (nothing more to do), or call Widgets.closeOthers("<config>") when it opens.
-// A widget that should ignore the rule sets `exclusive: false` on its GlassPopup (the clipboard does) and
-// is simply not listed here, so nobody closes it either.
-// Normal windows (the settings window, the wallpaper window) are not widgets in this sense and are
-// left alone: they are like any application window.
+// "One widget at a time". Each shell runs in its own process, so a widget that opens asks every other
+// running Quickshell shell to close, over IPC: the target `widget`, function `closeForOther()`. Nothing is
+// registered here: a shell takes part by having that target (GlassPopup has it built in, so every popup
+// does; the wallpaper overlay and the bar have their own in their shell.qml). A widget that should ignore
+// the rule sets `exclusive: false` on its GlassPopup (the clipboard): its `closeForOther()` does nothing and
+// it does not close the others. Normal windows (the settings window, the wallpaper window) are not widgets
+// and are left alone, like any application window.
+// (`closeIfOpen()` on the same target is the close-window key's, see quickshell/close-widget.sh.)
 QtObject {
     id: root
 
-    readonly property var shells: [
-        { config: "app-launcher", target: "launcher", hide: "hide" },
-        { config: "settings", target: "settings", hide: "hideOverlay" },
-        { config: "wallpapers", target: "wallpapers", hide: "hideOverlay" },
-        // The bar's menus and panels.
-        { config: "status-bar", target: "bar", hide: "closePanels" }
-    ]
-
-    // Closes every listed widget except `self` (a `config` name).
-    function closeOthers(self) {
-        for (const s of shells) {
-            if (s.config !== self)
-                Quickshell.execDetached(["qs", "-c", s.config, "ipc", "call", s.target, s.hide])
-        }
+    // Closes every other widget: all running shells but this process, each asked in the background.
+    function closeOthers() {
+        Quickshell.execDetached(["sh", "-c",
+            'for pid in $(qs list --all 2>/dev/null | sed -n "s/^ *Process ID: *//p"); do '
+            + '[ "$pid" = "$1" ] || qs ipc --pid "$pid" call widget closeForOther >/dev/null 2>&1 & done; wait',
+            "sh", String(Quickshell.processId)])
     }
 
     // A widget opened (+1) or closed (-1): Hyprland keeps the window under it "active", so hyprland.lua's

@@ -26,6 +26,11 @@ ShellRoot {
             overlay.shown = false
             return true
         }
+
+        // Another widget opened (shared/Widgets.qml).
+        function closeForOther(): bool {
+            return closeIfOpen()
+        }
     }
 
     IpcHandler {
@@ -55,11 +60,6 @@ ShellRoot {
         function showOverlay() {
             window.shown = false
             overlay.shown = true
-        }
-
-        // The overlay only (what Widgets.qml asks when another widget opens; the window stays).
-        function hideOverlay() {
-            overlay.shown = false
         }
 
         function hide() {

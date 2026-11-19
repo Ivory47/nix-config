@@ -91,12 +91,11 @@ PanelWindow {
     signal popupOpened()
     // One widget at a time (shared/Widgets.qml): opening closes the other widgets (and the bar's menus),
     // unless `exclusive` is false (the clipboard): that one only closes the bar's menus, and is never
-    // closed by the others. The shell's `qs -c` name is taken from the layer namespace, so set the
-    // namespace to it (Widgets.qml lists them).
+    // closed by the others (the `widget` IPC target below is how they ask).
     property bool exclusive: true
     onPopupOpened: {
         if (exclusive)
-            Widgets.closeOthers(WlrLayershell.namespace)
+            Widgets.closeOthers()
         else
             Widgets.closeBarPanels()
     }
@@ -142,11 +141,19 @@ PanelWindow {
         function hide(): void { root.closePopup() }
     }
 
-    // The target every widget shell has, whatever its own `ipcTarget`: the "close" key (Hyprland's close
-    // window bind, hyprland.lua) asks all running shells to `closeIfOpen` before it closes a window
-    // (quickshell/close-widget.sh). True when this popup was open and is now closed.
+    // The target every widget shell has, whatever its own `ipcTarget`. `closeIfOpen`: the close-window key
+    // (hyprland.lua, quickshell/close-widget.sh) asks every shell before it closes a window. `closeForOther`:
+    // another widget opened (shared/Widgets.qml); an `exclusive: false` popup ignores it. Both answer true
+    // when this popup was open and is now closed.
     IpcHandler {
         target: "widget"
+
+        function closeForOther(): bool {
+            if (!root.exclusive || !root.shown)
+                return false
+            root.closePopup()
+            return true
+        }
 
         function closeIfOpen(): bool {
             if (!root.shown)
