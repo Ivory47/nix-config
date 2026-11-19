@@ -10,7 +10,8 @@ SettingsRow {
 
     readonly property color value: Theme[spec.key]
     readonly property bool hasAlpha: !!spec.alpha
-    property bool open: false
+    // Only one picker is open at a time: the store holds which colour it is.
+    readonly property bool open: ThemeStore.openColor === spec.key
 
     // The picker's own state (a colour with no saturation has no hue to read back).
     property real h: 0
@@ -37,7 +38,7 @@ SettingsRow {
         if (commit)
             ThemeStore.set(spec.key, str)
         else
-            ThemeStore.preview(spec.key, str)
+            ThemeStore.setLive(spec.key, str)  // other shells (the bar) show it during the drag
     }
 
     belowHeight: open ? 150 : 0
@@ -59,7 +60,7 @@ SettingsRow {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.open = !root.open
+                onClicked: ThemeStore.openColor = root.open ? "" : root.spec.key
             }
         }
 

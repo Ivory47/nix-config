@@ -66,7 +66,7 @@ QtObject {
 
     // Drop shadow around the app launcher and the clipboard popup (outside the panel only; under
     // the glass it would break the background recovery). Opacity 0 turns it off.
-    readonly property real popupShadowOpacity: 0.3
+    readonly property real popupShadowOpacity: 0.4
     readonly property real popupShadowBlur: 24      // how far it fades out, logical pixels
     readonly property real popupShadowOffset: 8     // how far it falls downwards
 
@@ -74,6 +74,10 @@ QtObject {
     // long; a notification that sets its own timeout keeps it; critical ones stay until closed).
     // 0 = until it is clicked away.
     readonly property real notificationTimeout: 5
+    // The drop shadow of notification cards and of the notification centre (the history panel).
+    readonly property real notificationShadowOpacity: 0.35
+    readonly property real notificationShadowBlur: 28
+    readonly property real notificationShadowOffset: 10
 
     // Blur strength of the settings app, which blurs the whole desktop while it is open (the
     // blurred picture is shared by that veil and the settings panel). Sigma in logical pixels.
@@ -98,6 +102,7 @@ QtObject {
     readonly property real glassPanelShine: 0.6
 
     readonly property real glassBarFrost: 0.9
+    readonly property color glassBarTint: "#1e1e2e"  // the bar glass tint colour (same as background)
     readonly property real glassBarTintStrength: 0.35
     readonly property real glassBarBrightness: 0.02
     readonly property real glassBarContrast: 1.04
@@ -120,6 +125,12 @@ QtObject {
     readonly property int radiusLarge: 8
 
     readonly property int statusBarHeight: 50
+    // How the status bar is laid out: classic, balanced, islands or notch (see status-bar/).
+    readonly property string barLayout: "balanced"
+    // The date and time in the middle of the "balanced" bar: capsule, stacked or rule.
+    readonly property string barCentreStyle: "stacked"
+    // The brightness / volume indicator of the "balanced" bar: simple, bubble or dock.
+    readonly property string barOsdStyle: "simple"
     readonly property int osdIndicatorWidth: 120
 
     // Spacing

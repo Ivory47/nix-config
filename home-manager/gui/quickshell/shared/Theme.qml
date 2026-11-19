@@ -44,6 +44,9 @@ QtObject {
     readonly property real popupShadowOpacity: ThemeFromSettingsApp.real("popupShadowOpacity", ThemeDefaults.popupShadowOpacity)
     readonly property real popupShadowBlur: ThemeFromSettingsApp.real("popupShadowBlur", ThemeDefaults.popupShadowBlur)
     readonly property real popupShadowOffset: ThemeFromSettingsApp.real("popupShadowOffset", ThemeDefaults.popupShadowOffset)
+    readonly property real notificationShadowOpacity: ThemeFromSettingsApp.real("notificationShadowOpacity", ThemeDefaults.notificationShadowOpacity)
+    readonly property real notificationShadowBlur: ThemeFromSettingsApp.real("notificationShadowBlur", ThemeDefaults.notificationShadowBlur)
+    readonly property real notificationShadowOffset: ThemeFromSettingsApp.real("notificationShadowOffset", ThemeDefaults.notificationShadowOffset)
     readonly property real notificationTimeout: ThemeFromSettingsApp.real("notificationTimeout", ThemeDefaults.notificationTimeout)
     readonly property real scrimBlurRadius: ThemeFromSettingsApp.real("scrimBlurRadius", ThemeDefaults.scrimBlurRadius)
     // The look of the glass (see ThemeDefaults.qml)
@@ -61,6 +64,8 @@ QtObject {
     readonly property real glassPanelShine: ThemeFromSettingsApp.real("glassPanelShine", ThemeDefaults.glassPanelShine)
 
     readonly property real glassBarFrost: ThemeFromSettingsApp.real("glassBarFrost", ThemeDefaults.glassBarFrost)
+    // Follows `background` until the settings app sets its own colour.
+    readonly property color glassBarTint: ThemeFromSettingsApp.color("glassBarTint", background)
     readonly property real glassBarTintStrength: ThemeFromSettingsApp.real("glassBarTintStrength", ThemeDefaults.glassBarTintStrength)
     readonly property real glassBarBrightness: ThemeFromSettingsApp.real("glassBarBrightness", ThemeDefaults.glassBarBrightness)
     readonly property real glassBarContrast: ThemeFromSettingsApp.real("glassBarContrast", ThemeDefaults.glassBarContrast)
@@ -79,6 +84,9 @@ QtObject {
     readonly property int radiusMedium: ThemeFromSettingsApp.integer("radiusMedium", ThemeDefaults.radiusMedium)
     readonly property int radiusLarge: ThemeFromSettingsApp.integer("radiusLarge", ThemeDefaults.radiusLarge)
 
+    readonly property string barCentreStyle: ThemeFromSettingsApp.text("barCentreStyle", ThemeDefaults.barCentreStyle)
+    readonly property string barOsdStyle: ThemeFromSettingsApp.text("barOsdStyle", ThemeDefaults.barOsdStyle)
+    readonly property string barLayout: ThemeFromSettingsApp.text("barLayout", ThemeDefaults.barLayout)
     readonly property int statusBarHeight: ThemeFromSettingsApp.integer("statusBarHeight", ThemeDefaults.statusBarHeight)
     readonly property int osdIndicatorWidth: ThemeFromSettingsApp.integer("osdIndicatorWidth", ThemeDefaults.osdIndicatorWidth)
 

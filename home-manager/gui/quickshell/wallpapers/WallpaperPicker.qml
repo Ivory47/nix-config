@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import Quickshell
 import Quickshell.Io
 import qs.shared
 import qs.shared.glass
@@ -18,23 +17,16 @@ import qs.shared.glass
 // Keys (typed in the search field, which has the keyboard): arrows move in the grid, Enter applies
 // and closes, Alt+1..5 picks a colour, Alt+Left/Right the scheme type, Alt+M light/dark, Ctrl+F favourite, Ctrl+T goes to the tag field (Esc comes back), Esc clears the
 // search and the tag filters and then closes, Ctrl+C closes.
-FloatingWindow {
+GlassWindow {
     id: root
 
     title: "Wallpapers"
-    color: "transparent"    // the glass shows through the window
     implicitWidth: 1120
     implicitHeight: 700
     minimumSize: Qt.size(780, 520)
 
-    // Open / closed. (The window only exists while this is true.)
-    property bool shown: false
-    visible: shown
-    onClosed: shown = false
-
-    // The card under the mouse, if any: set by the cards, highlighted by the glass.
-    property Item hoveredItem: null
-    readonly property bool glassOn: glass.active && glass.available
+    focusItem: searchField
+    readonly property bool glassOn: glass.glassOn
 
     // ---- what is selected -----------------------------------------------------------------------
 
@@ -167,7 +159,7 @@ FloatingWindow {
             if (wpModel.current !== "" && wpModel.indexOfName(wpModel.current) >= 0)
                 selectedName = wpModel.current
             Qt.callLater(() => { root.restoreSelection(); root.showSelected(); searchField.forceActiveFocus() })
-            focusTimer.restart()
+            focusSoon()
         } else {
             // A fresh start the next time: no search, no tag filters.
             searchField.text = ""
@@ -177,14 +169,11 @@ FloatingWindow {
         }
     }
 
-    // The compositor may give the new window the keyboard a moment after it is mapped.
-    Timer {
-        id: focusTimer
-        interval: 80
-        onTriggered: if (root.shown) searchField.forceActiveFocus()
+    // Adds the tag to the filters, or takes it off.
+    function focusSearch() {
+        searchField.forceActiveFocus()
     }
 
-    // Adds the tag to the filters, or takes it off.
     function toggleFilter(tag) {
         const on = wpModel.activeTags
         wpModel.activeTags = on.indexOf(tag) >= 0 ? on.filter(t => t !== tag) : on.concat([tag])
@@ -199,6 +188,8 @@ FloatingWindow {
     function closePicker() {
         root.shown = false
     }
+
+    readonly property alias wallpapers: wpModel
 
     WallpaperModel {
         id: wpModel
@@ -219,21 +210,10 @@ FloatingWindow {
     readonly property int margin: Theme.spacingLarge
     readonly property int detailWidth: 340
 
-    // Plain panel when there is no compositor glass.
-    Rectangle {
-        anchors.fill: parent
-        visible: !root.glassOn
-        color: Theme.background
-        radius: 6
-    }
-
-    // The glass: fills the window; Hyprland draws the border and the shadow.
-    LucentListPanel {
+    // The glass (or a plain panel without it): fills the window.
+    GlassWindowPanel {
         id: glass
         anchors.fill: parent
-        active: Theme.glass && Theme.compositorGlass
-        blurRadius: Theme.glassBlurRadius
-        maxTaps: Math.round(Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, Theme.glassBlurRadius)), Theme.blurTapsFalloff)))
         field: searchField
         listView: grid
         hoveredItem: root.hoveredItem
@@ -320,130 +300,20 @@ FloatingWindow {
                 }
             }
 
-            // Tag filters: the favourites chip (always there), then a row of the other tags (scrolls
-            // sideways). All the chosen ones must match.
-            Item {
+            // Tag filters: the favourites chip (always there), then the other tags.
+            WallpaperTagBar {
                 id: tagBar
+                picker: root
                 y: searchField.height + Theme.spacingMedium
                 width: parent.width
-                height: 28
-
-                readonly property var otherTags: wpModel.tagList.filter(t => t.tag !== WallpaperStore.favouriteTag)
-                readonly property int favouriteCount: WallpaperStore.favouriteCount(wpModel.entries.map(e => e.name))
-
-                TagChip {
-                    id: favChip
-                    y: 1
-                    text: "\u2605 Favourites"
-                    count: tagBar.favouriteCount
-                    selected: wpModel.activeTags.indexOf(WallpaperStore.favouriteTag) >= 0
-                    onClicked: root.toggleFilter(WallpaperStore.favouriteTag)
-                }
-
-                Text {
-                    visible: tagBar.otherTags.length === 0
-                    anchors.left: favChip.right
-                    anchors.leftMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "No other tags yet. Select a wallpaper and add some on the right."
-                    font.pixelSize: Theme.textSmall
-                    color: Theme.textMuted
-                }
-
-                ListView {
-                    anchors.left: favChip.right
-                    anchors.leftMargin: 6
-                    anchors.right: parent.right
-                    height: parent.height
-                    orientation: ListView.Horizontal
-                    spacing: 6
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    model: tagBar.otherTags
-
-                    delegate: TagChip {
-                        required property var modelData
-                        y: 1
-                        text: modelData.tag
-                        count: modelData.count
-                        selected: wpModel.activeTags.indexOf(modelData.tag) >= 0
-                        onClicked: root.toggleFilter(modelData.tag)
-                    }
-                }
             }
 
-            GridView {
+            WallpaperGrid {
                 id: grid
-
+                picker: root
                 y: tagBar.y + tagBar.height + Theme.spacingMedium
                 width: parent.width
                 height: parent.height - y
-
-                readonly property int columns: Math.max(2, Math.floor(width / 230))
-                cellWidth: Math.floor(width / columns)
-                cellHeight: Math.round((cellWidth - 16) * 0.56) + 8 + 8 + 6 + 20
-
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                currentIndex: -1
-
-                // The window is laid out after it opens and can be resized: keep the wallpaper that is
-                // on the screen in view until the user has chosen one.
-                onHeightChanged: if (root.shown && root.followCurrent) Qt.callLater(root.showSelected)
-                onCellWidthChanged: if (root.shown && root.followCurrent) Qt.callLater(root.showSelected)
-                model: wpModel.filtered
-                cacheBuffer: cellHeight * 2
-
-                ScrollBar.vertical: ScrollBar {
-                    policy: ScrollBar.AsNeeded
-                    contentItem: Rectangle {
-                        implicitWidth: 4
-                        radius: 2
-                        color: Theme.surfaceAlt
-                    }
-                    background: Item {}
-                }
-
-                delegate: WallpaperCard {
-                    id: card
-
-                    width: grid.cellWidth
-                    height: grid.cellHeight
-                    decodeWidth: (grid.cellWidth - 16) * root.devicePixelRatio
-                    isCurrent: modelData.name === wpModel.current
-                    colors: ColorCache.colorsOf(modelData)
-                    highlight: !root.glassOn && (index === grid.currentIndex || hovered)
-                    favourite: WallpaperStore.isFavourite(modelData.name)
-                    onFavouriteToggled: WallpaperStore.toggleFavourite(modelData.name)
-
-                    // The glass highlights the hovered card (hlRect2) and the selected one (hlRect1).
-                    onHoveredChanged: {
-                        if (hovered)
-                            root.hoveredItem = card
-                        else if (root.hoveredItem === card)
-                            root.hoveredItem = null
-                    }
-
-                    onActivated: {
-                        root.select(index)
-                        searchField.forceActiveFocus()
-                    }
-                    onApplied: {
-                        root.select(index)
-                        root.apply(true)
-                    }
-                }
-
-                Text {
-                    visible: grid.count === 0
-                    anchors.centerIn: parent
-                    horizontalAlignment: Text.AlignHCenter
-                    text: wpModel.entries.length === 0
-                        ? "No images in ~/Pictures/Wallpapers"
-                        : "No wallpapers match"
-                    font.pixelSize: Theme.textMedium
-                    color: Theme.textMuted
-                }
             }
         }
 

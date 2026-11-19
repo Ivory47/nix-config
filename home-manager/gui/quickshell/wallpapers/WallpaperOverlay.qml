@@ -1,12 +1,8 @@
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Effects
-import Glass.Native
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
-import Quickshell.Widgets
 import qs.shared
 
 // The wallpaper picker as an OVERLAY: a full-screen layer-shell surface over the desktop (dimmed a
@@ -294,6 +290,9 @@ PanelWindow {
     // The wallpaper in the middle is the one on the desktop (false right after opening on a favourites
     // list that does not contain it, or after another filter).
     readonly property bool applied: !!entry && entry.name === appliedName
+    // A wallpaper or colour is being applied, or waits for it.
+    readonly property bool busy: applier.running || !!pending || wallpaperTimer.running
+    readonly property int totalCount: wpModel.entries.length
 
     Timer {
         id: wallpaperTimer
@@ -372,6 +371,9 @@ PanelWindow {
 
     onShownChanged: {
         if (shown) {
+            // One widget at a time: the others (and the bar's menus) close when this takes over.
+            Widgets.closeOthers()
+            Widgets.noteOpened(true)
             followCurrent = true
             appliedName = wpModel.current
             addingTag = false
@@ -387,6 +389,7 @@ PanelWindow {
         } else {
             wheelCarry = 0
             addingTag = false
+            Widgets.noteOpened(false)
         }
     }
 
@@ -449,7 +452,7 @@ PanelWindow {
     readonly property bool sideGlass: true
     readonly property real sideBlur: 7
     // The backing of the bar and the hints over the desktop (so that they read over any window).
-    readonly property color plateColor: Qt.rgba(0, 0, 0, 0.82)
+    readonly property color plateColor: OnImage.shadeA(0.82)
 
     FocusScope {
         id: keys
@@ -503,7 +506,7 @@ PanelWindow {
         Rectangle {
             id: fade
             anchors.fill: parent
-            color: "black"
+            color: OnImage.shade
             opacity: root.shown ? root.dim : 0
             Behavior on opacity {
                 NumberAnimation { duration: 180 }
@@ -520,496 +523,20 @@ PanelWindow {
             }
         }
 
-        // The pictures. Only the ones near the middle load their image (the folder may be large).
-        Item {
-            id: stage
+        // The pictures, the plate over the middle one and the text for an empty list.
+        OverlayStage {
             anchors.fill: parent
-            opacity: root.shown && !root.filterPending ? 1 : 0
-            Behavior on opacity {
-                NumberAnimation { duration: 180 }
-            }
-
-            Repeater {
-                model: root.entries.length
-
-                delegate: Item {
-                    id: card
-                    required property int index
-
-                    readonly property real off: index - root.pos
-                    readonly property real a: Math.abs(off)
-                    readonly property bool near: a < 3
-                    readonly property var info: root.entries[index]
-
-                    visible: near && !!info
-                    width: root.cardW
-                    height: root.cardH
-                    // The neighbours sit behind the middle picture, smaller, and fade out.
-                    x: stage.width / 2 - width / 2
-                       + (off < 0 ? -1 : 1) * root.cardW * (a <= 1 ? a * 0.74 : 0.74 + (a - 1) * 0.30)
-                    y: stage.height / 2 - height / 2
-                    scale: Math.max(0.5, 1 - 0.32 * a)
-                    // (The neighbours stay quite opaque, then fade out towards the edges.)
-                    opacity: a <= 1 ? 1 - 0.08 * a : Math.max(0, 0.92 - 0.92 * (a - 1) / 1.9)
-                    // 0 for the middle picture, 1 from the first neighbour on.
-                    readonly property real side: Math.min(1, a)
-                    z: 100 - a * 10
-
-                    // The glass behind this picture. It is NOT a child of the card: the region it sends to the
-                    // compositor is its own position and size (it ignores an ancestor's scale, and is only
-                    // updated when its own geometry changes), so it sits in the stage and follows the card's
-                    // drawn rectangle, which changes at every step of the glide. It fades with the card, and
-                    // is not needed under the middle picture (opaque).
-                    LucentGlass {
-                        parent: stage
-                        x: card.x + card.width * (1 - card.scale) / 2
-                        y: card.y + card.height * (1 - card.scale) / 2
-                        width: card.width * card.scale
-                        height: card.height * card.scale
-                        active: root.sideGlass && Theme.glass && Theme.compositorGlass && card.a > 0.15 && card.near
-                        blurRadius: root.sideBlur
-                        cornerRadius: root.cornerRadius * card.scale
-                        glassOpacity: card.opacity
-                    }
-
-                    ClippingRectangle {
-                        anchors.fill: parent
-                        radius: root.cornerRadius
-                        color: Theme.surface
-
-                        // The picture is not drawn itself: the effect draws it, less saturated and flatter
-                        // the further it is from the middle.
-                        Image {
-                            id: picture
-                            anchors.fill: parent
-                            visible: false
-                            source: card.near && card.info ? "file://" + card.info.path : ""
-                            asynchronous: true
-                            cache: true
-                            fillMode: Image.PreserveAspectCrop
-                            sourceSize.width: Math.ceil(root.cardW * root.devicePixelRatio)
-                        }
-
-                        MultiEffect {
-                            anchors.fill: parent
-                            source: picture
-                            saturation: root.sideSaturation * card.side
-                            contrast: root.sideContrast * card.side
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: root.cornerRadius
-                        color: "transparent"
-                        border.width: card.a < 0.5 ? 2 : 1
-                        border.color: card.a < 0.5 ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(1, 1, 1, 0.25)
-                    }
-
-                    // The one on the desktop now.
-                    Rectangle {
-                        visible: !!card.info && card.info.name === root.appliedName
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 14
-                        width: nowLabel.implicitWidth + 20
-                        height: 24
-                        radius: 12
-                        color: Theme.accent
-
-                        CenteredText {
-                            id: nowLabel
-                            anchors.centerIn: parent
-                            text: "✓ Current"
-                            font.pixelSize: Theme.textSmall
-                            font.bold: true
-                            color: Theme.background
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            if (card.a >= 0.5)
-                                root.select(card.index)
-                            else
-                                root.applyNow()
-                        }
-                        onWheel: wheel => {
-                            root.onWheelDelta(wheel.angleDelta.x, wheel.angleDelta.y)
-                            wheel.accepted = true
-                        }
-                    }
-                }
-            }
-
-            // Over the middle picture (which it does not move with: the pictures glide under it): at the
-            // top the star and the tags, at the bottom the name, the position in the list, and the colours.
-            ClippingRectangle {
-                id: plate
-                visible: !!root.entry
-                x: stage.width / 2 - width / 2
-                y: stage.height / 2 - height / 2
-                width: root.cardW
-                height: root.cardH
-                radius: root.cornerRadius
-                color: "transparent"
-                z: 1000
-
-                // Top: the star and the tags.
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: root.addingTag ? 140 : 90
-                    gradient: Gradient {
-                        GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.66) }
-                        GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0) }
-                    }
-                }
-
-                Row {
-                    id: tagRow
-                    anchors.left: parent.left
-                    anchors.leftMargin: 20
-                    anchors.top: parent.top
-                    anchors.topMargin: 16
-                    anchors.right: parent.right
-                    anchors.rightMargin: 110
-                    spacing: 8
-                    height: 30
-                    clip: true
-
-                    // The star (F): the favourite tag.
-                    Item {
-                        width: 32
-                        height: 30
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: root.favourite ? "★" : "☆"
-                            color: root.favourite ? "#f5c542" : (starArea.containsMouse ? "white" : Qt.rgba(1, 1, 1, 0.75))
-                            font.pixelSize: 26
-                        }
-
-                        MouseArea {
-                            id: starArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.toggleFavourite()
-                        }
-                    }
-
-                    Repeater {
-                        model: root.entryTags.filter(t => t !== WallpaperStore.favouriteTag)
-
-                        delegate: TagChip {
-                            required property string modelData
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData
-                            removable: true
-                            onRemoved: if (root.entry) WallpaperStore.removeTag(root.entry.name, modelData)
-                            onClicked: root.setFilter(modelData)
-                        }
-                    }
-
-                    // "+ tag": click or T. Becomes a text field.
-                    TagChip {
-                        visible: !root.addingTag
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "+ tag"
-                        onClicked: root.startAddTag()
-                    }
-
-                    // The tag field exists only while a tag is being typed. (A hidden TextField that once had
-                    // the focus stays the focus item of the key scope and then takes Escape and Ctrl+C, which
-                    // a text field treats as "copy": the overlay could no longer be closed with them.)
-                    Loader {
-                        active: root.addingTag
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        sourceComponent: TextField {
-                            width: 220
-                            height: 28
-                            leftPadding: 12
-                            rightPadding: 12
-                            topPadding: 0
-                            bottomPadding: 0
-                            verticalAlignment: TextInput.AlignVCenter
-                            selectByMouse: true
-                            font.pixelSize: Theme.textSmall + 1
-                            color: Theme.text
-                            placeholderText: "new tag, or pick one below"
-                            placeholderTextColor: Theme.textMuted
-
-                            background: Rectangle {
-                                radius: 14
-                                color: Qt.rgba(0, 0, 0, 0.6)
-                                border.width: 2
-                                border.color: Theme.accent
-                            }
-
-                            Component.onCompleted: forceActiveFocus()
-
-                            text: root.tagText
-                            onTextEdited: {
-                                root.tagText = text
-                                root.sugIndex = -1
-                            }
-
-                            // Esc cancels; Down / Up highlight an existing tag; Enter adds the highlighted
-                            // one (the field stays open), or what is typed (and closes it); Tab adds the
-                            // highlighted one, or the first.
-                            Keys.onPressed: event => {
-                                const n = root.tagSuggestions.length
-                                if (event.key === Qt.Key_Escape) {
-                                    root.finishAddTag("")
-                                } else if (event.key === Qt.Key_Down) {
-                                    root.sugIndex = Math.min(root.sugIndex + 1, n - 1)
-                                } else if (event.key === Qt.Key_Up) {
-                                    root.sugIndex = Math.max(root.sugIndex - 1, -1)
-                                } else if (event.key === Qt.Key_Tab) {
-                                    if (n > 0)
-                                        root.pickSuggestion(root.sugIndex >= 0 ? root.sugIndex : 0)
-                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                    if (root.sugIndex >= 0)
-                                        root.pickSuggestion(root.sugIndex)
-                                    else
-                                        root.finishAddTag(text)
-                                } else {
-                                    return
-                                }
-                                event.accepted = true
-                            }
-                        }
-                    }
-                }
-
-                // The existing tags, to pick from while a tag is being typed: click one, or Down / Up and Enter,
-                // or Tab for the first. (On a plate: it is over the picture.)
-                Rectangle {
-                    visible: root.addingTag && root.tagSuggestions.length > 0
-                    anchors.left: parent.left
-                    anchors.leftMargin: 20
-                    anchors.top: tagRow.bottom
-                    anchors.topMargin: 10
-                    width: Math.min(parent.width - 40, suggestionRow.implicitWidth + 28)
-                    height: 40
-                    radius: height / 2
-                    color: root.plateColor
-                    border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.14)
-                    clip: true
-
-                    Row {
-                        id: suggestionRow
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.left: parent.left
-                        anchors.leftMargin: 14
-                        spacing: 6
-
-                        CenteredText {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "existing"
-                            color: Qt.rgba(1, 1, 1, 0.6)
-                            font.pixelSize: Theme.textSmall
-                        }
-
-                        Repeater {
-                            model: root.tagSuggestions
-
-                            delegate: SegmentChip {
-                                required property var modelData
-                                required property int index
-                                anchors.verticalCenter: parent.verticalCenter
-                                height: 32
-                                text: modelData.tag
-                                count: modelData.count
-                                chosen: index === root.sugIndex
-                                onClicked: root.pickSuggestion(index)
-                            }
-                        }
-                    }
-                }
-
-                // Bottom: the name and the colours.
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    height: 140
-                    gradient: Gradient {
-                        GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
-                        GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.78) }
-                    }
-                }
-
-                Column {
-                    anchors.left: parent.left
-                    anchors.leftMargin: 28
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 24
-                    anchors.right: swatches.left
-                    anchors.rightMargin: 20
-                    spacing: 4
-
-                    Text {
-                        width: parent.width
-                        elide: Text.ElideRight
-                        text: root.entry ? root.entry.base : ""
-                        color: "white"
-                        font.pixelSize: Theme.textLarge + 4
-                        font.bold: true
-                    }
-
-                    Text {
-                        width: parent.width
-                        elide: Text.ElideRight
-                        text: root.entry
-                            ? (root.selected + 1) + " / " + root.entries.length
-                              + "  ·  " + root.choice.type.replace("scheme-", "").replace(/-/g, " ")
-                              + "  ·  " + root.choice.mode
-                              + (root.applyError ? "  ·  " + root.applyError
-                                 : (applier.running || root.pending || wallpaperTimer.running ? "  ·  applying…"
-                                    : (!root.applied ? "  ·  not applied: Space" : "")))
-                            : ""
-                        color: root.applyError ? Theme.red : Qt.rgba(1, 1, 1, 0.72)
-                        font.pixelSize: Theme.textMedium
-                    }
-                }
-
-                Row {
-                    id: swatches
-                    anchors.right: parent.right
-                    anchors.rightMargin: 28
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 24
-                    spacing: 12
-
-                    Text {
-                        visible: !root.colors
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "reading colours…"
-                        color: Qt.rgba(1, 1, 1, 0.6)
-                        font.pixelSize: Theme.textSmall
-                    }
-
-                    Repeater {
-                        model: root.colors || []
-
-                        delegate: Item {
-                            id: sw
-                            required property string modelData
-                            required property int index
-                            readonly property bool chosen: index === root.colorIndex
-
-                            width: 46
-                            height: 46
-
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: swArea.containsMouse || sw.chosen ? 44 : 38
-                                height: width
-                                radius: width / 2
-                                color: sw.modelData
-                                border.width: sw.chosen ? 3 : 1
-                                border.color: sw.chosen ? "white" : Qt.rgba(1, 1, 1, 0.35)
-                                Behavior on width {
-                                    NumberAnimation { duration: 90 }
-                                }
-                            }
-
-                            MouseArea {
-                                id: swArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.pickColor(sw.index)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Nothing to show: an empty favourites list, or a tag nobody has any more.
-            Text {
-                visible: root.entries.length === 0 && wpModel.entries.length > 0
-                anchors.centerIn: parent
-                horizontalAlignment: Text.AlignHCenter
-                text: root.filterTag === WallpaperStore.favouriteTag
-                    ? "No favourites yet.\nPress Tab for all wallpapers, then F on one you like."
-                    : "No wallpapers with this tag.\nPress Tab for another list."
-                color: Qt.rgba(1, 1, 1, 0.8)
-                font.pixelSize: Theme.textLarge
-            }
+            overlay: root
         }
 
-        // Which wallpapers are listed: the bar at the top of the screen (Tab). A segmented control on a dark
-        // plate (so that it reads over whatever is on the desktop): the chips fill the plate's height, the
-        // chosen one is solid, the others have no outline.
-        Rectangle {
-            id: filterPlate
-            readonly property int pad: 4
-            opacity: root.shown && !root.filterPending ? 1 : 0
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: Math.max(24, Math.round(root.height / 4 - 74))
-            width: filterBar.width + 2 * pad
-            height: 40
-            radius: height / 2
-            color: root.plateColor
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.14)
-            Behavior on opacity {
-                NumberAnimation { duration: 180 }
-            }
-
-            ListView {
-                id: filterBar
-                anchors.centerIn: parent
-                width: Math.min(root.width * 0.8, contentWidth)
-                height: filterPlate.height - 2 * filterPlate.pad - 2
-                orientation: ListView.Horizontal
-                spacing: 2
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                model: root.filterChips
-
-                // Keep the chosen chip in view.
-                property int chosenIndex: Math.max(0, root.filterChips.findIndex(c => c.tag === root.filterTag))
-                onChosenIndexChanged: positionViewAtIndex(chosenIndex, ListView.Contain)
-
-                delegate: SegmentChip {
-                    required property var modelData
-                    text: modelData.label
-                    count: modelData.count
-                    chosen: modelData.tag === root.filterTag
-                    height: filterBar.height
-                    onClicked: root.setFilter(modelData.tag)
-                }
-            }
+        // Which wallpapers are listed: the bar at the top of the screen (Tab).
+        OverlayFilterBar {
+            overlay: root
         }
 
         // What the keys are, on a dark plate (see the bar above).
-        Rectangle {
-            opacity: root.shown && !root.filterPending ? 1 : 0
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 24
-            width: hints.implicitWidth + 40
-            height: 36
-            radius: height / 2
-            color: root.plateColor
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.14)
-
-            CenteredText {
-                id: hints
-                anchors.centerIn: parent
-                text: "\u2190 \u2192 wallpaper     \u21E7\u2190 \u21E7\u2192 colour     Tab list     F favourite     T tag     Esc close"
-                color: Qt.rgba(1, 1, 1, 0.85)
-                font.pixelSize: Theme.textSmall
-            }
+        OverlayHints {
+            overlay: root
         }
     }
 }

@@ -6,6 +6,11 @@ import qs.shared
 Item {
     id: audio
 
+    // True: no popup menu of its own; a click only emits `toggled()` (the balanced bar shows the menu in
+    // its own glass panel).
+    property bool embedded: false
+    signal toggled()
+
     implicitWidth: audioText.implicitWidth
     implicitHeight: audioText.implicitHeight
 
@@ -65,18 +70,25 @@ Item {
         }
 
         onClicked: {
-            audioMenu.visible = !audioMenu.visible
+            if (audio.embedded)
+                audio.toggled()
+            else
+                menuLoader.item.visible = !menuLoader.item.visible
         }
     }
 
-    AudioMenu {
-        id: audioMenu
+    Loader {
+        id: menuLoader
+        active: !audio.embedded
+        sourceComponent: AudioMenu {
+            id: audioMenu
 
-        visible: false
+            visible: false
 
-        anchor.item: audio
-        anchor.edges: Edges.Bottom | Edges.Right
-        anchor.gravity: Edges.Bottom | Edges.Left
-        anchor.margins.top: 24
+            anchor.item: audio
+            anchor.edges: Edges.Bottom | Edges.Right
+            anchor.gravity: Edges.Bottom | Edges.Left
+            anchor.margins.top: 24
+        }
     }
 }

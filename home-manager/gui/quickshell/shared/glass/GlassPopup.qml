@@ -1,6 +1,8 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Glass.Native
 import qs.shared
 
@@ -87,6 +89,84 @@ PanelWindow {
 
     // Emitted after `shown` changed (Quickshell windows have a `closed` signal of their own).
     signal popupOpened()
+    // One widget at a time (shared/Widgets.qml): opening closes the other widgets (and the bar's menus),
+    // unless `exclusive` is false (the clipboard): that one only closes the bar's menus, and is never
+    // closed by the others (the `widget` IPC target below is how they ask).
+    property bool exclusive: true
+    onPopupOpened: {
+        if (exclusive)
+            Widgets.closeOthers()
+        else
+            Widgets.closeBarPanels()
+    }
+
+    // Opening and closing for callers (the instances' own code, the IPC handler below). Use these and
+    // not `shown` directly when something has to be prepared first: `aboutToOpen` is emitted by
+    // openPopup() before `shown` goes true (the clipboard refreshes its list there).
+    signal aboutToOpen()
+    function openPopup() {
+        aboutToOpen()
+        shown = true
+    }
+    function closePopup() {
+        shown = false
+    }
+    function togglePopup() {
+        if (shown)
+            closePopup()
+        else
+            openPopup()
+    }
+
+    // Closes when the workspace changes (the popup would stay over a desktop it was not opened on).
+    property bool closeOnWorkspaceChange: true
+    Connections {
+        target: Hyprland
+        enabled: root.closeOnWorkspaceChange
+
+        function onFocusedWorkspaceChanged() {
+            root.closePopup()
+        }
+    }
+
+    // IPC target with toggle / show / hide (`qs -c <config> ipc call <target> toggle`). Leave empty for
+    // a shell that has its own handler (the settings, the wallpaper picker).
+    property string ipcTarget: ""
+    IpcHandler {
+        target: root.ipcTarget
+        enabled: root.ipcTarget !== ""
+
+        function toggle(): void { root.togglePopup() }
+        function show(): void { root.openPopup() }
+        function hide(): void { root.closePopup() }
+    }
+
+    // The target every widget shell has, whatever its own `ipcTarget`. `closeIfOpen`: the close-window key
+    // (hyprland.lua, quickshell/close-widget.sh) asks every shell before it closes a window. `closeForOther`:
+    // another widget opened (shared/Widgets.qml); an `exclusive: false` popup ignores it. Both answer true
+    // when this popup was open and is now closed.
+    IpcHandler {
+        target: "widget"
+
+        function closeForOther(): bool {
+            if (!root.exclusive || !root.shown)
+                return false
+            root.closePopup()
+            return true
+        }
+
+        function closeIfOpen(): bool {
+            if (!root.shown)
+                return false
+            root.closePopup()
+            return true
+        }
+    }
+
+    // A click outside `panelItem` closes the popup (the whole surface is the click area, under
+    // everything the popup puts in). Set `panelItem` to the panel's item; unset, every click closes.
+    property bool closeOnOutsideClick: true
+    property Item panelItem: null
     signal popupClosed()
 
     default property alias items: surface.data
@@ -192,8 +272,10 @@ PanelWindow {
                 // nothing to wait for.
                 present(true)
             popupOpened()
+            Widgets.noteOpened(true)
         } else {
             popupClosed()
+            Widgets.noteOpened(false)
         }
     }
 
@@ -207,6 +289,21 @@ PanelWindow {
         id: surface
         anchors.fill: parent
         visible: root.presented
+
+        // Click outside the panel (below everything the popup adds, which comes after this).
+        MouseArea {
+            anchors.fill: parent
+            enabled: root.closeOnOutsideClick
+            onClicked: mouse => {
+                const p = root.panelItem
+                if (p) {
+                    const m = mapToItem(p, mouse.x, mouse.y)
+                    if (m.x >= 0 && m.y >= 0 && m.x <= p.width && m.y <= p.height)
+                        return
+                }
+                root.closePopup()
+            }
+        }
 
         // One opaque pixel at the top left: says which version of the surface a capture holds.
         // (Above everything: a veil over the whole surface, GlassScrim, must not cover it.)

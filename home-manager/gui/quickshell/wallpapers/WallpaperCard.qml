@@ -64,7 +64,7 @@ Item {
             width: dots.width + 12
             height: 20
             radius: 10
-            color: "#262626"
+            color: Theme.surface
 
             Row {
                 id: dots
@@ -93,14 +93,14 @@ Item {
             width: 28
             height: 28
             radius: 14
-            color: "#262626"
+            color: Theme.surface
             z: 2
 
             Text {
                 anchors.centerIn: parent
                 anchors.verticalCenterOffset: -1
                 text: root.favourite ? "\u2605" : "\u2606"
-                color: root.favourite ? "#f5c542" : "#cccccc"
+                color: root.favourite ? Theme.orange : Theme.textSecondary
                 font.pixelSize: 17
             }
 

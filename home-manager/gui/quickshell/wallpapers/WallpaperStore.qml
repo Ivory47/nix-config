@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.shared
 
 // What the user has set per wallpaper: its tags, and the colour / scheme type / mode last picked.
 // Lives outside the nix store (survives `hms`), in
@@ -145,58 +146,17 @@ Singleton {
 
     // ---- file -------------------------------------------------------------------------------
 
-    property var ownWrites: []
-
     function commit() {
-        writeTimer.restart()
+        file.save({ tags: root.tags, choice: root.choices })
     }
 
-    function parse(text) {
-        if (ownWrites.indexOf(text) >= 0)
-            return
-        try {
-            const obj = JSON.parse(text)
-            tags = (obj && typeof obj.tags === "object" && obj.tags !== null) ? obj.tags : ({})
-            choices = (obj && typeof obj.choice === "object" && obj.choice !== null) ? obj.choice : ({})
-        } catch (e) {
-            console.warn("wallpapers.json is not valid JSON, ignoring it:", e)
-        }
-    }
-
-    Timer {
-        id: writeTimer
-        interval: 30
-        onTriggered: {
-            const text = JSON.stringify({ tags: root.tags, choice: root.choices }, null, 2) + "\n"
-            root.ownWrites = root.ownWrites.concat([text]).slice(-8)
-            file.setText(text)
-        }
-    }
-
-    FileView {
+    JsonFile {
         id: file
         path: root.path
-        blockLoading: true
-        watchChanges: true
-        printErrors: false
-
-        onFileChanged: reload()
-        onLoaded: root.parse(text())
-        Component.onCompleted: if (loaded) root.parse(text())
-        onSaveFailed: error => console.warn("wallpapers.json could not be saved:", error)
-    }
-
-    // A file that does not exist yet cannot be watched: look for it until it appears.
-    Timer {
-        running: !file.loaded
-        interval: 2000
-        repeat: true
-        onTriggered: file.reload()
-    }
-
-    // The folder has to exist for the first write.
-    Process {
-        running: true
-        command: ["mkdir", "-p", root.dir]
+        name: "wallpapers.json"
+        onParsed: value => {
+            tags = (value && typeof value.tags === "object" && value.tags !== null) ? value.tags : ({})
+            choices = (value && typeof value.choice === "object" && value.choice !== null) ? value.choice : ({})
+        }
     }
 }

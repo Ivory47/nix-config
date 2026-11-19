@@ -170,6 +170,27 @@ Item {
         }
     }
 
+    // The drop shadow (Theme.notificationShadow*): outside the card only (GlassShadow draws nothing
+    // under the glass), in the window's top item like the glass, below the cards (z).
+    Item {
+        parent: card.glassParent
+        z: -1
+        x: glass.x
+        y: glass.y
+        width: glass.width
+        height: glass.height
+        opacity: card.appear
+        visible: card.visible && glass.height > 8
+        GlassShadow {
+            panelWidth: parent.width
+            panelHeight: parent.height
+            cornerRadius: Theme.radiusLarge
+            strength: Theme.notificationShadowOpacity
+            softness: Theme.notificationShadowBlur
+            drop: Theme.notificationShadowOffset
+        }
+    }
+
     Item {
         id: body
         width: card.width

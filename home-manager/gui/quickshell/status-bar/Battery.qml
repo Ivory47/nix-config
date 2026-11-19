@@ -8,6 +8,10 @@ Item {
 
     visible: UPower.displayDevice.isLaptopBattery
 
+    // In the balanced bar the menu is a panel of the bar: no popup of its own, `toggled()` instead.
+    property bool embedded: false
+    signal toggled()
+
     implicitWidth: batteryText.implicitWidth
     implicitHeight: batteryText.implicitHeight
 
@@ -66,18 +70,23 @@ Item {
         cursorShape: Qt.PointingHandCursor
 
         onClicked: {
-            powerMenu.visible = !powerMenu.visible
+            if (battery.embedded)
+                battery.toggled()
+            else
+                menuLoader.item.visible = !menuLoader.item.visible
         }
     }
 
-    PowerMenu {
-        id: powerMenu
+    Loader {
+        id: menuLoader
+        active: !battery.embedded
+        sourceComponent: PowerMenu {
+            visible: false
 
-        visible: false
-
-        anchor.item: battery
-        anchor.edges: Edges.Bottom | Edges.Right
-        anchor.gravity: Edges.Bottom | Edges.Left
-        anchor.margins.top: 24
+            anchor.item: battery
+            anchor.edges: Edges.Bottom | Edges.Right
+            anchor.gravity: Edges.Bottom | Edges.Left
+            anchor.margins.top: 24
+        }
     }
 }

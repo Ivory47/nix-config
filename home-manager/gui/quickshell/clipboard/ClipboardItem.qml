@@ -1,27 +1,13 @@
 import QtQuick
 import qs.shared
+import qs.shared.glass
 
-Item {
+GlassListRow {
     id: root
 
     required property var entry
 
-    signal picked()
-
-    property bool selected: false
-    property bool hovered: mouseArea.containsMouse
-
     height: 56
-
-    Rectangle {
-        anchors.fill: parent
-
-        radius: Theme.radiusMedium
-
-        // Always transparent: the highlight is drawn by the glass (see ClipboardPopup.qml). A
-        // translucent item over the glass would cost the blur under it.
-        color: "transparent"
-    }
 
     Column {
         anchors.left: parent.left
@@ -55,16 +41,5 @@ Item {
 
             visible: text.length > 0
         }
-    }
-
-    MouseArea {
-        id: mouseArea
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-
-        onClicked: root.picked()
     }
 }

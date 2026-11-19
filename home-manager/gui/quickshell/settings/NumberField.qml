@@ -19,67 +19,16 @@ SettingsRow {
     }
 
     // Slider (kind "real")
-    Item {
-        id: slider
+    SettingsSlider {
         visible: !root.isInt
         width: visible ? 200 : 0
-        height: 44
-
-        Rectangle {
-            id: groove
-            x: 0
-            y: 20
-            width: 150
-            height: 4
-            radius: 2
-            color: Theme.surface
-            border.width: 1
-            border.color: Theme.surfaceAlt
-
-            Rectangle {
-                width: handle.x + handle.width / 2
-                height: parent.height
-                radius: 2
-                color: Theme.accent
-            }
-
-            Rectangle {
-                id: handle
-                width: 14
-                height: 14
-                radius: 7
-                anchors.verticalCenter: parent.verticalCenter
-                x: (root.value - root.spec.min) / (root.spec.max - root.spec.min) * (groove.width - width)
-                color: Theme.text
-            }
-        }
-
-        MouseArea {
-            x: 0
-            width: groove.width
-            height: parent.height
-            cursorShape: Qt.PointingHandCursor
-            // A drag moves the slider; the page's Flickable must not take it over.
-            preventStealing: true
-
-            function move(mx) {
-                const f = Math.max(0, Math.min(1, (mx - handle.width / 2) / (groove.width - handle.width)))
-                ThemeStore.preview(root.spec.key, root.clamp(root.spec.min + f * (root.spec.max - root.spec.min)))
-            }
-
-            onPressed: mouse => move(mouse.x)
-            onPositionChanged: mouse => { if (pressed) move(mouse.x) }
-            onReleased: ThemeStore.commit()
-        }
-
-        Text {
-            x: 160
-            anchors.verticalCenter: parent.verticalCenter
-            width: 40
-            text: root.text(root.value)
-            color: Theme.textSecondary
-            font.pixelSize: Theme.textMedium
-        }
+        from: root.spec.min
+        to: root.spec.max
+        step: root.step
+        value: root.value
+        decimals: root.step < 0.1 ? 2 : 1
+        onMoved: v => ThemeStore.preview(root.spec.key, v)
+        onReleased: ThemeStore.commit()
     }
 
     // Stepper (kind "int")

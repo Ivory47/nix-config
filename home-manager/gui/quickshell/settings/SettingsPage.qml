@@ -1,0 +1,38 @@
+import QtQuick
+import QtQuick.Controls
+import qs.shared
+
+// A scrolling page of the settings app: a KineticFlickable (touchpad momentum) with the slim scroll bar and
+// one Column for the content. Put the content inside it (it goes into `column`); set `spacing`. The
+// column is inset by 6 px (a row is outlined 4 px outside its edges) and 16 px narrower than the page.
+KineticFlickable {
+    id: page
+
+    property real spacing: 0
+    default property alias content: pageColumn.data
+    readonly property alias column: pageColumn
+
+    contentWidth: width
+    contentHeight: pageColumn.implicitHeight + Theme.spacingLarge
+    clip: true
+
+    ScrollBar.vertical: ScrollBar {
+        id: bar
+        width: 6
+        policy: ScrollBar.AsNeeded
+        contentItem: Rectangle {
+            implicitWidth: 4
+            radius: 2
+            color: Theme.surfaceAlt
+            opacity: bar.active ? 1 : 0.6
+        }
+        background: Item {}
+    }
+
+    Column {
+        id: pageColumn
+        x: 6
+        width: page.width - 16
+        spacing: page.spacing
+    }
+}

@@ -116,6 +116,27 @@ end)
 ---- LOOK AND FEEL ----
 -----------------------
 
+-- The window border colours, as variables because widgetFocus() (below) swaps them.
+local activeBorder = {
+    colors = {
+        colors.primary .. "ee",
+        colors.secondary .. "ee",
+    },
+    angle = 45
+}
+local inactiveBorder = colors.background .. "ee"
+
+-- Quickshell widgets (launcher, clipboard, settings overlay, ...) hold the keyboard but Hyprland keeps
+-- the window under them "active". While any widget is open the active border is drawn like the inactive
+-- one. The widgets call this over `hyprctl eval` (shared/Widgets.qml): delta +1 when one opens, -1 when
+-- one closes, a count so that widgets that swap (one closes while another opens) stay right. A config
+-- reload starts from 0 again.
+widgetsOpen = 0
+function widgetFocus(delta)
+    widgetsOpen = math.max(0, widgetsOpen + delta)
+    hl.config({ general = { col = { active_border = widgetsOpen > 0 and inactiveBorder or activeBorder } } })
+end
+
 -- Refer to https://wiki.hypr.land/Configuring/Basics/Variables/
 hl.config({
     general = {
@@ -125,14 +146,8 @@ hl.config({
         border_size = 1,
 
         col = {
-            active_border = {
-                colors = {
-                    colors.primary .. "ee",
-                    colors.secondary .. "ee",
-                },
-                angle = 45
-            },
-            inactive_border = colors.background .. "ee",
+            active_border = activeBorder,
+            inactive_border = inactiveBorder,
         },
 
         -- Set to true to enable resizing windows by clicking and dragging on borders and gaps
@@ -304,9 +319,29 @@ local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("ghostty"))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
--- The settings app is a layer surface, not a window: while it is open Super+C closes it,
--- otherwise the focused window as before.
-local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.exec_cmd([[sh -c 'if [ "$(qs -c settings ipc call settings isOpen 2>/dev/null)" = true ]; then qs -c settings ipc call settings hide; else hyprctl dispatch "hl.dsp.window.close()"; fi']]))
+-- Quickshell widgets (settings overlay, app launcher, clipboard, ...) are layer surfaces, not windows.
+-- Whatever bind closes a window closes an open widget first (quickshell/close-widget.sh asks every
+-- running shell with a `widget` IPC target; none open: the focused window closes as usual). Done by
+-- replacing hl.dsp.window.close (when called without arguments, i.e. for the focused window), so it
+-- covers every bind that uses it, not one key. The original stays reachable as hyprWindowCloseRaw().
+hyprWindowCloseRaw = hl.dsp.window.close
+local closeWidgetScript = os.getenv("HOME") .. "/.config/home-manager/gui/quickshell/close-widget.sh"
+local patched = pcall(function()
+    hl.dsp.window.close = function(...)
+        if select("#", ...) > 0 then
+            return hyprWindowCloseRaw(...)
+        end
+        return hl.dsp.exec_cmd(closeWidgetScript)
+    end
+end)
+if not patched then
+    -- (hl.dsp.window may be read-only: then only the binds written with closeWindowOrWidget() are covered.)
+    print("hyprland.lua: could not wrap hl.dsp.window.close")
+end
+function closeWindowOrWidget()
+    return hl.dsp.exec_cmd(closeWidgetScript)
+end
+local closeWindowBind = hl.bind(mainMod .. " + C", patched and hl.dsp.window.close() or closeWindowOrWidget())
 -- closeWindowBind:set_enabled(false)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))

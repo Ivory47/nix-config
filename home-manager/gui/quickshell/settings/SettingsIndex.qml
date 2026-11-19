@@ -45,7 +45,10 @@ QtObject {
                         // "radiusLarge" -> "radius large"
                         key: item.key.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(),
                         keywords: (item.keywords || []).map(k => k.toLowerCase()),
-                        place: (where + " " + c.name).toLowerCase()
+                        place: (where + " " + c.name).toLowerCase(),
+                        // The headlines: "status bar", "notifications" find everything under them.
+                        sectionTitle: s.title.toLowerCase(),
+                        groupTitle: group ? group.title.toLowerCase() : ""
                     })
                 }
             }
@@ -71,6 +74,9 @@ QtObject {
             if (k.startsWith(w) || start.test(k)) take(50)
             else if (k.includes(w)) take(40)
         }
+        // The section's headline (and the group's), so that searching for it lists what is under it.
+        if (e.sectionTitle.startsWith(w) || start.test(e.sectionTitle)) take(90)
+        if (e.groupTitle !== "" && (e.groupTitle.startsWith(w) || start.test(e.groupTitle))) take(85)
         // The property name, the section and category, the note.
         if (start.test(e.key)) take(35)
         else if (e.key.includes(w)) take(30)

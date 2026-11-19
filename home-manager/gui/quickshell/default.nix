@@ -1,17 +1,12 @@
 { pkgs, ... }:
 
 let
-    # Live liquid glass (shared/glass), used by the status bar, the app launcher and the clipboard popup.
-    #  - glassNative: the QML module `Glass.Native` (wlr-screencopy region capture), C++.
-    #  - glassShaders: the GLSL shaders compiled to .qsb, which is what QML's ShaderEffect loads.
+    # The glass (shared/glass): the C++ QML module `Glass.Native` and the shaders compiled to .qsb.
     glassNative = pkgs.callPackage ./shared/glass/native/package.nix { };
     glassShaders = pkgs.callPackage ./shared/glass/shaders/package.nix { };
 
-    # Keeps the long-running shells out of swap. Their popups sit idle for hours, the kernel pages
-    # them out, and the next open waits for the page-ins. Only these processes are affected: each
-    # one is started in its own systemd user scope with MemorySwapMax=0 (cgroup v2; the user
-    # manager delegates the memory controller). `ipc` calls are short-lived and run as they are.
-    # If a scope cannot be made, quickshell just starts normally. Sourced by the wrapper script.
+    # Keeps the long-running shells out of swap (idle popups were paged out and opened slowly): each
+    # starts in its own systemd user scope with MemorySwapMax=0. `ipc` calls and failures run as normal.
     noSwap = pkgs.writeText "quickshell-no-swap.sh" ''
         case " $* " in
             *" ipc "*) ;;
@@ -24,7 +19,7 @@ let
         esac
     '';
 
-    # quickshell, able to find the Glass.Native module.
+    # quickshell with the Glass.Native module on its import path.
     quickshellWithGlass = pkgs.symlinkJoin {
         name = "quickshell-with-glass";
         paths = [ pkgs.quickshell ];
@@ -42,10 +37,8 @@ let
         '';
     };
 
-    # A `qs -c <n>` config can only import files inside its own folder, so the
-    # shared theme (./shared, used via `import qs.shared`) is copied into each config
-    # at build time. There is still only one Theme.qml to edit.
-    # The glass sources (C++ and GLSL) are not needed at run time: only the compiled shaders.
+    # A config can only import files in its own folder: ./shared (`import qs.shared`) is copied into each
+    # one, without the glass sources (only the compiled shaders are needed at run time).
     mkConfig = name: src: pkgs.runCommandLocal "quickshell-${name}" { } ''
         cp -r --no-preserve=mode ${src} $out
         rm -rf $out/shared
@@ -55,10 +48,8 @@ let
         cp ${glassShaders}/*.qsb $out/shared/glass/shaders/
     '';
 
-    # Opens (or starts, if it is not running) the wallpaper picker: what the desktop entry runs. The
-    # argument says which form: `overlay` (the full-screen picker) or `window` (the normal window).
-    # `ipc call` fails when no `qs -c wallpapers` instance is there; then one is started and, once it
-    # answers, asked to open (`ipc call ... show` only prints the IPC listing here, so it toggles).
+    # What the wallpaper desktop entry runs: toggles the picker as `overlay` or `window`, starting the
+    # shell first if it is not running.
     wallpapersToggle = pkgs.writeShellScript "quickshell-wallpapers-toggle" ''
         qs=${quickshellWithGlass}/bin/qs
         case "$1" in
@@ -81,6 +72,7 @@ in
     home.packages = with pkgs; [
         quickshellWithGlass # status bar, launcher and widgets
         qt6Packages.qt5compat
+        qt6.qtdeclarative # qmllint (and qmlls): checks the QML of the shells without running them, see check.sh
         cliphist # clipboard history for the clipboard popup
         wtype # only used if autoPaste is enabled in clipboard/ClipboardPopup.qml
     ];
@@ -94,8 +86,7 @@ in
     xdg.configFile."quickshell/wallpapers".source = mkConfig "wallpapers" ./wallpapers;
     xdg.configFile."quickshell/notifications".source = mkConfig "notifications" ./notifications;
 
-    # The icon of that entry: Quickshell's icon lookup does not find the generic theme icons
-    # (preferences-system and the like), only app icons, so the app brings its own: an outlined eight-tooth gear.
+    # Own icons (Quickshell's lookup does not find the generic theme icons): a gear...
     xdg.dataFile."icons/hicolor/scalable/apps/quickshell-settings.svg".text = ''
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
                   <g fill="none" stroke="#cdd6f4" stroke-width="4" stroke-linejoin="round">
@@ -105,8 +96,8 @@ in
         </svg>
     '';
 
-    # Lets the app launcher (and any other launcher) open the settings app: it toggles the
-    # running `qs -c settings` instance over IPC (as the full-screen overlay; see the action below).
+    # Launcher entry for the settings (overlay; the `window` action opens the window form, which gives
+    # the app launcher its Overlay | Window toggle, see app-launcher/LauncherModes.qml).
     xdg.desktopEntries.quickshell-settings = {
         name = "Shell Settings";
         genericName = "Settings";
@@ -116,16 +107,13 @@ in
         terminal = false;
         categories = [ "Settings" ];
 
-        # The settings can also be a normal window. An app with an action called `window` gets an
-        # Overlay | Window toggle in the app launcher (app-launcher/LauncherModes.qml), which then
-        # runs this instead of `exec` when "Window" is chosen. (Other launchers list it as an action.)
         actions.window = {
             name = "Open as window";
             exec = "qs -c settings ipc call settings toggleWindow";
         };
     };
 
-    # The wallpaper picker (wallpapers/): same outlined style as the gear above, a picture with a sun and mountains.
+    # ... and a picture with a sun and mountains.
     xdg.dataFile."icons/hicolor/scalable/apps/quickshell-wallpapers.svg".text = ''
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
                   <g fill="none" stroke="#cdd6f4" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
@@ -136,13 +124,11 @@ in
         </svg>
     '';
 
-    # Lets the app launcher open the wallpaper picker.
+    # Launcher entry for the wallpaper picker (overlay; `window` action for the window form).
     xdg.desktopEntries.quickshell-wallpapers = {
         name = "Wallpapers";
         genericName = "Wallpaper picker";
         comment = "Browse wallpapers, pick matugen colours and tag them";
-        # The overlay is the entry's own way, the window the `window` action: the launcher shows an
-        # Overlay | Window toggle for it (app-launcher/LauncherModes.qml).
         exec = "${wallpapersToggle} overlay";
         icon = "quickshell-wallpapers";
         terminal = false;

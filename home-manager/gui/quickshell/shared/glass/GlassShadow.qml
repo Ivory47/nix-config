@@ -11,16 +11,20 @@ ShaderEffect {
     property real panelWidth: 0
     property real panelHeight: 0
     property real cornerRadius: Theme.radiusLarge
+    // The look: by default the popups' (Theme.popupShadow*); notifications pass their own.
+    property real strength: Theme.popupShadowOpacity
+    property real softness: Theme.popupShadowBlur
+    property real drop: Theme.popupShadowOffset
 
     // Over the settings' veil (alpha 0.92) a shadow of 0.6 still lets 3.2% of the background
     // through, about the least that can be recovered, so the opacity is capped there.
     readonly property real maxOpacity: 0.6
-    readonly property real blurSize: Math.max(0.1, Theme.popupShadowBlur)
-    readonly property real offsetY: Theme.popupShadowOffset
+    readonly property real blurSize: Math.max(0.1, softness)
+    readonly property real offsetY: drop
     // Room for the fade and the offset.
     readonly property real extent: Math.ceil(blurSize + Math.abs(offsetY)) + 2
 
-    visible: Theme.popupShadowOpacity > 0
+    visible: strength > 0
     blending: true
     x: -extent
     y: -extent
@@ -29,7 +33,7 @@ ShaderEffect {
 
     property vector2d itemSize: Qt.vector2d(width, height)
     property vector2d offset: Qt.vector2d(0, offsetY)
-    property vector4d color: Qt.vector4d(0, 0, 0, Math.min(Theme.popupShadowOpacity, maxOpacity))
+    property vector4d color: Qt.vector4d(0, 0, 0, Math.min(strength, maxOpacity))
     property real margin: extent
     property real radius: cornerRadius
     property real blur: blurSize

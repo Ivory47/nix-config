@@ -41,29 +41,11 @@ Item {
     width: parent ? parent.width : 0
     height: 44 + belowHeight
 
-    Column {
-        anchors.left: parent.left
-        // Never under the control: the text is cut off with an ellipsis before it gets there.
+    // Never under the control: the text is cut off with an ellipsis before it gets there.
+    SettingsLabel {
+        label: root.spec.label
+        note: root.spec.note || ""
         width: Math.max(0, controlSlot.x - Theme.spacingMedium)
-        y: 22 - height / 2
-        spacing: 1
-
-        Text {
-            width: parent.width
-            elide: Text.ElideRight
-            text: root.spec.label
-            color: Theme.text
-            font.pixelSize: Theme.textMedium
-        }
-
-        Text {
-            visible: !!root.spec.note
-            width: parent.width
-            elide: Text.ElideRight
-            text: root.spec.note || ""
-            color: Theme.textMuted
-            font.pixelSize: Theme.textSmall - 1
-        }
     }
 
     Item {
@@ -75,29 +57,10 @@ Item {
         width: childrenRect.width
     }
 
-    Item {
+    ResetButton {
         id: resetButton
-        anchors.right: parent.right
-        y: 11
-        width: 22
-        height: 22
-
-        Text {
-            anchors.centerIn: parent
-            visible: root.overridden
-            text: "↺"
-            color: resetArea.containsMouse ? Theme.text : Theme.textMuted
-            font.pixelSize: Theme.textLarge - 4
-        }
-
-        MouseArea {
-            id: resetArea
-            anchors.fill: parent
-            enabled: root.overridden
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: ThemeStore.reset(root.spec.key)
-        }
+        active: root.overridden
+        onClicked: ThemeStore.reset(root.spec.key)
     }
 
     Item {

@@ -2,7 +2,6 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.shared
 
 // Where the settings app changes the theme: the same file the shells read (ThemeFromSettingsApp).
@@ -21,7 +20,7 @@ Singleton {
 
     function same(a, b) {
         if (typeof a === "string")
-            return Qt.colorEqual(a, b)
+            return a.charAt(0) === "#" ? Qt.colorEqual(a, b) : a === b
         if (typeof a === "number")
             return Math.abs(a - b) < 1e-9
         return a === b
@@ -40,6 +39,17 @@ Singleton {
         else
             next[key] = value
         ThemeFromSettingsApp.values = next
+    }
+
+    // The colour picker that is open (a Theme key, "" for none): one at a time.
+    property string openColor: ""
+
+    // For values that other processes show (the bar): changes it and writes while the drag goes on,
+    // at most every 50 ms (commit() would wait for the drag to stop).
+    function setLive(key, value) {
+        preview(key, value)
+        if (!liveTimer.running)
+            liveTimer.start()
     }
 
     function commit() {
@@ -67,23 +77,12 @@ Singleton {
     Timer {
         id: writeTimer
         interval: 30
-        onTriggered: {
-            const text = JSON.stringify(ThemeFromSettingsApp.values, null, 2) + "\n"
-            ThemeFromSettingsApp.noteOwnWrite(text)
-            out.setText(text)
-        }
+        onTriggered: ThemeFromSettingsApp.file.write(ThemeFromSettingsApp.values)
     }
 
-    FileView {
-        id: out
-        path: ThemeFromSettingsApp.path
-        printErrors: false
-        onSaveFailed: error => console.warn("settings-app-theme.json could not be saved:", error)
-    }
-
-    // The folder has to exist for the first write.
-    Process {
-        running: true
-        command: ["mkdir", "-p", ThemeFromSettingsApp.path.replace(/\/[^\/]*$/, "")]
+    Timer {
+        id: liveTimer
+        interval: 50
+        onTriggered: writeTimer.restart()
     }
 }

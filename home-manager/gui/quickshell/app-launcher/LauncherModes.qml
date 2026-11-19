@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.shared
 
 // Apps that can be opened in two ways: as an overlay (their normal entry, e.g. the settings as a
 // full-screen popup) or as a normal window. An app says so by having a desktop ACTION with the id
@@ -49,7 +50,7 @@ Singleton {
         else
             next[app.id] = "window"
         modes = next
-        writeTimer.restart()
+        file.save(root.modes)
     }
 
     // Opens the app the way it is set.
@@ -63,59 +64,19 @@ Singleton {
             app.execute()
     }
 
-    property var ownWrites: []
-
-    function parse(text) {
-        if (ownWrites.indexOf(text) >= 0)
-            return
-        try {
-            const obj = JSON.parse(text)
+    JsonFile {
+        id: file
+        path: root.path
+        name: "modes.json"
+        // Only "window" is stored; anything else in the file is dropped.
+        onParsed: value => {
             const clean = {}
-            if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-                for (const k of Object.keys(obj))
-                    if (obj[k] === "window")
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                for (const k of Object.keys(value))
+                    if (value[k] === "window")
                         clean[k] = "window"
             }
             modes = clean
-        } catch (e) {
-            console.warn("modes.json is not valid JSON, ignoring it:", e)
         }
-    }
-
-    Timer {
-        id: writeTimer
-        interval: 30
-        onTriggered: {
-            const text = JSON.stringify(root.modes, null, 2) + "\n"
-            root.ownWrites = root.ownWrites.concat([text]).slice(-8)
-            file.setText(text)
-        }
-    }
-
-    FileView {
-        id: file
-        path: root.path
-        blockLoading: true
-        watchChanges: true
-        printErrors: false
-
-        onFileChanged: reload()
-        onLoaded: root.parse(text())
-        Component.onCompleted: if (loaded) root.parse(text())
-        onSaveFailed: error => console.warn("modes.json could not be saved:", error)
-    }
-
-    // A file that does not exist yet cannot be watched: look for it until it appears.
-    Timer {
-        running: !file.loaded
-        interval: 2000
-        repeat: true
-        onTriggered: file.reload()
-    }
-
-    // The folder has to exist for the first write.
-    Process {
-        running: true
-        command: ["mkdir", "-p", root.dir]
     }
 }

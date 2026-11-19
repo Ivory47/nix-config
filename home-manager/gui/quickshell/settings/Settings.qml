@@ -1,7 +1,5 @@
 import QtQuick
-import Quickshell
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import qs.shared
 import qs.shared.glass
 
@@ -15,36 +13,19 @@ GlassPopup {
     WlrLayershell.namespace: "settings"
 
     focusItem: view
+    panelItem: panel
 
     // The whole desktop is blurred while this is open; its strength is its own setting. (The one
     // blurred picture is shared by the veil and the panel.)
     blurRadius: Math.max(0.1, Theme.scrimBlurRadius)
 
-    function close() {
-        root.shown = false
-    }
-
     onPopupClosed: view.reset()
-
-    Connections {
-        target: Hyprland
-
-        function onFocusedWorkspaceChanged() {
-            root.shown = false
-        }
-    }
 
     // The glass highlights the category row under the mouse (GlassListPanel reads popup.hoveredItem).
     Binding {
         target: root
         property: "hoveredItem"
         value: view.hoveredItem
-    }
-
-    // A click outside the panel closes it.
-    MouseArea {
-        anchors.fill: parent
-        onClicked: root.close()
     }
 
     // The desktop behind is blurred too, so that it is clear that only the settings can be used
@@ -97,7 +78,7 @@ GlassPopup {
         SettingsView {
             id: view
             anchors.fill: parent
-            onCloseRequested: root.close()
+            onCloseRequested: root.closePopup()
         }
     }
 }
