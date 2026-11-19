@@ -4,10 +4,12 @@
 #   1. lint:  qmllint over every .qml of every shell (also files that only load later, through a Loader).
 #             Fails on a type that is not found or not resolved; everything else is only counted
 #             (`-v` prints all of it).
-#   2. build: builds the Home Manager config this device runs (NIX_CONFIG_TYPE: laptop, desktop, ...,
+#   2. refs:  members read through an untyped parent reference (`required property var overlay`, `pane`, ...),
+#             which qmllint cannot see, must exist on the parent (needs python3).
+#   3. build: builds the Home Manager config this device runs (NIX_CONFIG_TYPE: laptop, desktop, ...,
 #             else `default`), through the same flake reference `hms` uses, so a file that git does not
 #             track (invisible to the build) fails here and not after `hms`.
-# Usage: check.sh [-v] [lint|build]      (no argument: both)
+# Usage: check.sh [-v] [lint|refs|build]      (no argument: all)
 # Needs qmllint (qt6.qtdeclarative, installed by default.nix) and the profile's quickshell (`qs`).
 set -u
 
@@ -93,6 +95,113 @@ lint() {
     return $failed
 }
 
+# A component that is told its parent through an untyped `required property var <name>` (WallpaperOverlay's
+# parts, DetailPane's sections, ...) reads `<name>.x`, which qmllint cannot check. This does: every member the
+# component reads must exist on the parent (a property, function or signal of the file whose root is passed in).
+refs() {
+    command -v python3 >/dev/null || { red "refs: python3 not found"; return 1; }
+    python3 - "$here" <<'PY'
+import os, re, sys
+here = sys.argv[1]
+BUILTIN = set("""width height x y z visible opacity enabled parent children data resources implicitWidth implicitHeight
+devicePixelRatio screen color title contentItem contentWidth contentHeight activeFocus focus clip scale rotation
+anchors state states transitions""".split())
+bad = 0
+
+# Every component of the tree by name, for the base types.
+ALL = {}
+for dd, _, ff in os.walk(here):
+    if '/tools' in dd or 'glass-test' in dd:
+        continue
+    for f in ff:
+        if f.endswith('.qml'):
+            ALL.setdefault(f[:-4], open(os.path.join(dd, f)).read())
+
+def read(p): return open(p).read()
+
+def members(src):
+    out = set(re.findall(r'\bproperty\s+(?:alias\s+|\w+(?:<[^>]*>)?\s+)?(\w+)\s*:', src))
+    out |= set(re.findall(r'\bproperty\s+(?:alias\s+|\w+(?:<[^>]*>)?\s+)?(\w+)\s*\n', src))
+    out |= set(re.findall(r'\bfunction\s+(\w+)', src))
+    out |= set(re.findall(r'\bsignal\s+(\w+)', src))
+    out |= set(re.findall(r'\bproperty\s+(?:alias\s+)?(?:\w+\s+)?(\w+)', src))
+    return out
+
+def root_id(src):
+    m = re.search(r'^\w[\w.]*\s*\{\s*\n\s*id:\s*(\w+)', src, re.M)
+    return m.group(1) if m else None
+
+ALLMEM = {n: members(src) for n, src in ALL.items()}
+
+for d, _, fs in os.walk(here):
+    if '/tools' in d or 'glass-test' in d:
+        continue
+    qml = {f[:-4]: read(os.path.join(d, f)) for f in fs if f.endswith('.qml')}
+    rid = {n: root_id(s) for n, s in qml.items()}
+    mem = {n: members(s) for n, s in qml.items()}
+    # A file inherits the members of the type it is based on, here or in shared/ (GlassSearchPopup is a
+    # GlassPopup, WallpaperPicker a GlassWindow).
+    def base(n):
+        m = re.search(r'^(\w+)\s*\{', qml[n] if n in qml else ALL.get(n, ''), re.M)
+        return m.group(1) if m and m.group(1) in ALL and m.group(1) != n else None
+    for n in qml:
+        b = base(n)
+        seen = set()
+        while b and b not in seen:
+            seen.add(b)
+            mem[n] |= ALLMEM.get(b, set())
+            b = base(b)
+    # (type, prop) -> list of (parent type) from instantiations "<Type> { ... prop: <expr>"
+    def parents_of(ctype, prop, depth=0):
+        found = set()
+        if depth > 4:
+            return found
+        for g, gs in qml.items():
+            if g == ctype:
+                continue
+            for m in re.finditer(r'\b' + ctype + r'\s*\{', gs):
+                end = gs.find('\n', m.end())
+                # the property assignments in the first lines of the block
+                block = gs[m.end():m.end() + 600]
+                a = re.search(r'\b' + prop + r':\s*([\w.]+)', block)
+                if not a:
+                    continue
+                v = a.group(1)
+                if v == rid.get(g):
+                    found.add(g)
+                elif '.' in v:
+                    ident, p2 = v.split('.', 1)
+                    if ident == rid.get(g):
+                        found |= parents_of(g, p2, depth + 1)
+                        continue
+                    t = re.search(r'\b(\w+)\s*\{\s*(?://[^\n]*\n\s*)*id:\s*' + ident + r'\b', gs)
+                    if t and t.group(1) in qml:
+                        found |= parents_of(t.group(1), p2, depth + 1)
+                elif g in qml:
+                    t = re.search(r'\b(\w+)\s*\{\s*(?://[^\n]*\n\s*)*id:\s*' + v + r'\b', gs)
+                    if t and t.group(1) in qml and False:
+                        pass
+        return found
+    for c, cs in qml.items():
+        for prop in re.findall(r'required property var (\w+)', cs):
+            ps = parents_of(c, prop)
+            if not ps:
+                continue
+            used = set(re.findall(r'\b' + prop + r'\.(\w+)', cs))
+            for u in sorted(used):
+                if u in BUILTIN:
+                    continue
+                for pt in ps:
+                    if u not in mem[pt]:
+                        print('    %s/%s.qml: %s.%s is not a member of %s.qml' % (os.path.relpath(d, here), c, prop, u, pt))
+                        bad += 1
+sys.exit(1 if bad else 0)
+PY
+    local rc=$?
+    if [ $rc = 0 ]; then green "refs: every parent member read through a required property exists"; else red "refs: members read through a parent reference that the parent does not have (above)"; fi
+    return $rc
+}
+
 build() {
     local type=${NIX_CONFIG_TYPE:-default}
     case "$type" in desktop|laptop|nas-server|default) ;; *) type=default ;; esac
@@ -106,9 +215,10 @@ build() {
 }
 
 case "$what" in
-    lint) tracked || status=1; lint || status=1 ;;
+    lint) tracked || status=1; lint || status=1; refs || status=1 ;;
+    refs) refs || status=1 ;;
     build) tracked || status=1; build || status=1 ;;
-    all) tracked || status=1; lint || status=1; build || status=1 ;;
-    *) echo "usage: check.sh [-v] [lint|build]"; exit 2 ;;
+    all) tracked || status=1; lint || status=1; refs || status=1; build || status=1 ;;
+    *) echo "usage: check.sh [-v] [lint|refs|build]"; exit 2 ;;
 esac
 exit $status

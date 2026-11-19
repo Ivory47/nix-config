@@ -1,5 +1,4 @@
 import QtQuick
-import qs.shared
 
 // The Wi-Fi menu as a popup window (classic, islands and notch layouts). The content is WifiPanel.qml.
 BarMenu {

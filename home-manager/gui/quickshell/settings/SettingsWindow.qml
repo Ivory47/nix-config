@@ -1,6 +1,4 @@
 import QtQuick
-import Quickshell
-import qs.shared
 import qs.shared.glass
 
 // The settings app as a NORMAL WINDOW (a Quickshell FloatingWindow, tiled or floated by Hyprland like

@@ -1,8 +1,6 @@
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import qs.shared
 import qs.shared.glass
 
 // The clipboard history: the model, the rows, picking and deleting. The panel, search, keys, glass and

@@ -1,5 +1,4 @@
 import QtQuick
-import qs.shared
 
 // The power-profile menu as a popup window (classic, islands and notch layouts). The content is PowerPanel.qml.
 BarMenu {

@@ -23,34 +23,17 @@ Item {
         Repeater {
             model: root.options
 
-            delegate: Rectangle {
-                id: seg
+            delegate: Chip {
                 required property var modelData
-                readonly property bool on: root.current === modelData.id
 
-                width: label.implicitWidth + 28
+                text: modelData.label
+                selected: root.current === modelData.id
+                pill: false
+                horizontalPadding: 28
+                fontSize: Theme.textSmall + 1
+                boldWhenSelected: true
                 height: root.segmentHeight
-                radius: Theme.radiusSmall
-                color: on ? Theme.accent : "transparent"
-                border.width: 1
-                border.color: on ? Theme.accent : (area.containsMouse ? Theme.textMuted : Theme.surfaceAlt)
-
-                CenteredText {
-                    id: label
-                    anchors.centerIn: parent
-                    text: seg.modelData.label
-                    font.pixelSize: Theme.textSmall + 1
-                    font.bold: seg.on
-                    color: seg.on ? Theme.background : Theme.textSecondary
-                }
-
-                MouseArea {
-                    id: area
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.picked(seg.modelData.id)
-                }
+                onClicked: root.picked(modelData.id)
             }
         }
     }

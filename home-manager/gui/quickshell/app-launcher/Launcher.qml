@@ -1,7 +1,5 @@
 import QtQuick
-import Quickshell
 import Quickshell.Wayland
-import qs.shared
 import qs.shared.glass
 
 // The app launcher: the model, the rows and what Enter and Tab do. The panel, search, keys, glass and

@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import qs.shared
 
 // The search results: the settings that match, as the real controls (change a value right

@@ -1,8 +1,6 @@
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
 import qs.shared
-import qs.shared.glass
 
 // Layout "islands": three glass pills with the desktop between them.
 //   left: workspaces; centre: the clock (and what plays); right: the status icons and the bell.

@@ -1,8 +1,6 @@
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
 import qs.shared
-import qs.shared.glass
 
 // Layout "notch": one pill in the middle of the top edge and nothing else. It grows to what it
 // shows: the workspaces, the clock and a few status icons at rest; the brightness / volume

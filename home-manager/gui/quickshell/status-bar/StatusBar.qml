@@ -2,10 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
-import Quickshell.Services.UPower
 import qs.shared
 import qs.shared.glass
-import Glass.Native
 
 PanelWindow {
     id: statusBar

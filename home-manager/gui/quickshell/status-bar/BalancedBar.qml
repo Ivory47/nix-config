@@ -3,7 +3,6 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import qs.shared
-import qs.shared.glass
 
 // Layout "balanced": a full-width bar where every part has one job.
 //   left: workspaces; centre: date and time (click: the notification history drops down); right: what

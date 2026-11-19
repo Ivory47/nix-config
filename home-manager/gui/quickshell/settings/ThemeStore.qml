@@ -2,7 +2,6 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.shared
 
 // Where the settings app changes the theme: the same file the shells read (ThemeFromSettingsApp).

@@ -1,5 +1,4 @@
 import QtQuick
-import Glass.Native
 import qs.shared
 import qs.shared.glass
 
