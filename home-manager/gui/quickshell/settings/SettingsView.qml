@@ -22,12 +22,11 @@ FocusScope {
 
     // False when the host has no glass behind this: plain fills for the highlights then.
     property bool glassOn: true
-    // The category row under the mouse, if any.
-    property Item hoveredItem: null
+    // The category row under the mouse, if any (the Sidebar's).
+    readonly property alias hoveredItem: sidebar.hoveredItem
     readonly property alias searchField: searchField
-    readonly property alias categoryList: categoryList
-    // For the keyboard (KeyNav): the pages and the search results.
-    readonly property alias pagesStack: pages
+    readonly property alias categoryList: sidebar.categoryList
+    // For the keyboard (KeyNav): the search results (the pages: pageAt).
     readonly property alias results: results
     signal closeRequested()
 
@@ -53,6 +52,11 @@ FocusScope {
         function onRevealRequested(catId, key) { root.jumpTo(catId, key, true) }
     }
 
+    // The page (an Item) of the category at this index in the sidebar's list.
+    function pageAt(index) {
+        return pageRepeater.itemAt(index)?.item ?? null
+    }
+
     function jumpTo(catId, key, gentle) {
         const idx = SettingsIndex.indexOf(catId)
         if (idx < 0)
@@ -62,7 +66,7 @@ FocusScope {
         searchField.focus = false
         root.forceActiveFocus()
         Qt.callLater(() => {
-            const page = pages.children[idx]
+            const page = pageAt(idx)
             if (page && page.scrollTo)
                 page.scrollTo(key, !!gentle)
         })
@@ -95,250 +99,29 @@ FocusScope {
             root.onlyThis = !root.onlyThis
     }
 
-    // The keyboard: AppSettings.mode "vim" (default) = KeyNav; "classic" = classicKeys below.
-    Keys.onPressed: event => {
-        if (nav.vim)
-            nav.handle(event)
-        else
-            root.classicKeys(event)
-    }
+    // The keyboard: KeyNav (Settings app > Keyboard: vim keys, or classic = type to search).
+    Keys.onPressed: event => nav.handle(event)
 
     KeyNav {
         id: nav
         view: root
     }
 
-    // Only keys that the focused item did not use arrive here. A text field (a hex value,
-    // the search field) uses every printable key, so typing a value never starts a
-    // search; with nothing like that focused, a printable key goes to the search field
-    // (as in Nautilus).
-    function classicKeys(event) {
-        const mods = event.modifiers
-        const altGr = (mods & Qt.ControlModifier) && (mods & Qt.AltModifier)
-        const printable = event.text.length > 0
-            && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127
-            && !(mods & Qt.MetaModifier)
-            && (altGr || !(mods & (Qt.ControlModifier | Qt.AltModifier)))
-
-        if (event.key === Qt.Key_Escape) {
-            // First the search, then the window.
-            if (searchField.text.length > 0) {
-                searchField.text = ""
-                // (Typing still goes to the search; there is just no blinking cursor.)
-                searchField.focus = false
-            } else {
-                root.closeRequested()
-            }
-            event.accepted = true
-        } else if (event.key === Qt.Key_C && (mods & Qt.ControlModifier)) {
-            root.closeRequested()
-            event.accepted = true
-        } else if (event.key === Qt.Key_Z && (mods & Qt.ControlModifier)) {
-            if (mods & Qt.ShiftModifier)
-                SettingsHistory.redo()
-            else
-                SettingsHistory.undo()
-            event.accepted = true
-        } else if (event.key === Qt.Key_Y && (mods & Qt.ControlModifier)) {
-            SettingsHistory.redo()
-            event.accepted = true
-        } else if (event.key === Qt.Key_Tab && root.searching && scopeChip.visible) {
-            root.onlyThis = !root.onlyThis
-            event.accepted = true
-        } else if (printable && !(event.text === " " && searchField.text.length === 0)) {
-            searchField.forceActiveFocus()
-            searchField.insert(searchField.length, event.text)
-            event.accepted = true
-        } else if (event.key === Qt.Key_Down) {
-            categoryList.currentIndex = Math.min(categoryList.currentIndex + 1, categoryList.count - 1)
-            event.accepted = true
-        } else if (event.key === Qt.Key_Up) {
-            categoryList.currentIndex = Math.max(categoryList.currentIndex - 1, 0)
-            event.accepted = true
-        }
-    }
-
-    Item {
+    Sidebar {
         id: sidebar
         x: Theme.spacingLarge
         y: Theme.spacingLarge
-        width: 190
         height: parent.height - 2 * Theme.spacingLarge
-
-        // Vim keys: where the list of keys is.
-        CenteredText {
-            visible: nav.vim
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.spacingMedium
-            anchors.verticalCenter: title.verticalCenter
-            text: nav.keyHint
-            color: Theme.textMuted
-            font.pixelSize: Theme.textSmall
-        }
-
-        Text {
-            id: title
-            text: "Settings"
-            color: Theme.text
-            font.pixelSize: Theme.textLarge
-            font.bold: true
-            height: 50
-            verticalAlignment: Text.AlignVCenter
-            leftPadding: Theme.spacingMedium
-        }
-
-        ListView {
-            id: categoryList
-            anchors.top: title.bottom
-            anchors.topMargin: Theme.spacingSmall
-            anchors.bottom: sidebarActions.top
-            anchors.bottomMargin: Theme.spacingSmall
-            width: parent.width
-            spacing: Theme.spacingSmall
-            clip: true
-            currentIndex: 0
-
-            // Another category: a fresh search.
-            onCurrentIndexChanged: {
-                searchField.text = ""
-                searchField.focus = false
-                root.onlyThis = false
-            }
-
-            // The categories under their top-level headings (ListView sections: the headings are not
-            // rows, so the current row and the glass highlight are unaffected). A ListModel, because
-            // sections need a role; filled once from SettingsIndex.categories (already in group order).
-            model: ListModel {
-                id: categoryModel
-                Component.onCompleted: {
-                    for (const c of SettingsIndex.categories)
-                        append({ catId: c.id, name: c.name, icon: c.icon, groupName: SettingsIndex.groupName(c.group) })
-                }
-            }
-
-            section.property: "groupName"
-            section.delegate: BlockTitle {
-                required property string section
-                width: categoryList.width
-                leftPadding: Theme.spacingMedium
-                topPadding: Theme.spacingLarge
-                bottomPadding: Theme.spacingSmall
-                text: section
-            }
-
-            delegate: Item {
-                id: cat
-                required property string catId
-                required property string name
-                required property string icon
-                required property int index
-                readonly property bool hovered: catArea.containsMouse
-                // Something on its page differs from the defaults.
-                readonly property bool changed: SettingsIndex.keysOf(catId).some(k => ThemeStore.isSet(k))
-
-                width: categoryList.width
-                height: 44
-                // The keyboard cursor (KeyNav) on the highlight's frame: the list clips what is outside.
-                readonly property var navFrame: ({ x: 0, y: 0, width: width, height: height, radius: Theme.radiusMedium })
-
-                // The glass draws the highlight of the selected and the hovered row; a plain fill
-                // only when there is no glass.
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Theme.radiusMedium
-                    color: (!root.glassOn && (cat.index === categoryList.currentIndex || cat.hovered))
-                        ? Theme.surface : "transparent"
-                }
-
-                onHoveredChanged: {
-                    if (hovered)
-                        root.hoveredItem = cat
-                    else if (root.hoveredItem === cat)
-                        root.hoveredItem = null
-                }
-
-                Row {
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spacingMedium
-                    spacing: Theme.spacingMedium
-
-                    Text {
-                        text: cat.icon
-                        color: Theme.text
-                        font.pixelSize: Theme.textLarge - 2
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Text {
-                        text: cat.name
-                        color: Theme.text
-                        font.pixelSize: Theme.textMedium
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                // While searching: how many settings of this category match.
-                Rectangle {
-                    visible: cat.changed && !root.searching
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacingMedium + 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 7
-                    height: 7
-                    radius: 3.5
-                    color: Theme.accent
-                }
-
-                Text {
-                    visible: root.searching
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacingMedium
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.matchCounts[cat.catId] || 0
-                    color: (root.matchCounts[cat.catId] || 0) > 0 ? Theme.textSecondary : Theme.textMuted
-                    font.pixelSize: Theme.textSmall
-                }
-
-                MouseArea {
-                    id: catArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: categoryList.currentIndex = cat.index
-                }
-            }
-        }
-
-        Column {
-            id: sidebarActions
-            anchors.bottom: parent.bottom
-            x: Theme.spacingSmall
-            spacing: Theme.spacingSmall
-
-            // Every change of the app, on any page (SettingsHistory); Ctrl+Z and Ctrl+Shift+Z do the same.
-            Row {
-                spacing: Theme.spacingSmall
-
-                ActionButton {
-                    text: "Undo"
-                    active: SettingsHistory.canUndo
-                    onClicked: SettingsHistory.undo()
-                }
-                ActionButton {
-                    text: "Redo"
-                    active: SettingsHistory.canRedo
-                    onClicked: SettingsHistory.redo()
-                }
-            }
-
-            // Resets every Theme value (all pages; not the window rules).
-            ActionButton {
-                id: resetAll
-                text: "Reset all to defaults"
-                active: Object.keys(ThemeStore.values).length > 0
-                onClicked: ThemeStore.resetAll()
-            }
+        glassOn: root.glassOn
+        searching: root.searching
+        matchCounts: root.matchCounts
+        showKeyHint: nav.vim
+        keyHint: nav.keyHint
+        // Another category: a fresh search.
+        onCategoryChanged: {
+            searchField.text = ""
+            searchField.focus = false
+            root.onlyThis = false
         }
     }
 
@@ -450,14 +233,20 @@ FocusScope {
             visible: !root.searching
             currentIndex: categoryList.currentIndex
 
-            // One page per category, in the order of SettingsIndex.categories.
-            ThemePage { catId: "appearance" }
-            ThemePage { catId: "bar" }
-            ThemePage { catId: "panels" }
-            ThemePage { catId: "notifications" }
-            ThemePage { catId: "glass" }
-            HyprlandPage {}
-            ThemePage { catId: "keyboard" }
+            // One page per category, in the order of SettingsIndex.categories (the sidebar's order).
+            Repeater {
+                id: pageRepeater
+                model: SettingsIndex.categories
+
+                Loader {
+                    id: pageLoader
+                    required property var modelData
+                    sourceComponent: modelData.id === "windowRules" ? rulesPage : themePage
+
+                    Component { id: themePage; ThemePage { catId: pageLoader.modelData.id } }
+                    Component { id: rulesPage; HyprlandPage {} }
+                }
+            }
         }
 
         SearchResults {

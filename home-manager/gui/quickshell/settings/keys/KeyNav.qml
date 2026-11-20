@@ -2,8 +2,8 @@ import QtQuick
 import qs.shared
 import qs.core
 
-// The vim keys of the settings app (AppSettings.mode "vim"; "classic" keeps SettingsView's own
-// handler). SettingsView passes every key that no text field used to `handle(event)`; text fields pass
+// The keys of the settings app: vim keys (AppSettings.mode "vim"), or "classic" (`handleClassic`: no vim
+// keys, type to search). SettingsView passes every key that no text field used to `handle(event)`; text fields pass
 // theirs first to FieldKeys. Which key does what is AppSettings.keys (KeyMap; the Keyboard page);
 // the names below are the default keys.
 //
@@ -234,7 +234,7 @@ Item {
         onTriggered: {
             if (!nav.vim || catIndex !== nav.view.categoryList.currentIndex)
                 return
-            const page = nav.view.pagesStack.children[catIndex]
+            const page = nav.view.pageAt(catIndex)
             const item = page && page.navItemFor ? page.navItemFor(key) : null
             if (!item)
                 return
@@ -314,7 +314,42 @@ Item {
         shown = true
     }
 
+    // Classic mode: no vim keys, only what every window has. A printable key (with no Ctrl or Alt) types
+    // into the search (as in Nautilus; Space only once there is text), Up / Down change the category, and
+    // the few non-vim actions (Esc back, Ctrl+C close, undo, redo, Tab: only this category) run through the
+    // same key map. Only keys the focused item did not use arrive here (a text field uses every printable one).
+    readonly property var classicActions: ["back", "close", "undo", "redo", "onlyThis"]
+    function handleClassic(event) {
+        const mods = event.modifiers
+        const altGr = (mods & Qt.ControlModifier) && (mods & Qt.AltModifier)
+        const printable = event.text.length > 0
+            && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127
+            && !(mods & Qt.MetaModifier)
+            && (altGr || !(mods & (Qt.ControlModifier | Qt.AltModifier)))
+        event.accepted = true
+        if (printable) {
+            if (event.text === " " && view.searchField.text.length === 0)
+                event.accepted = false
+            else {
+                view.searchField.forceActiveFocus()
+                view.searchField.insert(view.searchField.length, event.text)
+            }
+        } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Up) {
+            stepCategory(event.key === Qt.Key_Down ? 1 : -1)
+        } else {
+            const a = keys.match(event, classicActions, 0)
+            if (actions[a])
+                actions[a](event)
+            else
+                event.accepted = false
+        }
+    }
+
     function handle(event) {
+        if (!vim) {
+            handleClassic(event)
+            return
+        }
         const k = event.key
         const focused = Window.activeFocusItem
         event.accepted = true
@@ -403,7 +438,7 @@ Item {
                 nav.askDelete()
         },
         resetPage: () => {
-            const p = nav.view.pagesStack.children[nav.view.categoryList.currentIndex]
+            const p = nav.view.pageAt(nav.view.categoryList.currentIndex)
             if (p && p.navResetPage && !nav.view.searching)
                 p.navResetPage()
         },

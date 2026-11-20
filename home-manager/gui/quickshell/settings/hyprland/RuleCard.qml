@@ -25,7 +25,7 @@ Rectangle {
         HyprlandStore.remove(ruleId)
     }
 
-    // The row of a field (a TextRow, a ParamRow: their `fieldId`) in the editor, or null.
+    // The row of a field (a TextRow, a glass parameter's SettingField: their `fieldId`) in the editor, or null.
     function find(field, from) {
         for (const c of (from || content).children) {
             if (c.fieldId === field)
@@ -102,28 +102,23 @@ Rectangle {
                 color: headerArea.containsMouse ? Theme.surface : "transparent"
             }
 
-            Text {
+            Chevron {
                 id: chevron
-                x: 12
+                x: 11
                 anchors.verticalCenter: parent.verticalCenter
-                width: 14
-                text: root.expanded ? "▾" : "▸"
-                color: Theme.textSecondary
-                font.pixelSize: Theme.textMedium
+                open: root.expanded
             }
 
             // Enable switch.
-            Rectangle {
+            Toggle {
                 id: sw
                 anchors.left: chevron.right
                 anchors.leftMargin: Theme.spacingSmall
                 anchors.verticalCenter: parent.verticalCenter
                 width: 36
                 height: 20
-                radius: 10
-                color: root.rule && root.rule.enabled ? Theme.accent : Theme.surface
-                border.width: 1
-                border.color: Theme.surfaceAlt
+                checked: !!root.rule && root.rule.enabled
+                onToggled: HyprlandStore.setEnabled(root.ruleId, !root.rule.enabled)
 
                 // l: on, h: off, Enter: the other.
                 readonly property bool navStop: true
@@ -131,21 +126,6 @@ Rectangle {
                 function navAdjust(dir) {
                     if ((dir > 0) !== root.rule.enabled)
                         HyprlandStore.setEnabled(root.ruleId, dir > 0)
-                }
-
-                Rectangle {
-                    x: root.rule && root.rule.enabled ? parent.width - width - 3 : 3
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 14
-                    height: 14
-                    radius: 7
-                    color: root.rule && root.rule.enabled ? Theme.background : Theme.textMuted
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: HyprlandStore.setEnabled(root.ruleId, !root.rule.enabled)
                 }
             }
 
@@ -406,11 +386,8 @@ Rectangle {
             GlassParamBlocks {
                 visible: !!root.rule && (root.rule.glass.mode === "custom" || root.rule.glass.mode === "default")
                 width: parent.width
-                values: root.rule ? root.rule.glass.params : ({})
+                ruleId: root.ruleId
                 keys: root.rule && root.rule.glass.mode === "default" ? HyprlandStore.ownKeys : null
-                onPreview: (k, v) => HyprlandStore.previewParam(root.ruleId, k, v)
-                onCommit: (k, v) => HyprlandStore.setParam(root.ruleId, k, v)
-                onCleared: k => HyprlandStore.clearParam(root.ruleId, k)
             }
 
             Rectangle {

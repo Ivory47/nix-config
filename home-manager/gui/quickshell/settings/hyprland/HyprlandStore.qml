@@ -41,7 +41,6 @@ Singleton {
     // (The environment variables are for tests, to keep them away from the real files.)
     readonly property string path: Quickshell.env("HYPRLAND_SETTINGS_FILE")
         || (home + "/src/nix-config/home-manager/gui/hyprland/hyprland-settings.lua")
-    readonly property string basePath: Quickshell.env("HYPRLAND_BASE_FILE") || (home + "/.config/hypr/hyprland.lua")
     // Where the plugin is installed: without it `lucent_glass` is an unknown key (a config error).
     readonly property string pluginPath: "/etc/hypr/plugins/liblucent.so"
 
@@ -55,24 +54,17 @@ Singleton {
     readonly property var ownKeys: ["radius", "taps", "corner_radius", "opacity"]
 
     // The default look (the settings app's Glass page) as lucent_glass parameters.
-    readonly property var defaultLookParams: ({
-        frost: Theme.glassDefault.frost,
-        tint: ThemeStore.colorString(Theme.glassDefault.tint, false),
-        tint_strength: Theme.glassDefault.tintStrength,
-        brightness: Theme.glassDefault.brightness,
-        contrast: Theme.glassDefault.contrast,
-        saturation: Theme.glassDefault.saturation,
-        bevel: Theme.glassDefault.bevel,
-        thickness: Theme.glassDefault.thickness,
-        bevel_profile: Theme.glassDefault.bevelProfile,
-        refraction: Theme.glassDefault.refraction,
-        ior: Theme.glassDefault.ior,
-        dispersion: Theme.glassDefault.dispersion,
-        shine: Theme.glassDefault.shine
-    })
+    readonly property var defaultLookParams: {
+        const out = {}
+        for (const g of GlassParams.look) {
+            const v = Theme.glassDefault[g.themeKey]
+            out[g.key] = g.type === "color" ? ThemeStore.colorString(v, false) : v
+        }
+        return out
+    }
     readonly property string defaultLook: glassParams
         .filter(p => defaultLookParams[p.key] !== undefined)
-        .map(p => p.key + "=" + (p.type === "color" ? defaultLookParams[p.key] : num(defaultLookParams[p.key])))
+        .map(p => p.key + "=" + (p.type === "color" ? defaultLookParams[p.key] : RuleLua.num(defaultLookParams[p.key])))
         .join(" ")
 
     // What a rule's glass really uses for each key: the default look's values when it follows it
@@ -108,7 +100,7 @@ Singleton {
         const parts = []
         for (const p of glassParams)
             if (ownKeys.indexOf(p.key) >= 0 && params[p.key] !== undefined)
-                parts.push(p.key + "=" + num(params[p.key]))
+                parts.push(p.key + "=" + RuleLua.num(params[p.key]))
         parts.push(defaultLook)
         return parts.join(" ")
     }
@@ -138,25 +130,16 @@ Singleton {
     // The parameters of the glass (the keys of the `lucent_glass` rule; see the Lucent README). `def`
     // is what the plugin uses when the key is left out; `type: "color"` takes #rrggbb. `block` groups
     // them on the page (in this order: `paramBlocks`), like the Theme pages' Tone / Rim / Light.
-    readonly property var glassParams: [
-        { block: "Blur", key: "radius", label: "Radius", min: 0, max: 100, step: 1, def: 16, note: "Blur strength, in pixels" },
-        { block: "Blur", key: "taps", label: "Quality", min: 1, max: 48, step: 1, def: 32, note: "Samples per side: lower is cheaper" },
-        { block: "Tone", key: "frost", label: "Frost", min: 0, max: 1, step: 0.05, def: 1, note: "1: only the blurred picture. Lower: some sharp shows" },
-        { block: "Tone", key: "tint", label: "Tint colour", type: "color", def: "#000000", note: "Mixed in with the tint strength" },
-        { block: "Tone", key: "tint_strength", label: "Tint strength", min: 0, max: 1, step: 0.05, def: 0, note: "0: no tint (with a tint colour alone: 0.25)" },
-        { block: "Tone", key: "brightness", label: "Brightness", min: -1, max: 1, step: 0.01, def: 0, note: "Added to what is behind" },
-        { block: "Tone", key: "contrast", label: "Contrast", min: 0, max: 3, step: 0.01, def: 1 },
-        { block: "Tone", key: "saturation", label: "Saturation", min: 0, max: 3, step: 0.05, def: 1, note: "0 is grey" },
-        { block: "Rim", key: "bevel", label: "Width", min: 0, max: 40, step: 1, def: 0, note: "The curved glass edge, in px. 0 is flat" },
-        { block: "Rim", key: "thickness", label: "Height", min: 0, max: 16, step: 0.1, def: 0, note: "How far the rim bends what is behind" },
-        { block: "Rim", key: "bevel_profile", label: "Curve", min: 2, max: 4, step: 0.5, def: 3, note: "2 round, 3 smooth, 4 smoothest" },
-        { block: "Light", key: "refraction", label: "Refraction", min: 0, max: 16, step: 0.1, def: 0, note: "Needs a rim width and height" },
-        { block: "Light", key: "ior", label: "Index of refraction", min: 1, max: 4, step: 0.05, def: 1.45, note: "Higher bends more" },
-        { block: "Light", key: "dispersion", label: "Dispersion", min: 0, max: 1, step: 0.01, def: 0, note: "Coloured fringes along the rim" },
-        { block: "Light", key: "shine", label: "Shine", min: 0, max: 8, step: 0.1, def: 0, note: "Light that catches the rim" },
-        { block: "Window", key: "corner_radius", label: "Corner radius", min: 0, max: 40, step: 1, def: 6, note: "Left out: the window's own rounding (6)" },
-        { block: "Window", key: "opacity", label: "Opacity", min: 0, max: 1, step: 0.05, def: 1, note: "Below 1 the sharp background shows through" }
-    ]
+    readonly property var glassParams: {
+        const fromLook = g => Object.assign({}, g, { note: g.ruleNote ?? g.note })
+        const own = [
+            { block: "Blur", key: "radius", label: "Radius", min: 0, max: 100, step: 1, def: 16, note: "Blur strength, in pixels" },
+            { block: "Blur", key: "taps", label: "Quality", min: 1, max: 48, step: 1, def: 32, note: "Samples per side: lower is cheaper" },
+            { block: "Window", key: "corner_radius", label: "Corner radius", min: 0, max: 40, step: 1, def: 6, note: "Left out: the window's own rounding (6)" },
+            { block: "Window", key: "opacity", label: "Opacity", min: 0, max: 1, step: 0.05, def: 1, note: "Below 1 the sharp background shows through" }
+        ]
+        return own.slice(0, 2).concat(GlassParams.look.map(fromLook), own.slice(2))
+    }
 
     // [{ title, params }] in the order of glassParams.
     readonly property var paramBlocks: {
@@ -316,143 +299,6 @@ Singleton {
         return parts.length ? parts.join(" · ") : "nothing yet"
     }
 
-    // ---- Lua ------------------------------------------------------------------------------------
-
-    function luaStr(s) {
-        return "\"" + String(s).replace(/[\u0000-\u001f]/g, "").replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\""
-    }
-
-    function num(v) {
-        return String(Number(Number(v).toFixed(4)))
-    }
-
-    function glassString(r) {
-        if (r.glass.mode === "off")
-            return "false"
-        if (r.glass.mode === "default")
-            return withDefaultLook(r.glass.params)
-        const parts = []
-        for (const p of glassParams) {
-            const v = r.glass.params[p.key]
-            if (v === undefined)
-                continue
-            parts.push(p.key + "=" + (p.type === "color" ? v : num(v)))
-        }
-        return parts.length > 0 ? parts.join(" ") : "true"
-    }
-
-    function ruleLua(r, name) {
-        const m = r.match
-        const match = []
-        for (const k of ["class", "title", "initial_class", "initial_title"])
-            if (m[k])
-                match.push(k + " = " + luaStr(m[k]))
-        if (m.float)
-            match.push("float = " + (m.float === "yes" ? "true" : "false"))
-        const lines = ["hl.window_rule({"]
-        if (name)
-            lines.push("    name         = " + luaStr(name) + ",")
-        lines.push("    match        = { " + match.join(", ") + " },")
-        for (const e of r.effects || [])
-            if (e.value.trim() !== "")
-                lines.push("    " + e.key + " = " + e.value + ",")
-        if (r.glass.mode !== "inherit")
-            lines.push("    lucent_glass = " + luaStr(glassString(r)) + ",")
-        lines.push("})")
-        return lines.join("\n")
-    }
-
-    function toLua(list) {
-        const out = []
-        out.push("-- hyprland-settings.lua: written by the settings app (Hyprland › Window rules). Do not edit it")
-        out.push("-- by hand: the app rewrites it at every change, and the rules below come from the data in the")
-        out.push("-- comment. It is loaded at the END of hyprland.lua, so these rules override the base config's")
-        out.push("-- (a later rule wins), and it is in .gitignore: it never goes to GitHub.")
-        out.push("--[====[ quickshell-settings")
-        out.push(JSON.stringify({ version: 1, rules: list, follow: follow, look: defaultLook }, null, 2))
-        out.push("]====]")
-        out.push("")
-        out.push("-- lucent_glass is a window rule effect of the Lucent plugin: unknown (an error) without it.")
-        out.push("local lucent = io.open(\"" + pluginPath + "\", \"r\")")
-        out.push("if lucent then")
-        out.push("    lucent:close()")
-        out.push("")
-        let n = 0
-        // The base rules that follow the default look, first (the rules below win over them).
-        out.push("    LucentGlassFollowers = LucentGlassFollowers or {}")
-        for (const name of follow) {
-            const b = baseRules.find(x => x.name === name)
-            if (!b || !b.glass || b.glass.mode !== "custom")
-                continue
-            const match = []
-            for (const k of Object.keys(b.match)) {
-                const v = b.match[k]
-                match.push(k + " = " + (typeof v === "string" ? luaStr(v) : typeof v === "boolean" ? String(v) : num(v)))
-            }
-            out.push("    LucentGlassFollowers[" + luaStr(name) + "] = hl.window_rule({")
-            out.push("        name         = " + luaStr(name + " (default look)") + ",")
-            out.push("        match        = { " + match.join(", ") + " },")
-            out.push("        lucent_glass = " + luaStr(withDefaultLook(b.glass.params)) + ",")
-            out.push("    })")
-            out.push("")
-            n++
-        }
-        const used = {}
-        // The first rule of the list is written last: a later rule wins, so the rule higher in the list
-        // has the say when several match the same window.
-        for (let i = list.length - 1; i >= 0; i--) {
-            const r = list[i]
-            if (!r.enabled || !writable(r))
-                continue
-            let name = r.name.replace(/[^\w .\-]/g, "").trim()
-            if (name) {
-                let unique = name
-                for (let i = 2; used[unique]; i++)
-                    unique = name + " " + i
-                used[unique] = true
-                name = unique
-            }
-            out.push(ruleLua(r, name).replace(/^/gm, "    "))
-            out.push("")
-            n++
-        }
-        if (n === 0)
-            out.push("    -- (no rules)")
-        out.push("end")
-        out.push("")
-        return out.join("\n")
-    }
-
-    function fromLua(text) {
-        const m = /--\[====\[ quickshell-settings\n([\s\S]*?)\n\]====\]/.exec(text)
-        if (!m)
-            return null
-        try {
-            const data = JSON.parse(m[1])
-            if (!data || !Array.isArray(data.rules))
-                return null
-            root.follow = Array.isArray(data.follow) ? data.follow.filter(x => typeof x === "string") : []
-            root.writtenLook = typeof data.look === "string" ? data.look : ""
-            // Fill in what an older or hand-made file may lack.
-            return data.rules.map(r => {
-                const e = emptyRule()
-                return {
-                    id: typeof r.id === "string" && r.id ? r.id : e.id,
-                    name: typeof r.name === "string" ? r.name : "",
-                    enabled: r.enabled !== false,
-                    match: Object.assign(e.match, r.match || {}),
-                    effects: cleanEffects(r.effects),
-                    glass: {
-                        mode: root.modes.indexOf(r.glass?.mode) >= 0 ? r.glass.mode : "custom",
-                        params: (r.glass && typeof r.glass.params === "object" && r.glass.params) ? r.glass.params : {}
-                    }
-                }
-            })
-        } catch (e) {
-            return null
-        }
-    }
-
     // ---- writing and applying -------------------------------------------------------------------
 
     property var ownWrites: []
@@ -470,7 +316,7 @@ Singleton {
 
     function writeNow() {
         writtenLook = defaultLook
-        const text = toLua(rules)
+        const text = RuleLua.toLua(rules)
         ownWrites = ownWrites.concat([text]).slice(-8)
         status = "saving"
         message = ""
@@ -554,9 +400,11 @@ Singleton {
     function parseFile(text) {
         if (ownWrites.indexOf(text) >= 0)
             return
-        const list = fromLua(text)
-        if (list !== null) {
-            rules = list
+        const data = RuleLua.fromLua(text)
+        if (data !== null) {
+            follow = data.follow
+            writtenLook = data.look
+            rules = data.rules
             SettingsHistory.rebase(root)
         }
     }
@@ -617,220 +465,7 @@ Singleton {
         onTriggered: file.reload()
     }
 
-    // ---- the base config's rules (read-only) ----------------------------------------------------
-
-    property var baseRules: []
-
-    // Removes Lua comments (and nothing else; strings are kept as they are).
-    function stripComments(src) {
-        let out = ""
-        let i = 0
-        const n = src.length
-        while (i < n) {
-            const c = src[i]
-            if (c === "-" && src[i + 1] === "-") {
-                const m = /^--\[(=*)\[/.exec(src.substr(i, 40))
-                if (m) {
-                    const close = "]" + m[1] + "]"
-                    const e = src.indexOf(close, i + m[0].length)
-                    i = e < 0 ? n : e + close.length
-                } else {
-                    const e = src.indexOf("\n", i)
-                    i = e < 0 ? n : e
-                }
-                continue
-            }
-            if (c === "\"" || c === "'") {
-                let j = i + 1
-                while (j < n && src[j] !== c) {
-                    if (src[j] === "\\")
-                        j++
-                    j++
-                }
-                out += src.substring(i, j + 1)
-                i = j + 1
-                continue
-            }
-            const lm = c === "[" ? /^\[(=*)\[/.exec(src.substr(i, 12)) : null
-            if (lm) {
-                const close = "]" + lm[1] + "]"
-                const e = src.indexOf(close, i + lm[0].length)
-                const stop = e < 0 ? n : e + close.length
-                out += src.substring(i, stop)
-                i = stop
-                continue
-            }
-            out += c
-            i++
-        }
-        return out
-    }
-
-    // The index of the bracket that closes the one at `open` ({ or ( ), or -1.
-    function closeOf(src, open) {
-        const pairs = { "{": "}", "(": ")", "[": "]" }
-        let depth = 0
-        const n = src.length
-        for (let i = open; i < n; i++) {
-            const c = src[i]
-            if (c === "\"" || c === "'") {
-                i++
-                while (i < n && src[i] !== c) {
-                    if (src[i] === "\\")
-                        i++
-                    i++
-                }
-                continue
-            }
-            const lm = c === "[" ? /^\[(=*)\[/.exec(src.substr(i, 12)) : null
-            if (lm) {
-                const e = src.indexOf("]" + lm[1] + "]", i + lm[0].length)
-                if (e < 0)
-                    return -1
-                i = e + lm[1].length + 1
-                continue
-            }
-            if (c === "{" || c === "(" || c === "[")
-                depth++
-            else if (c === "}" || c === ")" || c === "]") {
-                depth--
-                if (depth === 0)
-                    return i
-            }
-        }
-        return -1
-    }
-
-    // The fields `key = value` at the top level of a table body, as [{key, value}] (value as text).
-    function topFields(body) {
-        const parts = []
-        let depth = 0
-        let start = 0
-        const n = body.length
-        for (let i = 0; i < n; i++) {
-            const c = body[i]
-            if (c === "\"" || c === "'") {
-                i++
-                while (i < n && body[i] !== c) {
-                    if (body[i] === "\\")
-                        i++
-                    i++
-                }
-                continue
-            }
-            const lm = c === "[" ? /^\[(=*)\[/.exec(body.substr(i, 12)) : null
-            if (lm) {
-                const e = body.indexOf("]" + lm[1] + "]", i + lm[0].length)
-                if (e < 0)
-                    break
-                i = e + lm[1].length + 1
-                continue
-            }
-            if (c === "{" || c === "(" || c === "[")
-                depth++
-            else if (c === "}" || c === ")" || c === "]")
-                depth--
-            else if (c === "," && depth === 0) {
-                parts.push(body.substring(start, i))
-                start = i + 1
-            }
-        }
-        parts.push(body.substring(start))
-        const out = []
-        for (const p of parts) {
-            const m = /^\s*([A-Za-z_]\w*)\s*=\s*([\s\S]*?)\s*$/.exec(p)
-            if (m)
-                out.push({ key: m[1], value: m[2] })
-        }
-        return out
-    }
-
-    // A Lua literal as text -> string / boolean, or undefined.
-    function literal(v) {
-        let m = /^"((?:[^"\\]|\\.)*)"$/.exec(v) || /^'((?:[^'\\]|\\.)*)'$/.exec(v)
-        if (m)
-            return m[1].replace(/\\(.)/g, "$1")
-        m = /^\[(=*)\[([\s\S]*)\]\1\]$/.exec(v)
-        if (m)
-            return m[2]
-        if (v === "true")
-            return true
-        if (v === "false")
-            return false
-        return undefined
-    }
-
-    // The rules of a Lua text: [{ name, match: {key: value}, effects: [{key, value}], glass }]
-    function parseBaseRules(text) {
-        const src = stripComments(text)
-        const out = []
-        let pos = 0
-        while (true) {
-            const at = src.indexOf("hl.window_rule(", pos)
-            if (at < 0)
-                break
-            pos = at + 15
-            const open = src.indexOf("{", at)
-            if (open < 0)
-                break
-            const close = closeOf(src, open)
-            if (close < 0)
-                break
-            pos = close
-            const fields = topFields(src.substring(open + 1, close))
-            const rule = { name: "", match: {}, effects: [], glass: null }
-            for (const f of fields) {
-                if (f.key === "name") {
-                    rule.name = String(literal(f.value) ?? "")
-                } else if (f.key === "match") {
-                    const mo = f.value.indexOf("{")
-                    const mc = mo >= 0 ? closeOf(f.value, mo) : -1
-                    if (mc > 0)
-                        for (const mf of topFields(f.value.substring(mo + 1, mc))) {
-                            const lv = literal(mf.value)
-                            if (lv !== undefined)
-                                rule.match[mf.key] = lv
-                        }
-                } else if (f.key !== "enabled") {
-                    rule.effects.push({ key: f.key, value: f.value.replace(/\s+/g, " ") })
-                    if (f.key === "lucent_glass")
-                        rule.glass = parseGlassValue(f.value)
-                }
-            }
-            out.push(rule)
-        }
-        return out
-    }
-
-    // The value of a lucent_glass effect (a string, or table.concat of strings): -> { mode, params }.
-    function parseGlassValue(value) {
-        const strings = []
-        const re = /"((?:[^"\\]|\\.)*)"/g
-        let m
-        while ((m = re.exec(value)) !== null)
-            strings.push(m[1])
-        const tokens = strings.join(" ").split(/[\s,]+/).filter(t => t.length > 0)
-        if (tokens.length === 1 && /^(false|off|no|0)$/.test(tokens[0]))
-            return { mode: "off", params: {} }
-        const params = {}
-        for (const t of tokens) {
-            const kv = /^([a-z_]+)=(.+)$/.exec(t)
-            if (!kv)
-                continue
-            const spec = glassParams.find(p => p.key === kv[1])
-            if (!spec)
-                continue
-            if (spec.type === "color") {
-                if (/^#[0-9a-fA-F]{6}$/.test(kv[2]))
-                    params[spec.key] = kv[2].toLowerCase()
-            } else {
-                const v = parseFloat(kv[2])
-                if (isFinite(v))
-                    params[spec.key] = Math.max(spec.min, Math.min(spec.max, v))
-            }
-        }
-        return { mode: "custom", params: params }
-    }
+    // ---- starting an override from a base config rule (BaseRules) -----------------------------
 
     // A new rule of ours that starts from a rule of the base config: the same match and glass.
     function overrideOf(b) {
@@ -848,22 +483,5 @@ Singleton {
             glass: b.glass ? JSON.parse(JSON.stringify(b.glass)) : { mode: "inherit", params: {} }
         }
         return addRule(base)
-    }
-
-    // Read again when it changes (`hms` links a new one) and when the Window rules page is shown, so
-    // that a rule written into hyprland.lua by hand shows up.
-    function reloadBase() {
-        baseFile.reload()
-    }
-
-    FileView {
-        id: baseFile
-        path: root.basePath
-        blockLoading: true
-        printErrors: false
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.baseRules = root.parseBaseRules(text())
-        Component.onCompleted: if (loaded) root.baseRules = root.parseBaseRules(text())
     }
 }

@@ -29,16 +29,18 @@ QtObject {
     function lookBlocks(prefix, showIf) {
         const look = ["glass", "blur", "frosted", "lens", "liquid", "style", "appearance"]
         const rim = look.concat(["bevel", "edge", "border", "refraction"])
-        const tone = [
-            { key: prefix + ".frost", keywords: look.concat(["blurred", "sharp", "transparency"]), label: "Frost", type: "number", kind: "real", min: 0, max: 1, step: 0.05, note: "1: only the blurred picture. Lower: some sharp shows" },
-            { key: prefix + ".tintStrength", keywords: look.concat(["tint", "colour", "color", "background", "dark", "opaque", "opacity", "hide"]), label: "Tint", type: "number", kind: "real", min: 0, max: 1, step: 0.05, note: "How much background colour is mixed in" },
-            { key: prefix + ".brightness", keywords: look.concat(["light", "dark", "lighten", "darken", "tone"]), label: "Brightness", type: "number", kind: "real", min: -0.5, max: 0.5, step: 0.01, note: "Added to what is behind" },
-            { key: prefix + ".contrast", keywords: look.concat(["tone", "flat", "sharpen"]), label: "Contrast", type: "number", kind: "real", min: 0.5, max: 1.5, step: 0.01 },
-            { key: prefix + ".saturation", keywords: look.concat(["colour", "color", "vivid", "grey", "gray", "tone"]), label: "Saturation", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "0 is grey" }
-        ]
+        // One parameter as a setting row (GlassParams has the ranges, labels and notes).
+        const row = (themeKey, base) => {
+            const g = GlassParams.byThemeKey(themeKey)
+            const item = { key: prefix + "." + themeKey, keywords: base.concat(g.words), label: g.themeLabel ?? g.label,
+                type: g.type === "color" ? "color" : "number", note: g.note ?? "" }
+            if (g.type !== "color")
+                Object.assign(item, { kind: "real", min: g.min, max: g.max, step: g.step })
+            return item
+        }
+        const tone = ["frost", "tintStrength", "tint", "brightness", "contrast", "saturation"].map(k => row(k, look))
         // The tint colour: Background for the default look until set, the default look's for a widget.
-        tone.splice(2, 0, { key: prefix + ".tint", keywords: look.concat(["tint", "colour", "color", "background", "hue"]), label: "Tint colour", type: "color",
-            note: prefix === "glassDefault" ? "Follows Background until set" : "The default look's until set" })
+        tone[2].note = prefix === "glassDefault" ? "Follows Background until set" : "The default look's until set"
         // The blur: the default look's is the setting glassBlurRadius, a widget's its own key.
         const blur = { key: prefix === "glassDefault" ? "glassBlurRadius" : prefix + ".blurRadius",
             keywords: look.concat(["strength", "sigma", "radius", "amount"]), label: "Blur radius", type: "number", kind: "real",
@@ -46,17 +48,8 @@ QtObject {
         const blocks = [
             { title: "Blur", items: [ blur ] },
             { title: "Tone", items: tone },
-            { title: "Rim", items: [
-                { key: prefix + ".bevel", keywords: rim.concat(["rim", "width", "curved"]), label: "Width", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "The curved glass edge, in px. 0 is flat" },
-                { key: prefix + ".thickness", keywords: rim.concat(["rim", "height", "depth", "lens"]), label: "Height", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "How far the rim bends what is behind" },
-                { key: prefix + ".bevelProfile", keywords: rim.concat(["rim", "curve", "profile", "smooth", "shape"]), label: "Curve", type: "number", kind: "real", min: 2, max: 4, step: 0.5, note: "2 round, 3 smooth, 4 smoothest. Compositor glass only" }
-            ] },
-            { title: "Light", items: [
-                { key: prefix + ".refraction", keywords: rim.concat(["bend", "lens", "distortion", "magnify"]), label: "Refraction", type: "number", kind: "real", min: 0, max: 4, step: 0.1, note: "How strongly the rim bends the background" },
-                { key: prefix + ".ior", keywords: rim.concat(["index", "refraction", "ior", "bend", "lens"]), label: "Index of refraction", type: "number", kind: "real", min: 1, max: 3, step: 0.05, note: "Higher bends more. 1.45 is glass" },
-                { key: prefix + ".dispersion", keywords: rim.concat(["fringe", "rainbow", "chromatic", "colour", "color"]), label: "Dispersion", type: "number", kind: "real", min: 0, max: 0.5, step: 0.01, note: "Coloured fringes along the rim" },
-                { key: prefix + ".shine", keywords: rim.concat(["light", "highlight", "gloss", "reflection", "glow"]), label: "Shine", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "Light that catches the rim" }
-            ] }
+            { title: "Rim", items: ["bevel", "thickness", "bevelProfile"].map(k => row(k, rim)) },
+            { title: "Light", items: ["refraction", "ior", "dispersion", "shine"].map(k => row(k, rim)) }
         ]
         for (const b of blocks) {
             if (showIf)
@@ -152,12 +145,9 @@ QtObject {
 
         { id: "bar", group: "theme", name: "Status bar", icon: "󰍹", description: "Layout and size of the bar. Height and glass changes apply after a restart", actions: ["restartBar"], sections: [
             { id: "style", title: "Style", items: [
-                { key: "barLayout", keywords: ["bar", "layout", "style", "notch", "islands", "balanced", "classic", "notification", "history", "osd", "brightness"], label: "Layout", type: "choice", options: [
-                    { id: "classic", label: "Classic" }, { id: "balanced", label: "Balanced" }, { id: "islands", label: "Islands" }, { id: "notch", label: "Notch" } ],
-                    note: "Balanced: clock in the centre. Islands: three pills. Notch: one pill that grows" },
-                { key: "barCentreStyle", showIf: { key: "barLayout", is: "balanced" }, keywords: ["bar", "clock", "date", "time", "balanced", "capsule", "stacked", "rule", "notification", "badge"], label: "Clock style", type: "choice", options: [
-                    { id: "capsule", label: "Capsule" }, { id: "stacked", label: "Stacked" }, { id: "rule", label: "Rule" } ],
-                    note: "Date and time in the middle. Balanced layout only" },
+                { key: "barLayout", keywords: ["bar", "layout", "style", "notch", "balanced", "notification", "history", "osd", "brightness"], label: "Layout", type: "choice", options: [
+                    { id: "balanced", label: "Balanced" }, { id: "notch", label: "Notch" } ],
+                    note: "Balanced: clock in the centre. Notch: one pill that grows" },
                 { key: "barOsdStyle", showIf: { key: "barLayout", is: "balanced" }, keywords: ["bar", "brightness", "volume", "osd", "indicator", "slider", "balanced", "bubble", "simple", "popup", "dock", "morph"], label: "Indicator style", type: "choice", options: [
                     { id: "simple", label: "Simple" }, { id: "bubble", label: "Bubble" }, { id: "dock", label: "Dock" } ],
                     note: "How brightness and volume changes show. Balanced layout only" }

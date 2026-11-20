@@ -10,11 +10,15 @@ Item {
     id: root
 
     required property var spec
+    // Where the value lives (SettingField's `store`).
+    property var store: ThemeStore
+    // A store that cannot be changed (base config rules): no reset arrow, no keyboard.
+    readonly property bool locked: !!store.readOnly
     default property alias control: controls.data
     property alias below: belowSlot.data
     property real belowHeight: 0
 
-    readonly property bool overridden: !!spec.key && ThemeStore.isSet(spec.key)
+    readonly property bool overridden: !!spec.key && store.isSet(spec.key)
     // A value of a widget's own look that it does not set: it follows the default look (dimmed).
     readonly property bool inherited: !!spec.inherits && !overridden
     // The small grey text under the label (a row may show something live instead of the schema's).
@@ -29,10 +33,11 @@ Item {
     // A stop of the keyboard cursor (KeyNav), without what opens under it; r resets it. The controls
     // (NumberField, ChoiceField, ...) add navAdjust / navActivate.
     readonly property bool navStop: true
+    readonly property bool navEnabled: !locked
     readonly property real navHeight: mainHeight
     function navReset() {
         if (overridden)
-            ThemeStore.reset(spec.key)
+            root.store.reset(spec.key)
     }
 
     width: parent ? parent.width : 0
@@ -62,6 +67,7 @@ Item {
         y: (root.mainHeight - 44) / 2
         height: 44
         width: Math.max(root.controlColumn, controls.width)
+        enabled: !root.locked
 
         Item {
             id: controls
@@ -74,8 +80,8 @@ Item {
     ResetButton {
         id: resetButton
         y: (root.mainHeight - 44) / 2 + 11
-        active: root.overridden
-        onClicked: ThemeStore.reset(root.spec.key)
+        active: root.overridden && !root.locked
+        onClicked: root.store.reset(root.spec.key)
     }
 
     Item {

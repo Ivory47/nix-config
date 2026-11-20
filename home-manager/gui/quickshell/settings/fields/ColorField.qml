@@ -9,10 +9,10 @@ import qs.core
 SettingsRow {
     id: root
 
-    readonly property color value: ThemeStore.value(spec.key)
+    readonly property color value: root.store.value(spec.key)
     readonly property bool hasAlpha: !!spec.alpha
     // Only one picker is open at a time: the store holds which colour it is.
-    readonly property bool open: ThemeStore.openColor === spec.key
+    readonly property bool open: root.store.openColor === spec.key
 
     // The picker's own state (a colour with no saturation has no hue to read back).
     property real h: 0
@@ -35,11 +35,11 @@ SettingsRow {
     Component.onCompleted: sync()
 
     function apply(commit) {
-        const str = ThemeStore.colorString(Qt.hsva(h, s, v, hasAlpha ? a : 1), hasAlpha)
+        const str = root.store.colorString(Qt.hsva(h, s, v, hasAlpha ? a : 1), hasAlpha)
         if (commit)
-            ThemeStore.set(spec.key, str)
+            root.store.set(spec.key, str)
         else
-            ThemeStore.setLive(spec.key, str)  // other shells (the bar) show it during the drag
+            root.store.setLive(spec.key, str)  // other shells (the bar) show it during the drag
     }
 
     belowHeight: open ? 150 : 0
@@ -49,7 +49,7 @@ SettingsRow {
     // In a colour grid: its cell, where the cursor goes back to when Enter closes the picker.
     property Item navBackTo: null
     function navActivate() {
-        ThemeStore.openColor = open ? "" : spec.key
+        root.store.openColor = open ? "" : spec.key
         const back = navBackTo
         return back ? () => back : undefined
     }
@@ -84,7 +84,7 @@ SettingsRow {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: ThemeStore.openColor = root.open ? "" : root.spec.key
+                onClicked: root.store.openColor = root.open ? "" : root.spec.key
             }
         }
 
@@ -104,7 +104,7 @@ SettingsRow {
             selectByMouse: true
             maximumLength: 9
 
-            readonly property string shown: ThemeStore.colorString(root.value, root.hasAlpha)
+            readonly property string shown: root.store.colorString(root.value, root.hasAlpha)
             text: shown
             onShownChanged: if (!activeFocus) text = shown
 
@@ -119,7 +119,7 @@ SettingsRow {
                 if (!/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(text))
                     text = shown
                 else if (!Qt.colorEqual(text, root.value))
-                    ThemeStore.set(root.spec.key, text.toLowerCase())
+                    root.store.set(root.spec.key, text.toLowerCase())
                 focus = false
             }
             onAccepted: accept()

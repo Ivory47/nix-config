@@ -8,7 +8,7 @@ QtObject {
     required property var view
 
     function scopeRoot() {
-        return view.searching ? view.results : view.pagesStack.children[view.categoryList.currentIndex]
+        return view.searching ? view.results : view.pageAt(view.categoryList.currentIndex)
     }
 
     function collect(item, out) {

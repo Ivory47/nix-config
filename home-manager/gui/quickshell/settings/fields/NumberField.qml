@@ -7,7 +7,7 @@ import qs.core
 SettingsRow {
     id: root
 
-    readonly property real value: ThemeStore.value(spec.key)
+    readonly property real value: root.store.value(spec.key)
     readonly property bool isInt: spec.kind === "int"
     readonly property real step: spec.step || (isInt ? 1 : 0.01)
 
@@ -19,7 +19,7 @@ SettingsRow {
     // h / l: one step; H / L: 10 steps (5 for whole numbers).
     function navAdjust(dir, big) {
         const n = big ? (isInt ? 5 : 10) : 1
-        ThemeStore.set(spec.key, clamp(value + dir * n * step))
+        root.store.set(spec.key, clamp(value + dir * n * step))
     }
 
     // i: type the value.
@@ -38,11 +38,11 @@ SettingsRow {
         to: root.spec.max
         step: root.step
         value: root.value
-        decimals: root.step < 0.1 ? 2 : 1
+        decimals: root.step >= 1 ? 0 : root.step < 0.1 ? 2 : 1
         dimmed: root.inherited
-        onMoved: v => ThemeStore.preview(root.spec.key, v)
-        onReleased: ThemeStore.commit()
-        onTyped: v => ThemeStore.set(root.spec.key, v)
+        onMoved: v => root.store.preview(root.spec.key, v)
+        onReleased: root.store.commit()
+        onTyped: v => root.store.set(root.spec.key, v)
     }
 
     // Stepper (kind "int")
@@ -51,7 +51,7 @@ SettingsRow {
         visible: root.isInt
         width: visible ? implicitWidth : 0
         text: root.text(root.value)
-        onStepped: d => ThemeStore.set(root.spec.key, root.clamp(root.value + d * root.step))
-        onTyped: v => ThemeStore.set(root.spec.key, root.clamp(v))
+        onStepped: d => root.store.set(root.spec.key, root.clamp(root.value + d * root.step))
+        onTyped: v => root.store.set(root.spec.key, root.clamp(v))
     }
 }
