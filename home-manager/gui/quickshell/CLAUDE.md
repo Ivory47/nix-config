@@ -27,7 +27,7 @@ Fails on untracked files (the flake cannot see them), on types or imports qmllin
 ## Detail docs (load automatically when you work in these folders; read them first when a task touches them)
 - `shared/glass/CLAUDE.md`: section 8 (status bar and background blur, clean mode, lessons), section 9 (glass on launcher and clipboard, testing without touching the real config, IPC and restarting) and section 11 (the Lucent plugin). Also `shared/glass/GLASS-WINDOWS.md`.
 - `settings/CLAUDE.md`: section 10 (theme overrides, the settings app, Hyprland window rules page).
-- `status-bar/CLAUDE.md`: the bar layouts (classic, balanced, islands, notch), the OSD and the notification history.
+- `status-bar/CLAUDE.md`: the bar layouts (balanced, notch), the OSD and the notification history.
 - `wallpapers/CLAUDE.md`: section 12 (wallpaper picker, overlay form). `notifications/CLAUDE.md`: section 13.
 - Section numbers cited elsewhere ("section 9", ...) keep the original numbering, which the headings in those files carry.
 
