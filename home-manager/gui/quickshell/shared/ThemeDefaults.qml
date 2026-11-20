@@ -105,7 +105,7 @@ QtObject {
     // The status bar and its small pills (its own look, as before: more of the sharp background).
     readonly property var glassBar: ({ look: "own", frost: 0.9, tintStrength: 0.35 })
     // The bar's menus and indicator: the Wi-Fi, volume and power panels, the notification centre, the
-    // brightness / volume indicator (the bar's "strong" pills, Balanced / Islands / Notch layouts).
+    // brightness / volume indicator (the bar's "strong" pills, Balanced / Notch layouts).
     readonly property var glassBarPanels: ({ look: "default" })
     readonly property var glassLauncher: ({ look: "default" })
     readonly property var glassClipboard: ({ look: "default" })
@@ -126,10 +126,8 @@ QtObject {
     readonly property int radiusLarge: 8
 
     readonly property int statusBarHeight: 50
-    // How the status bar is laid out: classic, balanced, islands or notch (see status-bar/).
+    // How the status bar is laid out: balanced or notch (see status-bar/).
     readonly property string barLayout: "balanced"
-    // The date and time in the middle of the "balanced" bar: capsule, stacked or rule.
-    readonly property string barCentreStyle: "stacked"
     // The brightness / volume indicator of the "balanced" bar: simple, bubble or dock.
     readonly property string barOsdStyle: "simple"
     readonly property int osdIndicatorWidth: 120

@@ -5,32 +5,24 @@ import qs.shared
 
 // The status bar. Which layout is shown is Theme.barLayout (Settings > Status bar), or what the IPC
 // target `bar` set for a quick look (`setLayout <name>`, `cycleLayout`; in memory only, `setLayout ""`
-// goes back to the setting). Classic is StatusBar.qml with its own brightness OSD; the others
-// (BalancedBar, IslandsBar, NotchBar) draw the indicator themselves from OsdSource.
+// goes back to the setting). Both layouts (BalancedBar, NotchBar) draw the indicator themselves from
+// OsdSource.
 ShellRoot {
     id: shell
 
     // The menus of the balanced bar close (a popup such as the launcher opened).
     signal closePanels()
 
-    readonly property var layouts: ["classic", "balanced", "islands", "notch"]
+    readonly property var layouts: ["balanced", "notch"]
     property string layoutOverride: ""
     readonly property string layout: {
         const l = layoutOverride !== "" ? layoutOverride : Theme.barLayout
-        return layouts.indexOf(l) >= 0 ? l : "classic"
+        return layouts.indexOf(l) >= 0 ? l : "balanced"
     }
 
     EventBridge {
         id: eventBridge
     }
-
-    // Classic's overlay OSD exists only in that layout.
-    Loader {
-        id: osdLoader
-        active: shell.layout === "classic"
-        sourceComponent: OSDManager {}
-    }
-    readonly property bool osdShowing: osdLoader.item?.showing ?? false
 
     Variants {
         model: Quickshell.screens
@@ -42,21 +34,11 @@ ShellRoot {
             sourceComponent: {
                 switch (shell.layout) {
                 case "balanced": return balancedC
-                case "islands": return islandsC
                 case "notch": return notchC
-                default: return classicC
+                default: return balancedC
                 }
             }
 
-            // Classic hides the bar while its OSD shows.
-            Binding {
-                target: bar.item
-                property: "showing"
-                value: !shell.osdShowing
-                when: shell.layout === "classic" && bar.item !== null
-            }
-
-            Component { id: classicC; StatusBar { screen: bar.modelData } }
             Component {
                 id: balancedC
                 BalancedBar {
@@ -68,7 +50,6 @@ ShellRoot {
                     }
                 }
             }
-            Component { id: islandsC; IslandsBar { screen: bar.modelData } }
             Component { id: notchC; NotchBar { screen: bar.modelData } }
         }
     }
@@ -77,10 +58,7 @@ ShellRoot {
         target: eventBridge
 
         function onBrightnessChanged() {
-            if (shell.layout === "classic")
-                osdLoader.item?.showBrightness()
-            else
-                OsdSource.showBrightness()
+            OsdSource.showBrightness()
         }
     }
 

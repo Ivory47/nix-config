@@ -3,8 +3,8 @@ import qs.shared
 
 // The brightness / volume indicator, simple: icon, bar, percent. The bar is the middle of it and the
 // icon and the number sit at its two ends in slots of the same width, so that the bar is exactly in
-// the middle of whatever this is put in. (The "simple" style of the balanced bar, and what the islands
-// and notch layouts draw inside their pills.) The icon is centred on the optical middle (CenteredText),
+// the middle of whatever this is put in. (The "simple" style of the balanced bar, and what the notch layout
+// draws inside its pill.) The icon is centred on the optical middle (CenteredText),
 // so that it lines up with the bar.
 Item {
     id: root

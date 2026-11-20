@@ -1,6 +1,6 @@
 import QtQuick
 
-// The power-profile menu as a popup window (classic, islands and notch layouts). The content is PowerPanel.qml.
+// The power-profile menu as a popup window (the notch layout). The content is PowerPanel.qml.
 BarMenu {
     id: popup
 

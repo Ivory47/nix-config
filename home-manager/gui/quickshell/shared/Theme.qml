@@ -73,7 +73,6 @@ QtObject {
     readonly property int radiusMedium: ThemeFromSettingsApp.integer("radiusMedium", ThemeDefaults.radiusMedium)
     readonly property int radiusLarge: ThemeFromSettingsApp.integer("radiusLarge", ThemeDefaults.radiusLarge)
 
-    readonly property string barCentreStyle: ThemeFromSettingsApp.text("barCentreStyle", ThemeDefaults.barCentreStyle)
     readonly property string barOsdStyle: ThemeFromSettingsApp.text("barOsdStyle", ThemeDefaults.barOsdStyle)
     readonly property string barLayout: ThemeFromSettingsApp.text("barLayout", ThemeDefaults.barLayout)
     readonly property int statusBarHeight: ThemeFromSettingsApp.integer("statusBarHeight", ThemeDefaults.statusBarHeight)

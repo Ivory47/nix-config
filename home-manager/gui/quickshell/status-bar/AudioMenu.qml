@@ -1,6 +1,6 @@
 import QtQuick
 
-// The volume menu as a popup window (classic, islands and notch layouts). The content is AudioPanel.qml.
+// The volume menu as a popup window (the notch layout). The content is AudioPanel.qml.
 BarMenu {
     id: popup
 

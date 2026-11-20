@@ -6,10 +6,9 @@ import Quickshell.Io
 import Quickshell.Services.Pipewire
 import qs.shared
 
-// What the brightness / volume indicator of the new bar layouts shows. `active` is true for about a
+// What the brightness / volume indicator of the bar layouts shows. `active` is true for about a
 // second after a change; `kind` is "brightness" or "volume"; `value` is 0..1 (the brightness is
-// on the same perceptual curve as BrightnessOSD); `muted` for the volume. The classic layout keeps
-// its own OSD (BrightnessOSD) and does not use this.
+// on a perceptual curve); `muted` for the volume.
 Singleton {
     id: root
 

@@ -4,14 +4,14 @@ import Quickshell.Wayland
 import qs.shared
 import qs.shared.glass
 
-// The window of a bar layout that draws its own pills (balanced, islands, notch): what they all have.
+// The window of a bar layout that draws its own pills (balanced, notch): what they all have.
 //  - the layer-shell window at the top edge (`barH` reserved, `panelH` more room below it for what grows
 //    out of the bar and its shadow; `gap`, `pillH` for pill layouts);
 //  - `panelOpen`: whether the bar has grown into a panel (history, menus, control centre); put a
 //    BarCatcher in the stage so that a click anywhere else closes it;
 //  - the toast: `toast` is the newest notification for `toastDuration` ms after it arrives (the one that
 //    was newest when the bar started is not news).
-// The layout adds `mask`, its pills and its own opening logic. (The classic bar is StatusBar.qml.)
+// The layout adds `mask`, its pills and its own opening logic.
 PanelWindow {
     id: win
 
