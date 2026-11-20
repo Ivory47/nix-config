@@ -16,8 +16,8 @@ Item {
     // The outline (a full one; `bottomLine` instead for a bar against the screen edges).
     property bool outline: true
     property bool bottomLine: false
-    // A bigger piece with text on it (a panel, the history): tinted like the popups, so that what is
-    // behind does not disturb the text.
+    // A bigger piece with text on it (a panel, the history, the indicator): the look of the bar's menus
+    // (Theme.glassBarPanels), so that what is behind does not disturb the text.
     property bool strong: false
     // A drop shadow (Theme.notificationShadow, outside the pill only): for the panels.
     property bool shadow: false
@@ -42,15 +42,15 @@ Item {
         height: Math.max(0, pill.height)
         active: wanted && pill.visible && pill.drawBackground && width > 8 && height > 8
         glassOpacity: pill.opacity
-        blurRadius: Theme.glassBlurRadius
+        blurRadius: (pill.strong ? Theme.glassBarPanels : Theme.glassBar).inUse.blurRadius
         holeRect: pill.holeRect
         holeRadius: pill.holeRadius
         maxTaps: Math.round(Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, blurRadius)), Theme.blurTapsFalloff)))
-        style: BarGlassStyle {
+        // The bar's look, or for a strong pill (a panel, the indicator) the look of the bar's menus.
+        style: ThemedGlassStyle {
+            look: pill.strong ? Theme.glassBarPanels.inUse : Theme.glassBar.inUse
             cornerRadius: pill.cornerRadius
             edges: pill.edges
-            tint: pill.strong ? Theme.background : Theme.barGlass.tint
-            tintStrength: pill.strong ? Theme.panelGlass.tintStrength : Theme.barGlass.tintStrength
         }
     }
 

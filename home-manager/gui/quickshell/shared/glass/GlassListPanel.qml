@@ -27,7 +27,9 @@ Item {
     property real selectedStrength: 0.7
     property real hoveredStrength: 0.5
     // How much of the tint colour is mixed into the glass (more hides more of what is behind).
-    property real tintStrength: Theme.panelGlass.tintStrength
+    // The look (Theme.glassX, one per widget): what it uses is `look.inUse` (its own or the default).
+    property GlassLook look: Theme.glassDefault
+    property real tintStrength: look.inUse.tintStrength
     // Opacity of the whole panel (1 = opaque glass; lower lets the live desktop show through).
     property real panelOpacity: 1.0
 
@@ -77,15 +79,14 @@ Item {
         return Qt.vector4d(highlightColor.r, highlightColor.g, highlightColor.b, strength)
     }
 
-    // (The look is Theme's: Settings › Theme › Panels, or the default look. Frost below 1 mixes some sharp background into
-    // the captured glass, which shows as faint text.)
-    PanelGlassStyle {
-        id: look
+    // (The look is Theme's: Settings › Theme › Glass › Widgets. Frost below 1 mixes some sharp
+    // background into the captured glass, which shows as faint text.)
+    ThemedGlassStyle {
+        id: panelStyle
+        look: root.look.inUse
         cornerRadius: Theme.radiusLarge
         edges: Qt.vector4d(1, 1, 1, 1)
-
-        // The old panel colour over the blur, translucent (raise tintStrength for more colour).
-        tint: Theme.background
+        // (The look's tint strength, unless the popup raises it.)
         tintStrength: root.tintStrength
         opacity: root.panelOpacity
     }
@@ -107,7 +108,7 @@ Item {
         hlColor1: root.highlight(root.selectedStrength)
         hlRect2: root.hoveredRect
         hlColor2: root.highlight(root.hoveredStrength)
-        style: look
+        style: panelStyle
     }
 
     // ... or the compositor's (GlassPopup.compositorGlass): the same look, drawn by the Lucent
@@ -125,6 +126,6 @@ Item {
         hlColor1: root.highlight(root.selectedStrength)
         hlRect2: root.hoveredRect
         hlColor2: root.highlight(root.hoveredStrength)
-        style: look
+        style: panelStyle
     }
 }

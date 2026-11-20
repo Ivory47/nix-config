@@ -32,6 +32,16 @@ KineticFlickable {
         background: Item {}
     }
 
+    // Scrolls so that `item` (anywhere inside the page) is near the top. `gentle`: only when it is not
+    // completely in view already.
+    function show(item, gentle) {
+        const y = item.mapToItem(contentItem, 0, 0).y
+        if (gentle && y >= contentY && y + item.height <= contentY + height)
+            return
+        stopGlide()
+        contentY = clampContentY(y - 40)
+    }
+
     Column {
         id: pageColumn
         x: 6

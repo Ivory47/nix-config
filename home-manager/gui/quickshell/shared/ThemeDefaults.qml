@@ -80,14 +80,14 @@ QtObject {
     // it; it is not blurred). 0: not darker.
     readonly property real scrimDim: 0.35
 
-    // The look of the glass (the same parameters as the Lucent plugin's glass and GlassStyle; see
-    // shared/glass/PanelGlassStyle.qml and BarGlassStyle.qml). `glassDefault` is the look everything follows
-    // unless it has its own: `glassPanel` (the launcher, the clipboard, the settings and the wallpaper picker)
-    // and `glassBar` (the status bar) are used only when glassPanelLook / glassBarLook is "own"; window rules
-    // of the settings app can follow it too. The defaults are the look the shells had before these were
-    // settings (the default look = the panels' look). The rim curve is only used by the compositor glass.
-
-    // Each is a GlassLook in Theme (Theme.glassDefault.frost, ...); keys in the settings file "glassBar.frost".
+    // The looks of the glass (the parameters of the Lucent plugin's glass and of GlassStyle; each is a
+    // GlassLook in Theme, read as Theme.glassLauncher.frost, ...; keys in the settings file
+    // {"glassLauncher": {"frost": ..}}). `glassDefault` is the look everything follows: every widget has a
+    // look of its own, used only while its `look` is "own"; a value it does not set follows the default
+    // look (live). So a widget's defaults hold only what differs from the default look. The default look
+    // is the look the panels had before these were settings. The rim curve is only used by the
+    // compositor glass. The tint colour is Background unless a look sets `tint`; the blur radius is
+    // glassBlurRadius unless a widget's look sets `blurRadius`.
     readonly property var glassDefault: ({
         frost: 1.0,
         tintStrength: 0.65,
@@ -102,38 +102,19 @@ QtObject {
         dispersion: 0.05,
         shine: 0.6
     })
-    readonly property var glassPanel: ({
-        frost: 1.0,
-        tintStrength: 0.65,
-        brightness: 0.02,
-        contrast: 1.04,
-        saturation: 1.2,
-        bevel: 14,
-        thickness: 0.7,
-        bevelProfile: 3,
-        refraction: 1.0,
-        ior: 1.45,
-        dispersion: 0.05,
-        shine: 0.6
-    })
-    readonly property var glassBar: ({
-        tint: "#1e1e2e",   // only the bar has a tint colour setting (follows Background until set)
-        frost: 0.9,
-        tintStrength: 0.35,
-        brightness: 0.02,
-        contrast: 1.04,
-        saturation: 1.2,
-        bevel: 14,
-        thickness: 0.7,
-        bevelProfile: 3,
-        refraction: 1.0,
-        ior: 1.45,
-        dispersion: 0.05,
-        shine: 0.6
-    })
-
-    readonly property string glassPanelLook: "default"   // "default": follow the default look; "own": glassPanel
-    readonly property string glassBarLook: "own"         // "default" or "own" (glassBar, with its tint colour)
+    // The status bar and its small pills (its own look, as before: more of the sharp background).
+    readonly property var glassBar: ({ look: "own", frost: 0.9, tintStrength: 0.35 })
+    // The bar's menus and indicator: the Wi-Fi, volume and power panels, the notification centre, the
+    // brightness / volume indicator (the bar's "strong" pills, Balanced / Islands / Notch layouts).
+    readonly property var glassBarPanels: ({ look: "default" })
+    readonly property var glassLauncher: ({ look: "default" })
+    readonly property var glassClipboard: ({ look: "default" })
+    readonly property var glassSettings: ({ look: "default" })      // the overlay and the window
+    readonly property var glassWallpapers: ({ look: "default" })    // the picker window
+    // The wallpaper overlay (Super+W): only its blur is used (the glass behind the side pictures, which
+    // are almost opaque); its own look by default, with the light blur it had before.
+    readonly property var glassWallpaperOverlay: ({ look: "own", blurRadius: 7 })
+    readonly property var glassNotifications: ({ look: "default" }) // the notification cards
 
     // Backdrop blur, used by shared/BackdropBlur.qml (independent of the compositor's blur).
     // 0.0 = off, 1.0 = strongest. Every config that uses BackdropBlur inherits this value.

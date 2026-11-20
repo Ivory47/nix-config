@@ -217,6 +217,7 @@ GlassWindow {
         field: searchField
         listView: grid
         hoveredItem: root.hoveredItem
+        look: Theme.glassWallpapers
     }
 
     Item {

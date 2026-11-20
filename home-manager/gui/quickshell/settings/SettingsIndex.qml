@@ -27,6 +27,9 @@ QtObject {
         { id: "windowRules", group: "hyprland", name: "Window rules", icon: "󰖯", sections: [] }
     ])
 
+    // Asks the settings view to show a setting in its page (a link row: LinkField). SettingsView.jumpTo.
+    signal jumpRequested(string catId, string key)
+
     function indexOf(catId) {
         return categories.findIndex(c => c.id === catId)
     }

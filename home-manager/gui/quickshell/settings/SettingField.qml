@@ -7,7 +7,8 @@ Loader {
 
     required property var spec
 
-    sourceComponent: spec.type === "color" ? colorC : spec.type === "bool" ? switchC : spec.type === "choice" ? choiceC : numberC
+    sourceComponent: spec.type === "color" ? colorC : spec.type === "bool" ? switchC : spec.type === "choice" ? choiceC
+        : spec.type === "link" ? linkC : numberC
 
     // Outlines the row for a moment (after "show in page").
     function flash() {
@@ -19,4 +20,5 @@ Loader {
     Component { id: switchC; SwitchField { spec: root.spec } }
     Component { id: choiceC; ChoiceField { spec: root.spec } }
     Component { id: numberC; NumberField { spec: root.spec } }
+    Component { id: linkC; LinkField { spec: root.spec } }
 }

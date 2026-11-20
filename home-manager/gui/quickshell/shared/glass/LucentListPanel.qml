@@ -24,6 +24,8 @@ LucentGlassPanel {
     // The blur's cost cap: the same as the popups' (GlassBackdrop.blurTaps), from the blur radius.
     maxTaps: Math.round(Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, blurRadius)), Theme.blurTapsFalloff)))
 
+    // The look (Theme.glassX, one per widget): what it uses is `look.inUse` (its own or the default).
+    property GlassLook look: Theme.glassDefault
     property color highlightColor: Theme.surfaceAlt
     property real fieldStrength: 0.55
     property real selectedStrength: 0.7
@@ -74,12 +76,12 @@ LucentGlassPanel {
     hlRect2: hoveredRect
     hlColor2: highlight(hoveredStrength)
 
-    // The look of the panels (Settings › Theme › Panels), with the rounding of a Hyprland window
+    // The widget's look (Settings › Theme › Glass › Widgets), with the rounding of a Hyprland window
     // (decoration.rounding): the window rounds its own content only, the glass rounds itself.
     // Override `style` for another look.
-    style: PanelGlassStyle {
+    style: ThemedGlassStyle {
+        look: root.look.inUse
         cornerRadius: 6
         edges: Qt.vector4d(1, 1, 1, 1)
-        tint: Theme.background
     }
 }

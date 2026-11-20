@@ -12,31 +12,17 @@ Item {
     property alias below: belowSlot.data
     property real belowHeight: 0
 
-    readonly property bool overridden: ThemeStore.isSet(spec.key)
+    readonly property bool overridden: !!spec.key && ThemeStore.isSet(spec.key)
+    // A value of a widget's own look that it does not set: it follows the default look (dimmed).
+    readonly property bool inherited: !!spec.inherits && !overridden
+    // The small grey text under the label (a row may show something live instead of the schema's).
+    property string note: spec.note || ""
 
-    // Outlines the row for a moment, so that it can be found (after "show in page"). An outline
-    // that is on or off, not faded: nothing translucent over the glass.
-    property bool flashing: false
+    // Outlines the row for a moment, so that it can be found (after "show in page", an undo).
     function flash() {
-        flashing = true
-        flashTimer.restart()
+        frame.flash()
     }
-    Timer {
-        id: flashTimer
-        interval: 1400
-        onTriggered: root.flashing = false
-    }
-    Rectangle {
-        visible: root.flashing
-        x: -4
-        y: 2
-        width: root.width + 8
-        height: root.height - 4
-        radius: Theme.radiusMedium
-        color: "transparent"
-        border.width: 2
-        border.color: Theme.accent
-    }
+    FlashFrame { id: frame }
 
     width: parent ? parent.width : 0
     height: mainHeight + belowHeight
@@ -53,7 +39,8 @@ Item {
         wrap: true
         y: (root.mainHeight - height) / 2
         label: root.spec.label
-        note: root.spec.note || ""
+        labelColor: root.inherited ? Theme.textSecondary : Theme.text
+        note: root.note
         width: Math.max(0, controlSlot.x - Theme.spacingLarge)
     }
 

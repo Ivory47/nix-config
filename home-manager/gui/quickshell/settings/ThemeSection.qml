@@ -2,7 +2,7 @@ import QtQuick
 import qs.shared
 
 // One section of a ThemePage (ThemeSchema: { id, title, note, kind, ... }): the accent title with a line
-// under it, then the settings drawn by `kind` (list, colors, table; "collapsed" is a ThemeGroup with
+// under it, then the settings drawn by `kind` (list, colors, table, widgets; "collapsed" is a ThemeGroup with
 // its own header instead). `page` is the ThemePage. Set `width`.
 Column {
     id: sec
@@ -86,6 +86,24 @@ Column {
         sourceComponent: SizeTable {
             page: sec.page
             section: sec.modelData
+        }
+    }
+
+    // widgets: one GlassWidgetRow each.
+    Loader {
+        active: sec.kind === "widgets"
+        visible: active
+        width: parent.width
+        sourceComponent: Column {
+            Repeater {
+                model: sec.modelData.widgets
+                delegate: GlassWidgetRow {
+                    required property var modelData
+                    width: parent.width
+                    page: sec.page
+                    widget: modelData
+                }
+            }
         }
     }
 

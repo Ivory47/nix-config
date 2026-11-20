@@ -447,10 +447,11 @@ PanelWindow {
     readonly property real sideContrast: -0.2
     // The neighbours have the compositor's glass behind them (the Lucent plugin, as everywhere else: see
     // shared/glass/GLASS-WINDOWS.md), so that what shines through their translucent pictures is the desktop
-    // blurred by `sideBlur` (sigma, logical px) and not the sharp desktop. Without the plugin, or with
+    // blurred by `sideBlur` (sigma, logical px; Settings › Glass › Widgets › Wallpaper overlay) and not the
+    // sharp desktop. Without the plugin, or with
     // Theme.glass / Theme.compositorGlass off, nothing is drawn behind them (the sharp desktop shows).
     readonly property bool sideGlass: true
-    readonly property real sideBlur: 7
+    readonly property real sideBlur: Theme.glassWallpaperOverlay.inUse.blurRadius
     // The backing of the bar and the hints over the desktop (so that they read over any window).
     readonly property color plateColor: OnImage.shadeA(0.82)
 

@@ -32,41 +32,80 @@ Singleton {
         return "#" + (alpha ? h(c.a) : "") + h(c.r) + h(c.g) + h(c.b)
     }
 
-    // The default of a key: "background", or a path into a group ("glassBar.frost").
+    // The default of a key: "background", or a path into a group ("glassBar.frost"). A glass look knows
+    // its own (a widget's unset values are the default look's, live).
     function defaultOf(key) {
         const dot = key.indexOf(".")
         if (dot < 0)
             return ThemeDefaults[key]
-        const group = ThemeDefaults[key.slice(0, dot)]
-        return group ? group[key.slice(dot + 1)] : undefined
+        const group = key.slice(0, dot)
+        const sub = key.slice(dot + 1)
+        if (Theme[group] && typeof Theme[group].defaultOf === "function")
+            return Theme[group].defaultOf(sub)
+        return ThemeDefaults[group] ? ThemeDefaults[group][sub] : undefined
     }
 
-    // Settings files written before the glass looks and the shadows were groups have flat keys
-    // ("glassBarTintStrength", "popupShadowOpacity"): rewritten once to paths ("glassBar.tintStrength").
-    // Only the settings app writes the file, so only it does this; the other shells read the result.
+    // Old settings files, rewritten once (only the settings app writes the file; the other shells read
+    // the result):
+    //  - flat keys from before the groups ("glassBarTintStrength", "popupShadowOpacity", "glassBarLook")
+    //    become paths ("glassBar.tintStrength", "glassBar.look");
+    //  - the one look all panels shared (`glassPanel`, used while `glassPanel.look` was "own") goes to
+    //    each widget it covered; without "own" it is dropped.
+    // Values equal to their default are dropped, as set() does.
     readonly property var legacyKey: /^(glassDefault|glassPanel|glassBar|popupShadow|notificationShadow)([A-Z]\w*)$/
+    readonly property var panelWidgets: ["glassLauncher", "glassClipboard", "glassSettings", "glassWallpapers", "glassNotifications"]
     function migrate() {
         const vals = ThemeFromSettingsApp.values
-        const old = Object.keys(vals).filter(k => legacyKey.test(k) && k !== "glassPanelLook" && k !== "glassBarLook")
-        if (old.length === 0)
+        const keys = Object.keys(vals)
+        if (!keys.some(k => legacyKey.test(k) || k.startsWith("glassPanel.")))
             return
         const next = Object.assign({}, vals)
-        for (const k of old) {
+        for (const k of keys.filter(k => legacyKey.test(k))) {
             const m = legacyKey.exec(k)
             const path = m[1] + "." + m[2].charAt(0).toLowerCase() + m[2].slice(1)
-            // (A value equal to its default is dropped, as set() does.)
-            if (next[path] === undefined && !same(vals[k], defaultOf(path)))
+            if (next[path] === undefined)
                 next[path] = vals[k]
             delete next[k]
         }
+        const panelOwn = next["glassPanel.look"] === "own"
+        for (const k of Object.keys(next).filter(k => k.startsWith("glassPanel."))) {
+            const sub = k.slice("glassPanel.".length)
+            if (panelOwn)
+                for (const w of panelWidgets)
+                    if (next[w + "." + sub] === undefined)
+                        next[w + "." + sub] = next[k]
+            delete next[k]
+        }
+        for (const k of Object.keys(next))
+            if (k.indexOf(".") > 0 && k.slice(k.indexOf(".") + 1) !== "look" && same(next[k], defaultOf(k)))
+                delete next[k]
         ThemeFromSettingsApp.values = next
         commit()
+        SettingsHistory.rebase(root)
     }
     property Connections migrateOnLoad: Connections {
         target: ThemeFromSettingsApp
         function onValuesChanged() { root.migrate() }
     }
-    Component.onCompleted: migrate()
+    // A file read (the app's own writes are not read back) is not an undoable step.
+    property Connections rebaseOnLoad: Connections {
+        target: ThemeFromSettingsApp.file
+        function onParsed() { Qt.callLater(() => SettingsHistory.rebase(root)) }
+    }
+    // The first setting (page order) whose value differs between two states.
+    function locate(from, to) {
+        const eq = (x, y) => x === undefined || y === undefined ? x === y : same(x, y)
+        const e = SettingsIndex.entries.find(e => !eq(from[e.spec.key], to[e.spec.key]))
+        return e ? { catId: e.catId, key: e.spec.key } : null
+    }
+
+    Component.onCompleted: {
+        SettingsHistory.register(root, () => ThemeFromSettingsApp.values, v => {
+            ThemeFromSettingsApp.values = v
+            commit()
+        }, locate)
+        migrate()
+    }
 
     function preview(key, value) {
         const next = Object.assign({}, ThemeFromSettingsApp.values)
@@ -89,6 +128,7 @@ Singleton {
     }
 
     function commit() {
+        SettingsHistory.committed(root)
         writeTimer.restart()
     }
 

@@ -27,6 +27,49 @@ Item {
         open = next
     }
 
+    // Shows what an undo or redo changed (SettingsView.jumpTo): `key` is a rule's id, "<id>#<field>" (a
+    // field of its editor, RuleCard.find) or "base:<name>" (a base rule that follows the default look
+    // or not). The card is opened first, and the page scrolled once it has its new size.
+    function scrollTo(key, gentle) {
+        const base = key.startsWith("base:")
+        if (base)
+            baseOpen = true
+        else if (HyprlandStore.byId(key.split("#")[0]))
+            setOpen(key.split("#")[0], true)
+        else
+            return
+        scrollTimer.key = key
+        scrollTimer.gentle = !!gentle
+        scrollTimer.restart()
+    }
+
+    function _scrollNow(key, gentle) {
+        if (key.startsWith("base:")) {
+            const i = HyprlandStore.baseRules.findIndex(b => b.name === key.slice(5))
+            const item = i >= 0 ? baseRepeater.itemAt(i) : null
+            if (item) {
+                flick.show(item, gentle)
+                item.flash()
+            }
+            return
+        }
+        const parts = key.split("#")
+        const card = ruleRepeater.itemAt(HyprlandStore.ruleIds.indexOf(parts[0]))
+        if (!card)
+            return
+        const field = parts[1] ? card.find(parts[1]) : null
+        flick.show(field || card, gentle)
+        card.flash(parts[1])
+    }
+
+    Timer {
+        id: scrollTimer
+        property string key: ""
+        property bool gentle: false
+        interval: 60
+        onTriggered: root._scrollNow(key, gentle)
+    }
+
     function addRule(base) {
         const id = base === undefined ? HyprlandStore.addRule() : base
         setOpen(id, true)
@@ -107,6 +150,7 @@ Item {
         }
 
         Repeater {
+            id: ruleRepeater
             model: HyprlandStore.ruleIds
 
             delegate: RuleCard {
@@ -193,6 +237,7 @@ Item {
                 spacing: Theme.spacingSmall
 
                 Repeater {
+                    id: baseRepeater
                     model: HyprlandStore.baseRules
 
                     delegate: Rectangle {
@@ -207,6 +252,9 @@ Item {
                         color: "transparent"
                         border.width: 1
                         border.color: expanded ? Theme.textMuted : Theme.surfaceAlt
+
+                        function flash() { baseFrame.flash() }
+                        FlashFrame { id: baseFrame }
 
                         // The row: click to show the details (the buttons on it take their own clicks).
                         Item {

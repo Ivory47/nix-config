@@ -4,12 +4,14 @@
 #   1. lint:  qmllint over every .qml of every shell (also files that only load later, through a Loader).
 #             Fails on a type that is not found or not resolved; everything else is only counted
 #             (`-v` prints all of it).
+#   1b. imports: a file that uses a singleton of shared/ (Theme, ThemeDefaults, ...) imports qs.shared
+#             (without it the name is undefined at runtime, which qmllint only counts as a warning).
 #   2. refs:  members read through an untyped parent reference (`required property var overlay`, `pane`, ...),
 #             which qmllint cannot see, must exist on the parent (needs python3).
 #   3. build: builds the Home Manager config this device runs (NIX_CONFIG_TYPE: laptop, desktop, ...,
 #             else `default`), through the same flake reference `hms` uses, so a file that git does not
 #             track (invisible to the build) fails here and not after `hms`.
-# Usage: check.sh [-v] [lint|refs|build]      (no argument: all)
+# Usage: check.sh [-v] [lint|imports|refs|build]      (no argument: all)
 # Needs qmllint (qt6.qtdeclarative, installed by default.nix) and the profile's quickshell (`qs`).
 set -u
 
@@ -93,6 +95,27 @@ lint() {
     done
     [ "$failed" = 0 ] && green "lint: all types resolve ($total other warnings, not failures; -v shows them)"
     return $failed
+}
+
+# A singleton of shared/ (Theme.x, ...) used in a file that does not `import qs.shared` is undefined at
+# runtime ("Theme is not defined": the launcher's glass ignored every setting once like this); qmllint only
+# reports it as one more "unqualified access" warning. Files directly in shared/ are that module and need no
+# import; shared/glass/ is another module and does. Comments are skipped.
+imports() {
+    local singletons bad=""
+    singletons=$(grep -l '^pragma Singleton' "$here"/shared/*.qml | xargs -n1 basename | sed 's/\.qml$//' | paste -sd'|')
+    while IFS= read -r f; do
+        case "$f" in "$here"/shared/*/*) ;; "$here"/shared/*) continue ;; esac
+        if sed 's#//.*##' "$f" | grep -qE "(^|[^A-Za-z0-9_.])($singletons)\." && ! grep -qE '^import qs\.shared$' "$f"; then
+            bad="$bad    ${f#"$here"/}\n"
+        fi
+    done < <(find "$here" -name '*.qml' -not -path '*/glass-test/*' -not -path '*/tools/*')
+    if [ -n "$bad" ]; then
+        red "imports: these use a singleton of shared/ (Theme, ...) without \`import qs.shared\`:"
+        printf "$bad"
+        return 1
+    fi
+    green "imports: every file that uses Theme (or another shared singleton) imports qs.shared"
 }
 
 # A component that is told its parent through an untyped `required property var <name>` (WallpaperOverlay's
@@ -215,10 +238,11 @@ build() {
 }
 
 case "$what" in
-    lint) tracked || status=1; lint || status=1; refs || status=1 ;;
+    lint) tracked || status=1; lint || status=1; imports || status=1; refs || status=1 ;;
+    imports) imports || status=1 ;;
     refs) refs || status=1 ;;
     build) tracked || status=1; build || status=1 ;;
-    all) tracked || status=1; lint || status=1; refs || status=1; build || status=1 ;;
-    *) echo "usage: check.sh [-v] [lint|refs|build]"; exit 2 ;;
+    all) tracked || status=1; lint || status=1; imports || status=1; refs || status=1; build || status=1 ;;
+    *) echo "usage: check.sh [-v] [lint|imports|refs|build]"; exit 2 ;;
 esac
 exit $status

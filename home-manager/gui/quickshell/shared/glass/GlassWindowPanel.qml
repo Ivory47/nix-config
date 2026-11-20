@@ -11,6 +11,8 @@ Item {
     required property Item field
     required property Item listView
     property Item hoveredItem: null
+    // The widget's glass look (Theme.glassX).
+    property GlassLook look: Theme.glassDefault
 
     readonly property bool glassOn: glass.active && glass.available
 
@@ -26,9 +28,10 @@ Item {
         id: glass
         anchors.fill: parent
         active: Theme.glass && Theme.compositorGlass
-        blurRadius: Theme.glassBlurRadius
+        blurRadius: root.look.inUse.blurRadius
         field: root.field
         listView: root.listView
         hoveredItem: root.hoveredItem
+        look: root.look
     }
 }

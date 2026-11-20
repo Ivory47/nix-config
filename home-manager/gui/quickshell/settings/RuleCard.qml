@@ -18,6 +18,29 @@ Rectangle {
 
     signal toggled(bool open)
 
+    // The row of a field (a TextRow, a ParamRow: their `fieldId`) in the editor, or null.
+    function find(field, from) {
+        for (const c of (from || content).children) {
+            if (c.fieldId === field)
+                return c
+            const r = find(field, c)
+            if (r)
+                return r
+        }
+        return null
+    }
+
+    // Outlines the card (or one field of it) for a moment.
+    function flash(field) {
+        const f = field ? find(field) : null
+        if (f)
+            f.flash()
+        else
+            frame.flash()
+    }
+
+    FlashFrame { id: frame }
+
     visible: !!rule
     width: parent ? parent.width : 0
     height: visible ? content.height : 0
@@ -32,8 +55,9 @@ Rectangle {
         const g = rule.glass
         if (g.mode === "off")
             return "glass off"
+        const ne = (rule.effects || []).length
         if (g.mode === "inherit")
-            return "no effect yet"
+            return ne > 0 ? ne + (ne === 1 ? " effect" : " effects") : "no effect yet"
         if (g.mode === "default")
             return "glass: default look"
         const n = Object.keys(g.params).length
@@ -204,6 +228,7 @@ Rectangle {
             }
 
             TextRow {
+                fieldId: "name"
                 label: "Name"
                 note: "Optional, for your own reference"
                 placeholder: "e.g. Terminal glass"
@@ -231,6 +256,7 @@ Rectangle {
 
                 delegate: TextRow {
                     required property var modelData
+                    fieldId: "match." + modelData.key
                     label: modelData.label
                     note: modelData.note
                     placeholder: modelData.ph
@@ -262,6 +288,30 @@ Rectangle {
             }
 
             Text {
+                visible: !!root.rule && root.rule.effects.length > 0
+                topPadding: Theme.spacingMedium
+                bottomPadding: Theme.spacingSmall
+                text: "EFFECTS   ·   other window rule effects (Lua values)"
+                color: Theme.textMuted
+                font.pixelSize: Theme.textSmall - 1
+                font.bold: true
+                font.letterSpacing: 1.0
+            }
+
+            Repeater {
+                // A count, not the list: an edit replaces the list, and the rows (with the focus) must stay.
+                model: root.rule ? root.rule.effects.length : 0
+
+                delegate: TextRow {
+                    required property int index
+                    fieldId: "effect." + index
+                    label: root.rule.effects[index].key
+                    value: root.rule.effects[index].value
+                    onEdited: text => HyprlandStore.setEffect(root.ruleId, index, text)
+                }
+            }
+
+            Text {
                 topPadding: Theme.spacingMedium
                 bottomPadding: Theme.spacingSmall
                 text: "GLASS   ·   drawn by the Lucent plugin behind the window"
@@ -287,7 +337,7 @@ Rectangle {
                 topPadding: Theme.spacingSmall
                 wrapMode: Text.WordWrap
                 text: !root.rule ? ""
-                    : root.rule.glass.mode === "inherit" ? "This rule does nothing yet. Pick Glass to add glass, or Glass off to switch the glass of a matching base rule off."
+                    : root.rule.glass.mode === "inherit" ? (root.rule.effects.length > 0 ? "This rule leaves the glass as it is. Pick Glass to add glass, or Glass off to switch it off." : "This rule does nothing yet. Pick Glass to add glass, or Glass off to switch the glass of a matching base rule off.")
                     : root.rule.glass.mode === "off" ? "Matching windows get no glass, even if a rule in the base config gives them some (this rule comes later, so it wins)."
                     : root.rule.glass.mode === "default" ? "The look set on the Theme › Glass page, kept up to date when it changes. Blur, corners and opacity below are this rule's own."
                     : "Only the parameters you change are set (marked with ↺); the rest keep the plugin's defaults, shown dimmed. It shows where the window itself is translucent."

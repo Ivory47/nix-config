@@ -56,7 +56,7 @@ Singleton {
     // The default look (the settings app's Glass page) as lucent_glass parameters.
     readonly property var defaultLookParams: ({
         frost: Theme.glassDefault.frost,
-        tint: ThemeStore.colorString(Theme.background, false),
+        tint: ThemeStore.colorString(Theme.glassDefault.tint, false),
         tint_strength: Theme.glassDefault.tintStrength,
         brightness: Theme.glassDefault.brightness,
         contrast: Theme.glassDefault.contrast,
@@ -184,8 +184,19 @@ Singleton {
         return {
             id: newId(), name: "", enabled: true,
             match: { class: "", title: "", initial_class: "", initial_title: "", float: "" },
+            effects: [],
             glass: { mode: "custom", params: {} }
         }
+    }
+
+    // The other effects of a rule (everything but lucent_glass, e.g. `float = true`): [{ key, value }],
+    // the value being Lua source, written as it is.
+    function cleanEffects(list) {
+        if (!Array.isArray(list))
+            return []
+        return list.filter(e => e && typeof e.key === "string" && /^[A-Za-z_]\w*$/.test(e.key)
+                                && e.key !== "lucent_glass" && e.key !== "name" && e.key !== "match")
+                   .map(e => ({ key: e.key, value: String(e.value ?? "") }))
     }
 
     // Adds a rule at the top and returns its id. `base` (optional) is merged over an empty rule.
@@ -198,6 +209,7 @@ Singleton {
             mode: root.modes.indexOf(g.mode) >= 0 ? g.mode : "custom",
             params: (g.params && typeof g.params === "object") ? g.params : {}
         }
+        r.effects = cleanEffects(base && base.effects)
         r.id = newId()
         rules = [r].concat(rules)
         commit()
@@ -238,6 +250,8 @@ Singleton {
     function setName(id, v) { modify(id, r => { r.name = v }); commit() }
     function setEnabled(id, v) { modify(id, r => { r.enabled = v }); commit() }
     function setMatch(id, key, v) { modify(id, r => { r.match[key] = v }); commit() }
+    function setEffect(id, index, v) { modify(id, r => { if (r.effects[index]) r.effects[index].value = v }); commit() }
+    function removeEffect(id, index) { modify(id, r => { r.effects.splice(index, 1) }); commit() }
     function setMode(id, mode) { modify(id, r => { r.glass.mode = mode }); commit() }
     // A glass parameter: `preview` while a slider is dragged (nothing is written), then commit().
     function previewParam(id, key, v) { modify(id, r => { r.glass.params[key] = v }) }
@@ -338,7 +352,11 @@ Singleton {
         if (name)
             lines.push("    name         = " + luaStr(name) + ",")
         lines.push("    match        = { " + match.join(", ") + " },")
-        lines.push("    lucent_glass = " + luaStr(glassString(r)) + ",")
+        for (const e of r.effects || [])
+            if (e.value.trim() !== "")
+                lines.push("    " + e.key + " = " + e.value + ",")
+        if (r.glass.mode !== "inherit")
+            lines.push("    lucent_glass = " + luaStr(glassString(r)) + ",")
         lines.push("})")
         return lines.join("\n")
     }
@@ -422,6 +440,7 @@ Singleton {
                     name: typeof r.name === "string" ? r.name : "",
                     enabled: r.enabled !== false,
                     match: Object.assign(e.match, r.match || {}),
+                    effects: cleanEffects(r.effects),
                     glass: {
                         mode: root.modes.indexOf(r.glass?.mode) >= 0 ? r.glass.mode : "custom",
                         params: (r.glass && typeof r.glass.params === "object" && r.glass.params) ? r.glass.params : {}
@@ -438,6 +457,7 @@ Singleton {
     property var ownWrites: []
 
     function commit() {
+        SettingsHistory.committed(root)
         writeTimer.restart()
     }
 
@@ -534,8 +554,58 @@ Singleton {
         if (ownWrites.indexOf(text) >= 0)
             return
         const list = fromLua(text)
-        if (list !== null)
+        if (list !== null) {
             rules = list
+            SettingsHistory.rebase(root)
+        }
+    }
+
+    Component.onCompleted: SettingsHistory.register(root, () => ({ rules: rules, follow: follow }), s => {
+        rules = s.rules
+        follow = s.follow
+        commit()
+    }, locate)
+
+    // What differs between two states, as a key for HyprlandPage.scrollTo: a base rule that follows the
+    // default look or not ("base:<name>"), else the first rule that was added, removed or changed
+    // (<id>, or <id>#<field> for the field of its editor). A rule that no longer exists has nothing to
+    // show: the page alone.
+    function locate(from, to) {
+        const page = key => ({ catId: "windowRules", key: key })
+        const name = from.follow.concat(to.follow).find(n => from.follow.includes(n) !== to.follow.includes(n))
+        if (name !== undefined)
+            return page("base:" + name)
+        for (const r of to.rules) {
+            const old = from.rules.find(x => x.id === r.id)
+            if (!old)
+                return page(r.id)
+            const field = changedField(old, r)
+            if (field !== "")
+                return page(r.id + (field === true ? "" : "#" + field))
+        }
+        return page("")
+    }
+
+    // The first field of a rule that differs: its editor's field id, true when it has none (the enable
+    // switch, the glass mode: the card is outlined), "" when nothing differs.
+    function changedField(a, b) {
+        const diff = (x, y) => JSON.stringify(x) !== JSON.stringify(y)
+        if (a.enabled !== b.enabled)
+            return true
+        if (a.name !== b.name)
+            return "name"
+        for (const k of Object.keys(b.match).concat(Object.keys(a.match)))
+            if (a.match[k] !== b.match[k])
+                return k === "float" ? true : "match." + k
+        for (let i = 0; i < Math.max(a.effects.length, b.effects.length); i++)
+            if (diff(a.effects[i], b.effects[i]))
+                return b.effects[i] ? "effect." + i : true
+        if (a.glass.mode !== b.glass.mode)
+            return true
+        for (const k of Object.keys(b.glass.params).concat(Object.keys(a.glass.params)))
+            if (diff(a.glass.params[k], b.glass.params[k]))
+                return "param." + k
+        return ""
     }
 
     // The file does not exist until the first change; look for it (Quickshell cannot watch a missing one).
@@ -773,7 +843,8 @@ Singleton {
                 initial_title: typeof m.initial_title === "string" ? m.initial_title : "",
                 float: m.float === true ? "yes" : (m.float === false ? "no" : "")
             },
-            glass: b.glass ? JSON.parse(JSON.stringify(b.glass)) : { mode: "custom", params: {} }
+            effects: b.effects.filter(e => e.key !== "lucent_glass"),
+            glass: b.glass ? JSON.parse(JSON.stringify(b.glass)) : { mode: "inherit", params: {} }
         }
         return addRule(base)
     }

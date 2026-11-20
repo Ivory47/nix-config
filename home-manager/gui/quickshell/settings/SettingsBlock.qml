@@ -37,7 +37,7 @@ Column {
                 width: parent.width
                 spec: entry.modelData
 
-                Component.onCompleted: root.page.fields[entry.modelData.key] = field
+                Component.onCompleted: if (entry.modelData.key) root.page.fields[entry.modelData.key] = field
             }
         }
     }

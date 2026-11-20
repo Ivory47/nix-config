@@ -22,6 +22,10 @@ GlassPopup {
     property string noMatchText: "No matches"
     property real panelWidth: 480
     property real panelHeight: 400
+    // The widget's glass look (Theme.glassLauncher, glassClipboard, ...).
+    property GlassLook look: Theme.glassDefault
+    // Its blur (GlassPopup's) is the look's too.
+    blurRadius: look.inUse.blurRadius
 
     readonly property alias searchField: searchField
     readonly property alias list: list
@@ -49,6 +53,7 @@ GlassPopup {
         height: panel.height
 
         popup: root
+        look: root.look
         shadow: true
         panelOpacity: Theme.popupOpacity
         field: searchField

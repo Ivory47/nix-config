@@ -16,6 +16,10 @@ import QtQuick
 //   "colors"          `blocks` of colours, as a grid of swatches with one editor under it (ColorGrid)
 //   "table"           `items`, drawn as `rows` ([{ label, keys }]) by `columns` (titles) (SizeTable)
 //   "collapsed"       `items` under a header that opens on click, closed at start (ThemeGroup)
+//   "widgets"         `widgets` ([{ id, title, note, items, blocks }], made by `widget()`): one line each with
+//                     the Default look / Own look choice; Own opens its look in place (GlassWidgetRow)
+// An item of type "link" (`look`: a widget's GlassLook name) is a row that says whether that widget follows
+// the default look and jumps to it (LinkField); it is not a Theme value, so `flatten` leaves it out.
 // `flatten(section)` lists every setting of a section with its place (for the search and the counts).
 QtObject {
     id: root
@@ -32,10 +36,15 @@ QtObject {
             { key: prefix + ".contrast", keywords: look.concat(["tone", "flat", "sharpen"]), label: "Contrast", type: "number", kind: "real", min: 0.5, max: 1.5, step: 0.01 },
             { key: prefix + ".saturation", keywords: look.concat(["colour", "color", "vivid", "grey", "gray", "tone"]), label: "Saturation", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "0 is grey" }
         ]
-        // The bar glass also has a tint colour (the panels use Background).
-        if (prefix === "glassBar")
-            tone.splice(2, 0, { key: "glassBar.tint", keywords: look.concat(["tint", "colour", "color", "bar", "background", "hue"]), label: "Tint colour", type: "color", note: "Follows Background until set" })
+        // The tint colour: Background for the default look until set, the default look's for a widget.
+        tone.splice(2, 0, { key: prefix + ".tint", keywords: look.concat(["tint", "colour", "color", "background", "hue"]), label: "Tint colour", type: "color",
+            note: prefix === "glassDefault" ? "Follows Background until set" : "The default look's until set" })
+        // The blur: the default look's is the setting glassBlurRadius, a widget's its own key.
+        const blur = { key: prefix === "glassDefault" ? "glassBlurRadius" : prefix + ".blurRadius",
+            keywords: look.concat(["strength", "sigma", "radius", "amount"]), label: "Blur radius", type: "number", kind: "real",
+            min: 0, max: 40, step: 1, note: "How strongly what is behind is blurred" }
         const blocks = [
+            { title: "Blur", items: [ blur ] },
             { title: "Tone", items: tone },
             { title: "Rim", items: [
                 { key: prefix + ".bevel", keywords: rim.concat(["rim", "width", "curved"]), label: "Width", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "The curved glass edge, in px. 0 is flat" },
@@ -49,27 +58,55 @@ QtObject {
                 { key: prefix + ".shine", keywords: rim.concat(["light", "highlight", "gloss", "reflection", "glow"]), label: "Shine", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "Light that catches the rim" }
             ] }
         ]
-        if (showIf)
-            for (const b of blocks)
+        for (const b of blocks) {
+            if (showIf)
                 b.showIf = showIf
+            // A widget's own look: a value it does not set follows the default look (shown dimmed).
+            if (prefix !== "glassDefault")
+                for (const i of b.items)
+                    i.inherits = true
+        }
         return blocks
     }
 
-    // The choice between the default look and an own one (Theme.glassPanelLook / glassBarLook).
-    function lookChoice(key, who, note) {
-        return { key: key, keywords: ["glass", "look", "default", "own", "follow", "inherit", "custom", who], label: "Look", type: "choice", options: [
-            { id: "default", label: "Default look" }, { id: "own", label: "Own look" } ], note: note }
+    // One widget (or group of widgets) of the Glass page's "widgets" section: its choice between the
+    // default look and its own (`<name>.look`), and its own look, shown only while that is "own".
+    // `name` is its GlassLook in Theme ("glassLauncher"); `words` extra search words.
+    // `only` (optional): the titles of the blocks that apply to it (a widget that uses only the blur).
+    function widget(name, title, note, words, only) {
+        const own = { key: name + ".look", is: "own" }
+        return {
+            id: name, title: title, note: note,
+            items: [ { key: name + ".look", keywords: ["glass", "look", "default", "own", "follow", "custom", "widget"].concat(words),
+                label: title, type: "choice", note: note, options: [ { id: "default", label: "Default look" }, { id: "own", label: "Own look" } ] } ],
+            blocks: lookBlocks(name, own).filter(b => !only || only.indexOf(b.title) >= 0)
+        }
     }
 
-    // Every setting of a section: [{ item, place, showIf }]. `place` is the block it is in under the
-    // section title ("" or "Rim"), `showIf` the setting's or its block's condition (or null).
+    // A row on a widget's own page that leads to its glass on the Glass page (LinkField).
+    function glassLink(name, label) {
+        return { type: "link", look: name, label: label, keywords: [] }
+    }
+
+    // Every setting of a section: [{ item, place, showIf, group }]. `place` is where it is under the section
+    // title ("", "Rim", "App launcher › Rim"), `showIf` the setting's or its block's condition (or null),
+    // `group` the widget whose look it is in (it opens and closes; "" otherwise).
     function flatten(section) {
         const out = []
         for (const i of (section.items || []))
-            out.push({ item: i, place: "", showIf: i.showIf || null })
+            if (i.type !== "link")
+                out.push({ item: i, place: "", showIf: i.showIf || null, group: "" })
         for (const b of (section.blocks || []))
             for (const i of b.items)
-                out.push({ item: i, place: b.title || "", showIf: i.showIf || b.showIf || null })
+                out.push({ item: i, place: b.title || "", showIf: i.showIf || b.showIf || null, group: "" })
+        // A widget: its choice (always shown), then its look (only while own; it opens and closes).
+        for (const w of (section.widgets || [])) {
+            for (const i of w.items)
+                out.push({ item: i, place: w.title, showIf: null, group: "" })
+            for (const b of w.blocks)
+                for (const i of b.items)
+                    out.push({ item: i, place: w.title + " › " + b.title, showIf: b.showIf || null, group: w.id })
+        }
         return out
     }
 
@@ -135,15 +172,20 @@ QtObject {
                 { key: "barFillOpacity", keywords: ["bar", "transparency", "alpha", "translucent"], label: "Fill opacity", type: "number", kind: "real", min: 0, max: 1, note: "Only visible with the glass off" }
             ] },
             { id: "glass", title: "Glass", items: [
-                root.lookChoice("glassBarLook", "bar", "Default: the look set on the Glass page. Own: the settings below")
-            ], blocks: root.lookBlocks("glassBar", { key: "glassBarLook", is: "own" }) }
+                root.glassLink("glassBar", "The bar"),
+                root.glassLink("glassBarPanels", "Menus and indicator")
+            ] }
         ] },
 
         { id: "panels", group: "theme", name: "Panels", icon: "󰕮", description: "Launcher, clipboard, settings and wallpaper picker", sections: [
             { id: "glass", title: "Glass", items: [
-                root.lookChoice("glassPanelLook", "panel", "Default: the look set on the Glass page. Own: the settings below"),
+                root.glassLink("glassLauncher", "App launcher"),
+                root.glassLink("glassClipboard", "Clipboard"),
+                root.glassLink("glassSettings", "Settings"),
+                root.glassLink("glassWallpapers", "Wallpaper picker"),
+                root.glassLink("glassWallpaperOverlay", "Wallpaper overlay"),
                 { key: "popupOpacity", keywords: ["alpha", "transparency", "transparent", "translucent", "opacity", "see through", "glass", "launcher", "clipboard", "popup", "widget", "menu", "panel"], label: "Opacity", type: "number", kind: "real", min: 0.2, max: 1, step: 0.05, note: "Launcher and clipboard. Lower shows the desktop through" }
-            ], blocks: root.lookBlocks("glassPanel", { key: "glassPanelLook", is: "own" }) },
+            ] },
             { id: "overlay", title: "Settings overlay", items: [
                 { key: "scrimDim", keywords: ["dim", "dark", "darker", "veil", "background", "desktop", "scrim", "settings", "backdrop", "overlay"], label: "Desktop dim", type: "number", kind: "real", min: 0, max: 0.9, step: 0.05, note: "How much darker the desktop gets behind the settings. 0: as it is" }
             ] },
@@ -156,6 +198,7 @@ QtObject {
 
         { id: "notifications", group: "theme", name: "Notifications", icon: "󰂚", description: "Popups from apps and the notification centre", actions: ["testNotification"], sections: [
             { id: "popups", title: "Popups", items: [
+                root.glassLink("glassNotifications", "Glass"),
                 { key: "notificationTimeout", keywords: ["notification", "notify", "popup", "toast", "timeout", "duration", "dismiss", "disappear", "how long"], label: "Show for", type: "number", kind: "real", min: 0, max: 60, step: 1, note: "Seconds. 0: until clicked away. Critical ones always stay" }
             ] },
             { id: "shadow", title: "Shadow", note: "Under the cards and the notification centre", items: [
@@ -165,13 +208,22 @@ QtObject {
             ] }
         ] },
 
-        { id: "glass", group: "theme", name: "Glass", icon: "󰂵", description: "Live glass and the default look. The panels and the status bar can follow it or have their own", sections: [
+        { id: "glass", group: "theme", name: "Glass", icon: "󰂵", description: "Live glass, the default look, and which widgets have a look of their own", sections: [
             { id: "general", title: "General", items: [
                 { key: "glass", keywords: ["blur", "transparency", "liquid", "frosted", "capture", "effects", "acrylic"], label: "Live glass", type: "bool", note: "Off: no screen capture. May need a restart of the shells" },
-                { key: "compositorGlass", keywords: ["blur", "lag", "latency", "lucent", "plugin", "hyprland", "compositor", "bar", "fast", "window"], label: "Compositor glass", type: "bool", note: "Drawn by the Lucent plugin, with no lag. Off or without the plugin: blurred from screen captures" },
-                { key: "glassBlurRadius", keywords: ["blur", "frosted", "strength", "sigma", "bar", "popup", "launcher", "window", "settings", "overlay"], label: "Blur radius", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "Bar, panels and windows" }
+                { key: "compositorGlass", keywords: ["blur", "lag", "latency", "lucent", "plugin", "hyprland", "compositor", "bar", "fast", "window"], label: "Compositor glass", type: "bool", note: "Drawn by the Lucent plugin, with no lag. Off or without the plugin: blurred from screen captures" }
             ] },
-            { id: "look", title: "Default look", note: "Used by the panels, and by the status bar and window rules that are set to follow it", blocks: root.lookBlocks("glassDefault") },
+            { id: "look", title: "Default look", note: "Every widget follows it unless set to its own look below; window rules can follow it too", blocks: root.lookBlocks("glassDefault") },
+            { id: "widgets", title: "Widgets", kind: "widgets", note: "Own look: change only what you want, the rest keeps following the default look", widgets: [
+                root.widget("glassBar", "Status bar", "The bar and its small pills", ["bar", "status bar", "pill", "taskbar"]),
+                root.widget("glassBarPanels", "Bar menus & indicator", "Wi-Fi, volume, power, notification centre, brightness and volume indicator", ["wifi", "volume", "power", "menu", "osd", "indicator", "notification centre", "history", "panel"]),
+                root.widget("glassLauncher", "App launcher", "", ["launcher", "apps", "applications"]),
+                root.widget("glassClipboard", "Clipboard", "", ["clipboard", "history", "paste"]),
+                root.widget("glassSettings", "Settings", "The overlay and the window", ["settings"]),
+                root.widget("glassWallpapers", "Wallpaper picker", "The picker window", ["wallpaper", "background", "picker"]),
+                root.widget("glassWallpaperOverlay", "Wallpaper overlay", "Super+W: the blur behind the side pictures", ["wallpaper", "overlay", "carousel", "side"], ["Blur"]),
+                root.widget("glassNotifications", "Notifications", "The notification cards", ["notification", "popup", "toast", "card"])
+            ] },
             { id: "performance", title: "Performance", note: "What the blur costs", kind: "collapsed", items: [
                 { key: "blurMaxTaps", keywords: ["blur", "quality", "performance", "cost", "samples", "taps", "gpu", "fast", "cheap", "expensive"], label: "Blur quality", type: "number", kind: "int", min: 4, max: 48, step: 2, note: "Samples per side: lower is cheaper" },
                 { key: "blurTapsFalloff", keywords: ["blur", "quality", "performance", "cost", "samples", "taps", "gpu", "strength", "scaling", "adaptive"], label: "Fewer samples for stronger blur", type: "number", kind: "real", min: 0, max: 1, step: 0.1, note: "0: always the same. 1: fewer as the blur grows" }

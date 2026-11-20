@@ -19,12 +19,18 @@ Item {
     readonly property bool isColor: spec.type === "color"
     property bool readOnly: false
 
+    // What a reveal (RuleCard.find) looks for, and the outline it flashes.
+    property string fieldId: ""
+    function flash() { frame.flash() }
+
     signal preview(var v)
     signal commit(var v)
     signal cleared()
 
     width: parent ? parent.width : 0
     height: 44
+
+    FlashFrame { id: frame }
 
     SettingsLabel {
         label: root.spec.label

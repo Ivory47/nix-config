@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import Quickshell.Wayland
+import qs.shared
 import qs.shared.glass
 
 // The clipboard history: the model, the rows, picking and deleting. The panel, search, keys, glass and
@@ -12,6 +13,7 @@ GlassSearchPopup {
     tagRed: 38
 
     ipcTarget: "clipboard"
+    look: Theme.glassClipboard
     // Ignores "one widget at a time" (shared/Widgets.qml): other widgets neither close it nor does it close them.
     exclusive: false
 

@@ -120,7 +120,7 @@ PanelWindow {
             anchors.fill: parent
             visible: glassBackdrop.glassEnabled
             backdrop: glassBackdrop
-            style: BarGlassStyle { id: barGlassStyle }
+            style: ThemedGlassStyle { id: barGlassStyle; look: Theme.glassBar.inUse }
         }
 
         // One opaque pixel at the top left: says which version of the bar a capture holds.
@@ -205,7 +205,7 @@ PanelWindow {
     GlassBackdrop {
         id: glassBackdrop
         composite: barContent
-        blurRadius: Theme.glassBlurRadius
+        blurRadius: Theme.glassBar.inUse.blurRadius
         ipcTarget: "glass"
         // (Not while the compositor draws the glass: no capture, no pipeline.)
         glassEnabled: Theme.glass && !compositorGlass.shown

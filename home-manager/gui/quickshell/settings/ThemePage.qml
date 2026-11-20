@@ -26,9 +26,9 @@ Item {
     readonly property var placeOf: {
         const out = {}
         for (const s of sections)
-            for (const { item, showIf } of ThemeSchema.flatten(s))
+            for (const { item, showIf, group } of ThemeSchema.flatten(s))
                 out[item.key] = {
-                    group: s.kind === "collapsed" ? s.id : "",
+                    group: s.kind === "collapsed" ? s.id : group,
                     showIf: showIf
                 }
         return out
@@ -56,35 +56,39 @@ Item {
     // Scrolls the page so that the setting is near the top, and outlines it for a moment. A setting in a
     // closed group opens the group (and waits for the page to be laid out again); one hidden by `showIf`
     // shows the setting it depends on instead.
-    function scrollTo(key) {
+    function scrollTo(key, gentle) {
         const p = placeOf[key]
         if (!p)
             return
-        if (p.showIf && Theme.value(p.showIf.key) !== p.showIf.is)
-            key = p.showIf.key
+        // Hidden (a widget that follows the default look): its choice row instead, nothing to open.
+        if (p.showIf && Theme.value(p.showIf.key) !== p.showIf.is) {
+            _scrollNow(p.showIf.key, gentle)
+            return
+        }
         if (p.group && !openGroups[p.group]) {
             setGroupOpen(p.group, true)
             scrollTimer.key = key
+            scrollTimer.gentle = !!gentle
             scrollTimer.restart()
             return
         }
-        _scrollNow(key)
+        _scrollNow(key, gentle)
     }
 
-    function _scrollNow(key) {
+    function _scrollNow(key, gentle) {
         const f = fields[key]
         if (!f)
             return
-        flick.stopGlide()
-        flick.contentY = flick.clampContentY(f.mapToItem(flick.contentItem, 0, 0).y - 40)
+        flick.show(f, gentle)
         f.flash()
     }
 
     Timer {
         id: scrollTimer
         property string key: ""
+        property bool gentle: false
         interval: 60
-        onTriggered: root._scrollNow(key)
+        onTriggered: root._scrollNow(key, gentle)
     }
 
     PageHeader {

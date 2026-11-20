@@ -55,16 +55,17 @@ QtObject {
     readonly property ShadowLook notificationShadow: ShadowLook { name: "notificationShadow" }
     readonly property real notificationTimeout: ThemeFromSettingsApp.real("notificationTimeout", ThemeDefaults.notificationTimeout)
     readonly property real scrimDim: ThemeFromSettingsApp.real("scrimDim", ThemeDefaults.scrimDim)
-    // The looks of the glass (see ThemeDefaults.qml): Theme.glassDefault.frost, ...
-    readonly property GlassLook glassDefault: GlassLook { name: "glassDefault"; fallbackTint: root.background }
-    readonly property GlassLook glassPanel: GlassLook { name: "glassPanel"; fallbackTint: root.background }
-    readonly property GlassLook glassBar: GlassLook { name: "glassBar"; fallbackTint: root.background }
-    // "default" (follow glassDefault) or "own".
-    readonly property string glassPanelLook: ThemeFromSettingsApp.text("glassPanelLook", ThemeDefaults.glassPanelLook)
-    readonly property string glassBarLook: ThemeFromSettingsApp.text("glassBarLook", ThemeDefaults.glassBarLook)
-    // Derived (not settings): the looks the panels and the bar really use, after that choice.
-    readonly property GlassLook panelGlass: glassPanelLook === "own" ? glassPanel : glassDefault
-    readonly property GlassLook barGlass: glassBarLook === "own" ? glassBar : glassDefault
+    // The looks of the glass (see ThemeDefaults.qml and GlassLook.qml): the default look, and one per
+    // widget (or group of widgets). A widget draws with Theme.glassX.inUse: its own look or the default.
+    readonly property GlassLook glassDefault: GlassLook { name: "glassDefault"; fallbackTint: root.background; fallbackBlur: root.glassBlurRadius }
+    readonly property GlassLook glassBar: GlassLook { name: "glassBar"; base: root.glassDefault }
+    readonly property GlassLook glassBarPanels: GlassLook { name: "glassBarPanels"; base: root.glassDefault }
+    readonly property GlassLook glassLauncher: GlassLook { name: "glassLauncher"; base: root.glassDefault }
+    readonly property GlassLook glassClipboard: GlassLook { name: "glassClipboard"; base: root.glassDefault }
+    readonly property GlassLook glassSettings: GlassLook { name: "glassSettings"; base: root.glassDefault }
+    readonly property GlassLook glassWallpapers: GlassLook { name: "glassWallpapers"; base: root.glassDefault }
+    readonly property GlassLook glassWallpaperOverlay: GlassLook { name: "glassWallpaperOverlay"; base: root.glassDefault }
+    readonly property GlassLook glassNotifications: GlassLook { name: "glassNotifications"; base: root.glassDefault }
     readonly property real backdropBlur: ThemeFromSettingsApp.real("backdropBlur", ThemeDefaults.backdropBlur)
 
     // Shape

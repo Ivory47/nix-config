@@ -40,6 +40,7 @@ Column {
                 delegate: ParamRow {
                     required property var modelData
                     visible: root.shows(modelData.key)
+                    fieldId: "param." + modelData.key
                     width: block.width
                     spec: modelData
                     readOnly: root.readOnly

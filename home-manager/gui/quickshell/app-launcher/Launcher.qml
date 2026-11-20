@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Wayland
+import qs.shared
 import qs.shared.glass
 
 // The app launcher: the model, the rows and what Enter and Tab do. The panel, search, keys, glass and
@@ -9,6 +10,7 @@ GlassSearchPopup {
     WlrLayershell.namespace: "app-launcher"
 
     ipcTarget: "launcher"
+    look: Theme.glassLauncher
     placeholder: "Search applications..."
     panelWidth: 600
     panelHeight: 400

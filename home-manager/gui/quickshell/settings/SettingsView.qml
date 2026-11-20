@@ -32,7 +32,20 @@ FocusScope {
     readonly property string currentCategoryId: SettingsIndex.categories[categoryList.currentIndex]?.id ?? ""
 
     // "Show in page": opens the category, ends the search and scrolls to the setting.
-    function jumpTo(catId, key) {
+    // A link row (LinkField) asks for a jump through the index.
+    Connections {
+        target: SettingsIndex
+        function onJumpRequested(catId, key) { root.jumpTo(catId, key) }
+    }
+
+    // An undo or redo shows what it changed: the page, then the setting (scrolled to only if it was out
+    // of view).
+    Connections {
+        target: SettingsHistory
+        function onRevealRequested(catId, key) { root.jumpTo(catId, key, true) }
+    }
+
+    function jumpTo(catId, key, gentle) {
         const idx = SettingsIndex.indexOf(catId)
         if (idx < 0)
             return
@@ -43,7 +56,7 @@ FocusScope {
         Qt.callLater(() => {
             const page = pages.children[idx]
             if (page && page.scrollTo)
-                page.scrollTo(key)
+                page.scrollTo(key, !!gentle)
         })
     }
 
@@ -77,6 +90,15 @@ FocusScope {
             event.accepted = true
         } else if (event.key === Qt.Key_C && (mods & Qt.ControlModifier)) {
             root.closeRequested()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Z && (mods & Qt.ControlModifier)) {
+            if (mods & Qt.ShiftModifier)
+                SettingsHistory.redo()
+            else
+                SettingsHistory.undo()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Y && (mods & Qt.ControlModifier)) {
+            SettingsHistory.redo()
             event.accepted = true
         } else if (event.key === Qt.Key_Tab && root.searching && scopeChip.visible) {
             root.onlyThis = !root.onlyThis
@@ -116,7 +138,7 @@ FocusScope {
             id: categoryList
             anchors.top: title.bottom
             anchors.topMargin: Theme.spacingSmall
-            anchors.bottom: resetAll.top
+            anchors.bottom: sidebarActions.top
             anchors.bottomMargin: Theme.spacingSmall
             width: parent.width
             spacing: Theme.spacingSmall
@@ -233,14 +255,35 @@ FocusScope {
             }
         }
 
-        // Resets every Theme value (all pages; not the window rules).
-        ActionButton {
-            id: resetAll
+        Column {
+            id: sidebarActions
             anchors.bottom: parent.bottom
             x: Theme.spacingSmall
-            text: "Reset all to defaults"
-            active: Object.keys(ThemeStore.values).length > 0
-            onClicked: ThemeStore.resetAll()
+            spacing: Theme.spacingSmall
+
+            // Every change of the app, on any page (SettingsHistory); Ctrl+Z and Ctrl+Shift+Z do the same.
+            Row {
+                spacing: Theme.spacingSmall
+
+                ActionButton {
+                    text: "Undo"
+                    active: SettingsHistory.canUndo
+                    onClicked: SettingsHistory.undo()
+                }
+                ActionButton {
+                    text: "Redo"
+                    active: SettingsHistory.canRedo
+                    onClicked: SettingsHistory.redo()
+                }
+            }
+
+            // Resets every Theme value (all pages; not the window rules).
+            ActionButton {
+                id: resetAll
+                text: "Reset all to defaults"
+                active: Object.keys(ThemeStore.values).length > 0
+                onClicked: ThemeStore.resetAll()
+            }
         }
     }
 

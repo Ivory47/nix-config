@@ -16,7 +16,7 @@ GlassPopup {
     panelItem: panel
 
     // The panel's blur, as strong as the other panels'.
-    blurRadius: Math.max(0.1, Theme.glassBlurRadius)
+    blurRadius: Math.max(0.1, Theme.glassSettings.inUse.blurRadius)
 
     onPopupClosed: view.reset()
 
@@ -44,10 +44,11 @@ GlassPopup {
         height: panel.height
 
         popup: root
+        look: Theme.glassSettings
         shadow: true
         // The less the desktop behind is blurred, the more tint: sharp text behind the panel
         // would show through it (from about 8 px of blur up, the panel's own tint is enough).
-        tintStrength: Math.min(1, Theme.panelGlass.tintStrength + 0.3 * (1 - Math.min(1, root.blurRadius / 8)))
+        tintStrength: Math.min(1, Theme.glassSettings.inUse.tintStrength + 0.3 * (1 - Math.min(1, root.blurRadius / 8)))
         field: view.searchField
         listView: view.categoryList
     }

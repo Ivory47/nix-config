@@ -161,12 +161,12 @@ Item {
         height: Math.max(0, Math.min(body.height, card.height))
         active: wanted && card.visible && width > 8 && height > 8
         glassOpacity: card.appear
-        blurRadius: Theme.glassBlurRadius
+        blurRadius: Theme.glassNotifications.inUse.blurRadius
         maxTaps: Math.round(Math.max(4, Theme.blurMaxTaps * Math.pow(Math.min(1, 14 / Math.max(0.1, blurRadius)), Theme.blurTapsFalloff)))
-        style: PanelGlassStyle {
+        style: ThemedGlassStyle {
+            look: Theme.glassNotifications.inUse
             cornerRadius: Theme.radiusLarge
             edges: Qt.vector4d(1, 1, 1, 1)
-            tint: Theme.background
         }
     }
 

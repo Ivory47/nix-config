@@ -27,6 +27,7 @@ SettingsRow {
         step: root.step
         value: root.value
         decimals: root.step < 0.1 ? 2 : 1
+        dimmed: root.inherited
         onMoved: v => ThemeStore.preview(root.spec.key, v)
         onReleased: ThemeStore.commit()
     }

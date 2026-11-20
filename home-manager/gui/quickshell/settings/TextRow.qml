@@ -13,6 +13,10 @@ Item {
     property string value: ""
     property bool valid: true
 
+    // What a reveal (RuleCard.find) looks for, and the outline it flashes.
+    property string fieldId: ""
+    function flash() { frame.flash() }
+
     signal edited(string text)
 
     width: parent ? parent.width : 0
@@ -54,4 +58,6 @@ Item {
 
         onTextEdited: root.edited(text)
     }
+
+    FlashFrame { id: frame }
 }
