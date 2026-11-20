@@ -21,17 +21,8 @@ Column {
         return n
     }
 
-    // Outlined for a moment when found (the page's scrollTo of its choice).
-    property bool flashing: false
-    function flash() {
-        flashing = true
-        flashTimer.restart()
-    }
-    Timer {
-        id: flashTimer
-        interval: 1400
-        onTriggered: row.flashing = false
-    }
+    // Marked for a moment when found (the page's scrollTo of its choice).
+    function flash() { frame.flash() }
     Component.onCompleted: page.fields[choice.key] = row
 
     Rectangle {
@@ -139,17 +130,7 @@ Column {
             }
         }
 
-        Rectangle {
-            visible: row.flashing
-            x: -4
-            y: 2
-            width: parent.width + 8
-            height: parent.height - 4
-            radius: Theme.radiusMedium
-            color: "transparent"
-            border.width: 2
-            border.color: Theme.accent
-        }
+        FlashFrame { id: frame }
     }
 
     // Its own look, while open: indented, with a line on the left that closes it.

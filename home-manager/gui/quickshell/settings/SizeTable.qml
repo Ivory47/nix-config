@@ -68,27 +68,15 @@ Column {
                         width: root.cellWidth
                         height: 44
 
-                        property bool flashing: false
-                        function flash() {
-                            flashing = true
-                            flashTimer.restart()
-                        }
-                        Timer {
-                            id: flashTimer
-                            interval: 1400
-                            onTriggered: cell.flashing = false
-                        }
+                        function flash() { frame.flash() }
                         Component.onCompleted: root.page.fields[cell.modelData] = cell
 
-                        Rectangle {
-                            visible: cell.flashing
-                            anchors.fill: parent
-                            anchors.topMargin: 4
-                            anchors.bottomMargin: 4
-                            radius: Theme.radiusMedium
-                            color: "transparent"
-                            border.width: 2
-                            border.color: Theme.accent
+                        FlashFrame {
+                            id: frame
+                            x: 0
+                            y: 4
+                            width: parent.width
+                            height: parent.height - 8
                         }
 
                         Stepper {

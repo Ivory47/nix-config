@@ -45,27 +45,26 @@ Column {
                         width: grid.cellWidth
                         height: 48
 
-                        property bool flashing: false
-                        function flash() {
-                            flashing = true
-                            flashTimer.restart()
-                        }
-                        Timer {
-                            id: flashTimer
-                            interval: 1400
-                            onTriggered: cell.flashing = false
-                        }
+                        function flash() { frame.flash() }
 
                         Component.onCompleted: root.page.fields[cell.modelData.key] = cell
 
-                        // Hover fill, open (or found) outline. Opaque or outline only: over the glass.
+                        // Hover fill and the open outline; the found marker is the FlashFrame.
                         Rectangle {
                             anchors.fill: parent
                             anchors.margins: 2
                             radius: Theme.radiusMedium
                             color: cellArea.containsMouse ? Theme.surface : "transparent"
-                            border.width: cell.open || cell.flashing ? (cell.flashing ? 2 : 1) : 0
-                            border.color: cell.flashing ? Theme.accent : Theme.textMuted
+                            border.width: cell.open ? 1 : 0
+                            border.color: Theme.textMuted
+                        }
+
+                        FlashFrame {
+                            id: frame
+                            x: 2
+                            y: 2
+                            width: parent.width - 4
+                            height: parent.height - 4
                         }
 
                         Rectangle {
