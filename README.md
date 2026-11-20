@@ -37,7 +37,6 @@ home-manager switch --flake $HOME/.config/home-manager#default
 <details>
   <summary>Issues</summary>
     
-  * using dirs was a bad idea cause it only knows the recent directories of the current shell
   * link.sh should use paths relative to the git root folder and not relative to itself, because this breaks easily
     
 </details>

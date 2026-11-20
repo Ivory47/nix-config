@@ -52,6 +52,7 @@ Fails on untracked files (the flake cannot see them), on types or imports qmllin
 ### Apply-and-test sequence
 1. Edit sources under `home-manager/gui/quickshell/`.
 2. `git add` only newly created files the build needs (tracked-but-edited files are picked up automatically).
+2b. Run `./check.sh` (all parts) and fix what it reports before asking to deploy: untracked files, unresolved types, parent-reference members and the build of this device's config. A clean run is required, not optional.
 3. Ask the user for approval, stating what will be applied, then `hms` (updates the store paths behind `~/.config/quickshell/*`).
 4. Ask the user for approval, then `qsr` (restarts the shells so they load the new config). Changes to `.qml`, shaders or `default.nix` need `hms` first; `qsr` alone would restart the old config.
 5. Verify: `ls -l ~/.config/quickshell/` shows the new store path, the bar is running (`pgrep -af "quickshell -c status-bar"`), and the intended behaviour is observed. Run `qs -c status-bar` in a terminal if errors are suspected (reload.sh hides them).
@@ -76,7 +77,7 @@ Fails on untracked files (the flake cannot see them), on types or imports qmllin
 - Glass diagnostics: `qs ipc -c status-bar call glass stats` (IPC target `glass`; also `setCapture`, `setGlass`, `setProcessing`, `setDepth`, `setDmabuf`, `setWholeOutput`, `setInterval`, `setPoolLimit`, `setForceReject`, `setDiagnostics`); `shared/glass/tools/measure.py` drives it (`python3 measure.py [seconds] [scenario ...]`; scenarios `glass-off`, `capture-off`, `capture-only`, `normal`, `pool-2`, `reject`; default `glass-off` and `normal`). It runs from the repo, is not deployed, and changes live pipeline settings over IPC: it ends by restoring the normal settings and turning diagnostics off. `glass-off` temporarily replaces the glass with a plain rectangle.
 - Glass latency: `shared/glass/tools/latency/run.sh <sweep|ramp|pulse|idle> <seconds> <tag>` (read its header). It starts a test background and a probe surface (same `GlassBackdrop` and `GlassPanel` as the bar) for a few seconds, both visible on screen, and leaves the running shells alone; `timeline.py` reads the probe's `WAYLAND_DEBUG` log and says for every compositor frame whether the glass got it one frame later (the floor), and if not, why (not captured, dropped as a duplicate, slow update). `GLASS_QML=<build>/lib/qt-6/qml` tests a `Glass.Native` build before `hms` (and `GLASS_SRC=1` the repository's `shared/glass/*.qml`); build one with `nix build --no-link --print-out-paths --impure --expr 'let f = builtins.getFlake "git+file:///home/user/src/nix-config?dir=home-manager"; pkgs = f.inputs.nixpkgs.legacyPackages.x86_64-linux; in pkgs.callPackage /home/user/src/nix-config/home-manager/gui/quickshell/shared/glass/native/package.nix {}'` (gives the deployed store path for an unchanged tree). `LAGCAP=1` with `pulse` records the real screen with Lucent's `lagcap` (`pulse.py`); that tool slows the compositor, so its numbers are higher than the timeline's.
 - Existing IPC used by Hyprland: `qs ipc -c status-bar call events brightnessChanged`.
-- Test/lint commands: none found. **UNKNOWN** whether any exist.
+- Test/lint: `./check.sh [-v] [lint|refs|build]` (section "Checking changes without running them"). There are no runtime tests: looks and behaviour need `hms` + `qsr` and the user's eyes.
 
 ## 6. Git rules
 - Inspect `git status` / `git diff` before and after every change.
@@ -85,6 +86,8 @@ Fails on untracked files (the flake cannot see them), on types or imports qmllin
 
 ## 7. Coding and testing guidelines
 - Understand existing code before changing it; prefer incremental improvements over rewrites; preserve existing functionality.
+- **Use the existing architecture and the existing values when it makes sense.** Before writing a component, a store, a popup, a bar layout, a colour or a size, look at "Shared building blocks" above and at `shared/` for one that already does it (`GlassPopup` / `GlassSearchPopup` for popups, `GlassWindow` for windows, `JsonFile` for a file store, `Chip`, `SettingsPage`, `BarWindow`, `BarMenu`, the `widget` IPC target for "one widget at a time"). Extend or parameterise it rather than copying it. The same for values: `Theme` colours, `Theme.spacing*`, `Theme.radius*`, `Theme.text*` instead of literals; if a colour you want is close to an existing one, use the existing one, and add a new `Theme` value (three edits: `ThemeDefaults`, `Theme`, `ThemeSchema`) only when nothing existing fits. Two near-identical blocks are a sign to extract, not to copy a third.
+- Keep files focused: a file over about 400 lines usually wants to be split (the pieces take their parent as `required property var <name>`; `check.sh refs` checks those).
 - Avoid new dependencies; keep things simple and maintainable.
 - Write tests where appropriate; run the relevant build/lint/test checks; review your own diff critically.
 - Explain important architectural decisions.

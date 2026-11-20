@@ -1,7 +1,8 @@
 import QtQuick
 import qs.shared
 
-// The slider of a number setting: a groove with a handle and the value as text to the right (200 x 44).
+// The slider of a number setting: a groove with a handle and the value as text to the right (200 x 44 unless
+// `width` is set: the groove takes what the 50 px of the value leave).
 // It only reports: `moved(v)` while it is dragged (and on the press), `released(v)` when it is let go; `v`
 // is clamped and rounded to `step`. `dimmed` draws it in the muted colours (a value that is not set).
 Item {
@@ -34,7 +35,7 @@ Item {
         id: groove
         x: 0
         y: 20
-        width: 150
+        width: root.width - 50
         height: 4
         radius: 2
         color: Theme.surface
@@ -73,7 +74,7 @@ Item {
     }
 
     Text {
-        x: 160
+        x: groove.width + 10
         anchors.verticalCenter: parent.verticalCenter
         width: 40
         text: root.value.toFixed(root.decimals)

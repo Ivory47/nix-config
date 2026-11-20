@@ -116,7 +116,8 @@ FocusScope {
             id: categoryList
             anchors.top: title.bottom
             anchors.topMargin: Theme.spacingSmall
-            anchors.bottom: parent.bottom
+            anchors.bottom: resetAll.top
+            anchors.bottomMargin: Theme.spacingSmall
             width: parent.width
             spacing: Theme.spacingSmall
             clip: true
@@ -129,13 +130,36 @@ FocusScope {
                 root.onlyThis = false
             }
 
-            model: SettingsIndex.categories
+            // The categories under their top-level headings (ListView sections: the headings are not
+            // rows, so the current row and the glass highlight are unaffected). A ListModel, because
+            // sections need a role; filled once from SettingsIndex.categories (already in group order).
+            model: ListModel {
+                id: categoryModel
+                Component.onCompleted: {
+                    for (const c of SettingsIndex.categories)
+                        append({ catId: c.id, name: c.name, icon: c.icon, groupName: SettingsIndex.groupName(c.group) })
+                }
+            }
+
+            section.property: "groupName"
+            section.delegate: BlockTitle {
+                required property string section
+                width: categoryList.width
+                leftPadding: Theme.spacingMedium
+                topPadding: Theme.spacingLarge
+                bottomPadding: Theme.spacingSmall
+                text: section
+            }
 
             delegate: Item {
                 id: cat
-                required property var modelData
+                required property string catId
+                required property string name
+                required property string icon
                 required property int index
                 readonly property bool hovered: catArea.containsMouse
+                // Something on its page differs from the defaults.
+                readonly property bool changed: SettingsIndex.keysOf(catId).some(k => ThemeStore.isSet(k))
 
                 width: categoryList.width
                 height: 44
@@ -163,14 +187,14 @@ FocusScope {
                     spacing: Theme.spacingMedium
 
                     Text {
-                        text: cat.modelData.icon
+                        text: cat.icon
                         color: Theme.text
                         font.pixelSize: Theme.textLarge - 2
                         anchors.verticalCenter: parent.verticalCenter
                     }
 
                     Text {
-                        text: cat.modelData.name
+                        text: cat.name
                         color: Theme.text
                         font.pixelSize: Theme.textMedium
                         anchors.verticalCenter: parent.verticalCenter
@@ -178,13 +202,24 @@ FocusScope {
                 }
 
                 // While searching: how many settings of this category match.
+                Rectangle {
+                    visible: cat.changed && !root.searching
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.spacingMedium + 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 7
+                    height: 7
+                    radius: 3.5
+                    color: Theme.accent
+                }
+
                 Text {
                     visible: root.searching
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.spacingMedium
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.matchCounts[cat.modelData.id] || 0
-                    color: (root.matchCounts[cat.modelData.id] || 0) > 0 ? Theme.textSecondary : Theme.textMuted
+                    text: root.matchCounts[cat.catId] || 0
+                    color: (root.matchCounts[cat.catId] || 0) > 0 ? Theme.textSecondary : Theme.textMuted
                     font.pixelSize: Theme.textSmall
                 }
 
@@ -196,6 +231,16 @@ FocusScope {
                     onClicked: categoryList.currentIndex = cat.index
                 }
             }
+        }
+
+        // Resets every Theme value (all pages; not the window rules).
+        ActionButton {
+            id: resetAll
+            anchors.bottom: parent.bottom
+            x: Theme.spacingSmall
+            text: "Reset all to defaults"
+            active: Object.keys(ThemeStore.values).length > 0
+            onClicked: ThemeStore.resetAll()
         }
     }
 
@@ -226,10 +271,11 @@ FocusScope {
             // Room for the search icon.
             leftPadding: Theme.spacingMedium + 30
             rightPadding: Theme.spacingMedium
-            // The text and cursor sat a little low next to the icon: the bottom padding
-            // is larger than the top, which moves the line up by half the difference.
+            // Equal paddings: the capital letters' middle is then level with the icon's
+            // (measured in a screenshot: 51 and 51-51.5 px; a bottom padding of 5 put the
+            // text and the placeholder about 3 px too high).
             topPadding: 0
-            bottomPadding: 5
+            bottomPadding: 0
             verticalAlignment: TextInput.AlignVCenter
             font.pixelSize: Theme.textMedium
             color: Theme.text
@@ -296,7 +342,12 @@ FocusScope {
             visible: !root.searching
             currentIndex: categoryList.currentIndex
 
-            ThemePage {}
+            // One page per category, in the order of SettingsIndex.categories.
+            ThemePage { catId: "appearance" }
+            ThemePage { catId: "bar" }
+            ThemePage { catId: "panels" }
+            ThemePage { catId: "notifications" }
+            ThemePage { catId: "glass" }
             HyprlandPage {}
         }
 

@@ -35,7 +35,9 @@ Item {
     // Below this blur radius (px) the veil is the plain tint, and how opaque that is.
     property real plainBelow: 3
     property real plainOpacity: 0.35
-    readonly property bool plain: (!popup.backdrop.glassEnabled && !popup.compositorGlass) || popup.blurRadius < plainBelow
+    // false: never glass, always the plain tint (the desktop stays sharp, only darker).
+    property bool blurred: true
+    readonly property bool plain: !blurred || (!popup.backdrop.glassEnabled && !popup.compositorGlass) || popup.blurRadius < plainBelow
 
     x: 0
     y: 0

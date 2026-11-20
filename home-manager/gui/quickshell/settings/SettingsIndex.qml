@@ -4,20 +4,43 @@ import QtQuick
 
 // The categories of the settings app and the search over all their settings.
 //
-// A category: id, name, icon, sections (the same shape as ThemeSchema.sections). Its page is the
-// item of the same index in SettingsView.qml's StackLayout. To add a category: an entry here and a
-// page there; its settings are searchable as soon as they are in `sections`.
+// The sidebar has top-level `groups` (Theme, Hyprland, ...: a heading each) and under them the categories
+// (one page each). A category: id, group, name, icon, description, sections (ThemeSchema's shape); the list
+// is in sidebar order (grouped). Its page is the item of the same index in SettingsView.qml's StackLayout.
+// To add a top-level group: an entry in `groups` and categories with that `group`. The Theme categories come from ThemeSchema; to add one,
+// an entry there and a ThemePage in the StackLayout; its settings are searchable as soon as they are in
+// its `sections`.
 QtObject {
     id: root
 
-    readonly property var categories: [
-        { id: "theme", name: "Theme", icon: "󰏘", sections: ThemeSchema.sections },
-        // (No searchable settings: its page is a list of rules, not fixed settings.)
-        { id: "hyprland", name: "Hyprland", icon: "󰖯", sections: [] }
+    readonly property var groups: [
+        { id: "theme", name: "Theme" },
+        { id: "hyprland", name: "Hyprland" }
     ]
+
+    function groupName(groupId) {
+        return groups.find(g => g.id === groupId)?.name ?? ""
+    }
+
+    readonly property var categories: ThemeSchema.categories.concat([
+        // (No searchable settings: its page is a list of rules, not fixed settings.)
+        { id: "windowRules", group: "hyprland", name: "Window rules", icon: "󰖯", sections: [] }
+    ])
 
     function indexOf(catId) {
         return categories.findIndex(c => c.id === catId)
+    }
+
+    // catId -> the Theme keys of its settings (the sidebar's "changed" dot, "Reset page").
+    readonly property var keysByCategory: {
+        const out = {}
+        for (const e of entries)
+            (out[e.catId] = out[e.catId] || []).push(e.spec.key)
+        return out
+    }
+
+    function keysOf(catId) {
+        return keysByCategory[catId] || []
     }
 
     // One entry per setting, with the text to search in already lowercased.
@@ -26,14 +49,9 @@ QtObject {
         let order = 0
         for (const c of categories) {
             for (const s of c.sections) {
-                // The section's own settings, then those in its (collapsible) groups.
-                // (No flatMap: Qt's JavaScript engine does not have it.)
-                const all = s.items.map(i => ({ item: i, group: null }))
-                for (const g of (s.groups || []))
-                    for (const i of g.items)
-                        all.push({ item: i, group: g })
-                for (const { item, group } of all) {
-                    const where = s.title + (group ? " › " + group.title : "")
+                for (const { item, place } of ThemeSchema.flatten(s)) {
+                    const top = root.groupName(c.group)
+                    const where = s.title + (place ? " › " + place : "")
                     out.push({
                         order: order++,
                         catId: c.id,
@@ -45,10 +63,11 @@ QtObject {
                         // "radiusLarge" -> "radius large"
                         key: item.key.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(),
                         keywords: (item.keywords || []).map(k => k.toLowerCase()),
-                        place: (where + " " + c.name).toLowerCase(),
-                        // The headlines: "status bar", "notifications" find everything under them.
-                        sectionTitle: s.title.toLowerCase(),
-                        groupTitle: group ? group.title.toLowerCase() : ""
+                        place: (where + " " + c.name + " " + top).toLowerCase(),
+                        // The headlines: "status bar", "notifications" find everything under them
+                        // (the category's name, the section's title, the block or tab within it).
+                        sectionTitle: (c.name + " " + s.title).toLowerCase(),
+                        groupTitle: place.toLowerCase()
                     })
                 }
             }
@@ -143,7 +162,7 @@ QtObject {
             const cat = categories.find(c => c.id === id)
             groups.push({
                 catId: id,
-                title: "In " + cat.name,
+                title: "In " + root.groupName(cat.group) + " › " + cat.name,
                 primary: id === priorityId,
                 entries: mine.map(m => ({
                     catId: id,

@@ -15,9 +15,8 @@ GlassPopup {
     focusItem: view
     panelItem: panel
 
-    // The whole desktop is blurred while this is open; its strength is its own setting. (The one
-    // blurred picture is shared by the veil and the panel.)
-    blurRadius: Math.max(0.1, Theme.scrimBlurRadius)
+    // The panel's blur, as strong as the other panels'.
+    blurRadius: Math.max(0.1, Theme.glassBlurRadius)
 
     onPopupClosed: view.reset()
 
@@ -28,11 +27,14 @@ GlassPopup {
         value: view.hoveredItem
     }
 
-    // The desktop behind is blurred too, so that it is clear that only the settings can be used
-    // now, and that a click anywhere else closes them.
+    // The desktop behind is dimmed, so that it is clear that only the settings can be used now,
+    // and that a click anywhere else closes them.
+    // Not blurred (the user's choice): only darker, by Theme.scrimDim (Panels › Settings overlay).
     GlassScrim {
         popup: root
         hole: Qt.rect(panel.x, panel.y, panel.width, panel.height)
+        blurred: false
+        plainOpacity: Theme.scrimDim
     }
 
     GlassListPanel {
@@ -45,7 +47,7 @@ GlassPopup {
         shadow: true
         // The less the desktop behind is blurred, the more tint: sharp text behind the panel
         // would show through it (from about 8 px of blur up, the panel's own tint is enough).
-        tintStrength: Math.min(1, Theme.glassPanelTintStrength + 0.3 * (1 - Math.min(1, root.blurRadius / 8)))
+        tintStrength: Math.min(1, Theme.panelTintStrength + 0.3 * (1 - Math.min(1, root.blurRadius / 8)))
         field: view.searchField
         listView: view.categoryList
     }

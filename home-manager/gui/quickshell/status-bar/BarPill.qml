@@ -49,8 +49,8 @@ Item {
         style: BarGlassStyle {
             cornerRadius: pill.cornerRadius
             edges: pill.edges
-            tint: pill.strong ? Theme.background : Theme.glassBarTint
-            tintStrength: pill.strong ? Theme.glassPanelTintStrength : Theme.glassBarTintStrength
+            tint: pill.strong ? Theme.background : Theme.barTint
+            tintStrength: pill.strong ? Theme.panelTintStrength : Theme.barTintStrength
         }
     }
 
