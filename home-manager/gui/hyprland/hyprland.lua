@@ -22,6 +22,120 @@ end
 
 local colors = require("colors")
 
+-----------------------------------------------
+---- SNAPSHOT OF THE CONFIG (settings app) ----
+-----------------------------------------------
+
+-- The settings app (Hyprland › Window rules) lists the rules of this file, but Hyprland's Lua API cannot
+-- list them. So every hl.window_rule below is recorded as it is made, and the record is written as JSON to
+-- $XDG_RUNTIME_DIR/hyprland-config.json at the end of this file (before the app's own hyprland-settings.lua
+-- is loaded, so its rules are not in it). It is a snapshot of what THIS file says, rewritten at every load
+-- or reload; the app only reads it. Other kinds of config can get their own key next to `windowRules`.
+-- Nothing here can break the config: a failure only leaves the snapshot out of date.
+-- snapshot:begin (check.sh runs the code up to snapshot:end against the settings app's reader)
+local configSnapshot = { windowRules = {} }
+local realWindowRule = hl.window_rule
+
+local function sortedKeys(t)
+    local keys = {}
+    for k in pairs(t) do
+        keys[#keys + 1] = tostring(k)
+    end
+    table.sort(keys)
+    return keys
+end
+
+-- A value as Lua source text (an effect's value, shown in the app and copied into an override).
+local function luaLiteral(v)
+    if type(v) == "string" then
+        return string.format("%q", v)
+    elseif type(v) == "table" then
+        local parts = {}
+        if #v > 0 then
+            for _, item in ipairs(v) do
+                parts[#parts + 1] = luaLiteral(item)
+            end
+        else
+            for _, k in ipairs(sortedKeys(v)) do
+                parts[#parts + 1] = k .. " = " .. luaLiteral(v[k])
+            end
+        end
+        return "{ " .. table.concat(parts, ", ") .. " }"
+    end
+    return tostring(v)
+end
+
+-- JSON, indented by two spaces so that the file is readable (`pad`: the indent of the current line).
+local function jsonEncode(v, pad)
+    pad = pad or ""
+    local t = type(v)
+    if t == "string" then
+        local s = v:gsub('[%c"\\]', function(c)
+            local named = { ['"'] = '\\"', ["\\"] = "\\\\", ["\n"] = "\\n", ["\t"] = "\\t", ["\r"] = "\\r" }
+            return named[c] or string.format("\\u%04x", c:byte())
+        end)
+        return '"' .. s .. '"'
+    elseif t == "number" or t == "boolean" then
+        return tostring(v)
+    elseif t == "table" then
+        if next(v) == nil then
+            return "[]"
+        end
+        local inner = pad .. "  "
+        local out = {}
+        if #v > 0 then
+            for _, item in ipairs(v) do
+                out[#out + 1] = inner .. jsonEncode(item, inner)
+            end
+            return "[\n" .. table.concat(out, ",\n") .. "\n" .. pad .. "]"
+        end
+        for _, k in ipairs(sortedKeys(v)) do
+            out[#out + 1] = inner .. jsonEncode(k) .. ": " .. jsonEncode(v[k], inner)
+        end
+        return "{\n" .. table.concat(out, ",\n") .. "\n" .. pad .. "}"
+    end
+    return jsonEncode(tostring(v))
+end
+
+local function recordWindowRule(spec)
+    local rule = { name = type(spec.name) == "string" and spec.name or "", match = {}, effects = {} }
+    for k, v in pairs(spec.match or {}) do
+        rule.match[k] = type(v) == "table" and luaLiteral(v) or v
+    end
+    for _, k in ipairs(sortedKeys(spec)) do
+        if k ~= "name" and k ~= "match" and k ~= "enabled" then
+            rule.effects[#rule.effects + 1] = { key = k, value = luaLiteral(spec[k]) }
+            if k == "lucent_glass" and type(spec[k]) == "string" then
+                rule.glass = spec[k]
+            end
+        end
+    end
+    configSnapshot.windowRules[#configSnapshot.windowRules + 1] = rule
+end
+
+pcall(function()
+    hl.window_rule = function(spec)
+        pcall(recordWindowRule, spec)
+        return realWindowRule(spec)
+    end
+end)
+
+local function writeConfigSnapshot()
+    hl.window_rule = realWindowRule
+    local dir = os.getenv("XDG_RUNTIME_DIR")
+    if not dir then
+        return
+    end
+    local path = dir .. "/hyprland-config.json"
+    local tmp = io.open(path .. ".tmp", "w")
+    if tmp then
+        tmp:write(jsonEncode({ version = 1, windowRules = configSnapshot.windowRules }), "\n")
+        tmp:close()
+        os.rename(path .. ".tmp", path)
+    end
+end
+-- snapshot:end
+
 ------------------
 ---- MONITORS ----
 ------------------
@@ -648,6 +762,8 @@ end
 -- hyprland-gui.lua; it is in .gitignore, so it never goes to GitHub) and runs `hyprctl reload`, so they
 -- apply at once, without hms. It is loaded LAST on purpose: a later rule wins, so a rule there overrides
 -- one above for the same windows, and the base config above stays untouched.
+pcall(writeConfigSnapshot)  -- before the app's own rules, which are not part of the base config
+
 local settingsFile = home .. "/src/nix-config/home-manager/gui/hyprland/hyprland-settings.lua"
 local sf = io.open(settingsFile, "r")
 if sf then

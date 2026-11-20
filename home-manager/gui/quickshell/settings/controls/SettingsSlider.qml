@@ -57,7 +57,8 @@ Item {
             height: 14
             radius: 7
             anchors.verticalCenter: parent.verticalCenter
-            x: (root.value - root.from) / (root.to - root.from) * (groove.width - width)
+            // (A value outside the range, e.g. read from the config, sits at the end.)
+            x: Math.max(0, Math.min(1, (root.value - root.from) / (root.to - root.from))) * (groove.width - width)
             color: root.dimmed ? Theme.textMuted : Theme.text
         }
     }

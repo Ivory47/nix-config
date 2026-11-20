@@ -8,10 +8,13 @@
 #             (without it the name is undefined at runtime, which qmllint only counts as a warning).
 #   2. refs:  members read through an untyped parent reference (`required property var overlay`, `pane`, ...),
 #             which qmllint cannot see, must exist on the parent (needs python3).
+#   2b. config: the settings app reads the Hyprland config's snapshot (tests/hyprland-config): hyprland.lua's
+#             snapshot code writes it from a set of test rules (needs lua, luajit or `nix shell`), and
+#             BaseRules reads it back in a headless Quickshell (needs `qs`; the file must be indented JSON).
 #   3. build: builds the Home Manager config this device runs (NIX_CONFIG_TYPE: laptop, desktop, ...,
 #             else `default`), through the same flake reference `hms` uses, so a file that git does not
 #             track (invisible to the build) fails here and not after `hms`.
-# Usage: check.sh [-v] [lint|imports|refs|build]      (no argument: all)
+# Usage: check.sh [-v] [lint|imports|refs|config|build]      (no argument: all)
 # Needs qmllint (qt6.qtdeclarative, installed by default.nix) and the profile's quickshell (`qs`).
 set -u
 
@@ -248,6 +251,63 @@ PY
     return $rc
 }
 
+# The Hyprland config's snapshot: hyprland.lua writes the rules it makes as JSON, the settings app reads
+# them (settings/hyprland/BaseRules.qml). Nothing here touches the live session or the real files.
+config() {
+    command -v qs >/dev/null || { red "config: qs not found"; return 1; }
+    local lua_file="$here/../hyprland/hyprland.lua" tdir="$here/tests/hyprland-config"
+    local -a lua
+    if command -v lua >/dev/null; then lua=(lua)
+    elif command -v luajit >/dev/null; then lua=(luajit)
+    else lua=(nix shell nixpkgs#lua5_4 --command lua); fi
+    local tmp
+    tmp=$(mktemp -d) || return 1
+    trap 'rm -rf "$tmp"' RETURN
+
+    # 1. The real snapshot code of hyprland.lua (between its markers), run on the test rules.
+    if ! grep -q 'snapshot:begin' "$lua_file" || ! grep -q 'snapshot:end' "$lua_file"; then
+        red "config: hyprland.lua has no snapshot:begin / snapshot:end markers"; return 1
+    fi
+    { echo 'hl = { window_rule = function() return {} end }'
+      sed -n '/-- snapshot:begin/,/-- snapshot:end/p' "$lua_file"
+      cat "$tdir/rules.lua"
+      echo 'writeConfigSnapshot()'; } > "$tmp/gen.lua"
+    local lua_out
+    lua_out=$(XDG_RUNTIME_DIR=$tmp "${lua[@]}" "$tmp/gen.lua" 2>&1)
+    if [ ! -f "$tmp/hyprland-config.json" ]; then
+        red "config: the snapshot code did not write hyprland-config.json"
+        echo "$lua_out" | head -n 10 | sed 's/^/    /'
+        return 1
+    fi
+    local json="$tmp/hyprland-config.json"
+    if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$json" 2>/dev/null; then
+        red "config: the snapshot is not valid JSON"; return 1
+    fi
+    if [ "$(wc -l < "$json")" -lt 20 ]; then
+        red "config: the snapshot is not indented (one long line)"; return 1
+    fi
+
+    # 2. The settings app's reader (BaseRules) on that file, in a headless Quickshell with scratch config
+    # folders (the folders of the settings config are linked, the shared ones too).
+    mkdir -p "$tmp/cfg" "$tmp/xdg"
+    local d
+    for d in core controls fields theme keys hyprland; do ln -s "$here/settings/$d" "$tmp/cfg/$d"; done
+    ln -s "$here/shared" "$tmp/cfg/shared"
+    cp "$tdir/shell.qml" "$tmp/cfg/shell.qml"
+    local out
+    out=$(QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$tmp/xdg" HYPRLAND_CONFIG_FILE="$json" \
+        HYPRLAND_SETTINGS_FILE="$tmp/none.lua" HYPRLAND_INSTANCE_SIGNATURE=bogus \
+        timeout 60 qs -p "$tmp/cfg/shell.qml" 2>&1)
+    if echo "$out" | grep -q '^.*TEST PASS'; then
+        green "config: the snapshot is written (indented) and read back by the settings app"
+    else
+        red "config: reading the snapshot failed"
+        echo "$out" | grep -E 'TEST FAIL|ERROR|rror:|Warn|WARN' | grep -v 'WAYLAND_DISPLAY\|QT_QPA\|WARNING' | head -n 12 | sed 's/^/    /'
+        [ -z "$(echo "$out" | grep -E 'TEST ')" ] && echo "$out" | tail -n 8 | sed 's/^/    /'
+        return 1
+    fi
+}
+
 build() {
     local type=${NIX_CONFIG_TYPE:-default}
     case "$type" in desktop|laptop|nas-server|default) ;; *) type=default ;; esac
@@ -264,8 +324,9 @@ case "$what" in
     lint) tracked || status=1; lint || status=1; imports || status=1; refs || status=1 ;;
     imports) imports || status=1 ;;
     refs) refs || status=1 ;;
+    config) config || status=1 ;;
     build) tracked || status=1; build || status=1 ;;
-    all) tracked || status=1; lint || status=1; imports || status=1; refs || status=1; build || status=1 ;;
-    *) echo "usage: check.sh [-v] [lint|imports|refs|build]"; exit 2 ;;
+    all) tracked || status=1; lint || status=1; imports || status=1; refs || status=1; config || status=1; build || status=1 ;;
+    *) echo "usage: check.sh [-v] [lint|imports|refs|config|build]"; exit 2 ;;
 esac
 exit $status

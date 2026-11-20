@@ -34,7 +34,7 @@ import as an unresolved type).
   `GlassWidgetRow`, `SettingsBlock`.
 - `hyprland/` — Window rules: `HyprlandPage`, `RuleCard`, `BaseRuleList`, `GlassParamBlocks`, and the stores
   `HyprlandStore` (rules, edits, validation, writing, reload), `RuleLua` (rules <-> the Lua text),
-  `BaseRules` (reads the base config's rules), `GlassParamStore` (a rule's parameters as a store for fields).
+  `BaseRules` (reads the base config's rules from the snapshot JSON), `GlassParamStore` (a rule's parameters as a store for fields).
 - `keys/` — vim keys: `KeyNav` (the handler and the action table), `NavStops`, `NavCursor`, `KeyHelp`.
 
 ## 3. Recipes
@@ -100,15 +100,21 @@ import as an unresolved type).
   effects: [{key, value}], glass: { mode: "inherit"|"default"|"custom"|"off", params } }`. "inherit" is not
   written; "off" writes `lucent_glass = "false"`; "custom" writes only the changed parameters; "default" is the
   default look plus the rule's own `radius`, `taps`, `corner_radius`, `opacity` (`HyprlandStore.ownKeys`).
-- **Base rules** (`BaseRules`): the Lua API cannot list rules, so `~/.config/hypr/hyprland.lua` (the deployed
-  file; read again whenever the page is shown) is parsed as text, comments stripped, `hl.window_rule({...})`
-  read, any `lucent_glass` (a string or `table.concat`) read into parameters. They are listed read-only
-  (`BaseRuleList`); **Override** starts a rule of the user's from one (`HyprlandStore.overrideOf`). A base rule
+- **Base rules** (`BaseRules`): the Lua API cannot list rules, so `hyprland.lua` records every `hl.window_rule`
+  it makes (it wraps `hl.window_rule`, which also works in Hyprland 0.57: checked in a nested instance) and
+  writes the record as JSON, `{ version, windowRules: [{ name, match, effects: [{key, value: Lua text}],
+  glass }] }`, to `$XDG_RUNTIME_DIR/hyprland-config.json` (indented JSON) at every load or reload, just before it `dofile`s the
+  app's `hyprland-settings.lua` (so the app's own rules are not in it). It is a snapshot of what the config says:
+  generated, read-only for this app (env `HYPRLAND_CONFIG_FILE` overrides the path for tests); other kinds of
+  config get their own key next to `windowRules`, and anything the app changes still goes through
+  `hyprland-settings.lua`. A rule must be made with `hl.window_rule` before that point to be listed. `check.sh config` (`tests/hyprland-config`: `rules.lua` and `shell.qml`) runs the snapshot code of `hyprland.lua` (between its `snapshot:begin` / `snapshot:end` markers) on test rules and reads the result with `BaseRules` in a headless `qs`; add a rule kind to `rules.lua` and its expectation to `shell.qml` when the format grows. The rules
+  are listed read-only (`BaseRuleList`); a value in `glass` is taken as the config says, not clamped to the
+  sliders' range. **Override** starts a rule of the user's from one (`HyprlandStore.overrideOf`). A base rule
   with a name and custom glass can **follow the default look** (`HyprlandStore.follow`): the file then gets,
   before the user's rules, a rule with the same match, its own keys plus the default look, kept in the global
-  `LucentGlassFollowers[<name>]` so that the on/off bind in `hyprland.lua` switches it too. The JSON keeps
-  `look` (the default look it was written with); when that changes and something uses it, the file is written
-  again.
+  `LucentGlassFollowers[<name>]` so that the on/off bind in `hyprland.lua` switches it too. The JSON of
+  `hyprland-settings.lua` keeps `look` (the default look it was written with); when that changes and something
+  uses it, the file is written again.
 - **Parameter values:** a key a rule leaves out shows the PLUGIN's default (`def`, from the Lucent README),
   dimmed. Ranges are the Theme pages' (`GlassParams`); a rule already holding a value outside its range keeps
   it in the file and shows it clamped.
