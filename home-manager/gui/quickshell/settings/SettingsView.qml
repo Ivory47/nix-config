@@ -2,6 +2,11 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.shared
+import qs.controls
+import qs.core
+import qs.hyprland
+import qs.keys
+import qs.theme
 
 // The content of the settings app: categories on the left, the search field and the page of the
 // chosen category (or the search results) on the right. It has no window of its own: it is shown
@@ -21,6 +26,9 @@ FocusScope {
     property Item hoveredItem: null
     readonly property alias searchField: searchField
     readonly property alias categoryList: categoryList
+    // For the keyboard (KeyNav): the pages and the search results.
+    readonly property alias pagesStack: pages
+    readonly property alias results: results
     signal closeRequested()
 
     // The search: what is typed, and whether it is limited to the selected category (otherwise
@@ -58,19 +66,53 @@ FocusScope {
             if (page && page.scrollTo)
                 page.scrollTo(key, !!gentle)
         })
+        nav.placeAt(idx, key)
     }
 
     // A fresh start: no search, and no cursor in the empty field.
     function reset() {
         searchField.text = ""
         searchField.focus = false
+        nav.reset()
+    }
+
+    // The keys come here again (out of a text field). The field and every FocusScope between it and the view
+    // (a Loader is one) must give up their focus first: a FocusScope's forceActiveFocus hands the focus to
+    // its focused child, so one left with focus would take it back (the colour editor's Loader did).
+    function takeFocus() {
+        for (let f = Window.activeFocusItem; f && f !== root; f = f.parent)
+            f.focus = false
+        root.forceActiveFocus()
+    }
+
+    function clearSearch() {
+        searchField.text = ""
+        searchField.focus = false
+    }
+
+    function toggleOnlyThis() {
+        if (scopeChip.visible)
+            root.onlyThis = !root.onlyThis
+    }
+
+    // The keyboard: AppSettings.mode "vim" (default) = KeyNav; "classic" = classicKeys below.
+    Keys.onPressed: event => {
+        if (nav.vim)
+            nav.handle(event)
+        else
+            root.classicKeys(event)
+    }
+
+    KeyNav {
+        id: nav
+        view: root
     }
 
     // Only keys that the focused item did not use arrive here. A text field (a hex value,
     // the search field) uses every printable key, so typing a value never starts a
     // search; with nothing like that focused, a printable key goes to the search field
     // (as in Nautilus).
-    Keys.onPressed: event => {
+    function classicKeys(event) {
         const mods = event.modifiers
         const altGr = (mods & Qt.ControlModifier) && (mods & Qt.AltModifier)
         const printable = event.text.length > 0
@@ -122,6 +164,17 @@ FocusScope {
         y: Theme.spacingLarge
         width: 190
         height: parent.height - 2 * Theme.spacingLarge
+
+        // Vim keys: where the list of keys is.
+        CenteredText {
+            visible: nav.vim
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.spacingMedium
+            anchors.verticalCenter: title.verticalCenter
+            text: nav.keyHint
+            color: Theme.textMuted
+            font.pixelSize: Theme.textSmall
+        }
 
         Text {
             id: title
@@ -185,6 +238,8 @@ FocusScope {
 
                 width: categoryList.width
                 height: 44
+                // The keyboard cursor (KeyNav) on the highlight's frame: the list clips what is outside.
+                readonly property var navFrame: ({ x: 0, y: 0, width: width, height: height, radius: Theme.radiusMedium })
 
                 // The glass draws the highlight of the selected and the hovered row; a plain fill
                 // only when there is no glass.
@@ -326,6 +381,16 @@ FocusScope {
             placeholderText: activeFocus ? "Search settings…" : ""
             placeholderTextColor: Theme.textMuted
             selectByMouse: true
+            // Vim keys: leaving the field and Tab first (FieldKeys); Enter goes into the results.
+            Keys.priority: Keys.BeforeItem
+            Keys.onPressed: event => FieldKeys.press(event, searchField)
+            onAccepted: {
+                if (!nav.vim)
+                    return
+                root.takeFocus()
+                if (root.searching)
+                    nav.enterPage()
+            }
 
             background: Rectangle {
                 radius: Theme.radiusMedium
@@ -392,9 +457,11 @@ FocusScope {
             ThemePage { catId: "notifications" }
             ThemePage { catId: "glass" }
             HyprlandPage {}
+            ThemePage { catId: "keyboard" }
         }
 
         SearchResults {
+            id: results
             anchors.fill: parent
             visible: root.searching
             query: root.query
@@ -417,7 +484,29 @@ FocusScope {
             const p = searchField.mapFromItem(root, mouse.x, mouse.y)
             if (searchField.text.length === 0 && !searchField.contains(p))
                 searchField.focus = false
+            nav.pressedAt(mouse.x, mouse.y)
             mouse.accepted = false
         }
+    }
+
+    // Moving the mouse hides the keyboard cursor (the next key shows it again). Only a real move: items
+    // scrolling under a still pointer send hover events too.
+    HoverHandler {
+        property point last: Qt.point(-1, -1)
+        onPointChanged: {
+            const p = point.scenePosition
+            if (Math.abs(p.x - last.x) + Math.abs(p.y - last.y) > 2) {
+                if (last.x >= 0)
+                    nav.shown = false
+                last = p
+            }
+        }
+    }
+
+    // The list of the vim keys (?).
+    KeyHelp {
+        anchors.centerIn: content
+        visible: nav.helpOpen
+        z: 9000
     }
 }

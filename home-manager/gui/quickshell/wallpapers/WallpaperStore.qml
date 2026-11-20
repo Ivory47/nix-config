@@ -11,7 +11,7 @@ import qs.shared
 //   { "tags":   { "<file name>": ["calm", "dark"] },
 //     "choice": { "<file name>": { "index": 0, "type": "scheme-tonal-spot", "mode": "dark" } } }
 // Entries are keyed by file name, so renaming a file loses its tags.
-// Same pattern as settings/ThemeStore.qml: edits are kept in memory at once and written after a
+// Same pattern as settings/core/ThemeStore.qml: edits are kept in memory at once and written after a
 // short pause; a read of our own write is ignored.
 Singleton {
     id: root

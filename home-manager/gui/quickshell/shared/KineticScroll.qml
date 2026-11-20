@@ -7,7 +7,7 @@ import QtQuick
 //
 // Put it INSIDE the Flickable / ListView (it becomes a child of its content) and set `target`:
 //     ListView { id: list; KineticScroll { target: list } }
-// (settings/KineticFlickable.qml is a Flickable that has it.) Only touchpad events are handled (they
+// (settings/controls/KineticFlickable.qml is a Flickable that has it.) Only touchpad events are handled (they
 // carry a pixelDelta); a mouse wheel is left to the Flickable, so it behaves as before, and so does
 // dragging with the mouse. Set `boundsBehavior: Flickable.StopAtBounds` on the target.
 Item {

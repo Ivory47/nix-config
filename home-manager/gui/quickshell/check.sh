@@ -78,8 +78,21 @@ lint() {
         cp -r "$here/$cfg" "$tmp/cfg/$cfg"
         rm -rf "$tmp/cfg/$cfg/glass-test"
         mkqmldir "$tmp/cfg/$cfg" "$cfg"
+        # A config's own subfolders are `import qs.<folder>` (settings/core, ...): as modules next to shared.
+        local sub subs=()
+        for sub in "$tmp/cfg/$cfg"/*/; do
+            [ -d "$sub" ] || continue
+            sub=$(basename "$sub")
+            [ "$sub" = shared ] && continue
+            mkqmldir "$tmp/cfg/$cfg/$sub" "$sub"
+            rm -rf "$tmp/imp/qs/$sub"
+            cp -r "$tmp/cfg/$cfg/$sub" "$tmp/imp/qs/$sub"
+            mkqmldir "$tmp/imp/qs/$sub" "qs.$sub"
+            subs+=("$sub")
+        done
         out="$tmp/$cfg.txt"
-        (cd "$tmp/cfg/$cfg" && qmllint -I "$tmp/imp" "${inc[@]}" --max-warnings 100000 ./*.qml > "$out" 2>&1)
+        (cd "$tmp/cfg/$cfg" && shopt -s nullglob && qmllint -I "$tmp/imp" "${inc[@]}" --max-warnings 100000 ./*.qml ./*/*.qml > "$out" 2>&1)
+        for sub in "${subs[@]}"; do rm -rf "$tmp/imp/qs/$sub"; done
         # Real problems: a type or module that is not found or resolved. Not counted: "margins"
         # (PopupWindow's anchor group has no type information) and the singleton notice qmllint gives
         # when it checks a singleton's own file (the qmldir above does declare it).
@@ -156,10 +169,20 @@ def root_id(src):
 
 ALLMEM = {n: members(src) for n, src in ALL.items()}
 
+# One group per config with its subfolders (settings/core, settings/keys, ... use each other); shared/ per folder.
+groups = {}
 for d, _, fs in os.walk(here):
     if '/tools' in d or 'glass-test' in d:
         continue
-    qml = {f[:-4]: read(os.path.join(d, f)) for f in fs if f.endswith('.qml')}
+    rel = os.path.relpath(d, here)
+    top = rel.split(os.sep)[0]
+    key = rel if top in ('shared', '.') else top
+    for f in fs:
+        if f.endswith('.qml'):
+            groups.setdefault(key, {})[f[:-4]] = os.path.join(d, f)
+
+for paths in groups.values():
+    qml = {n: read(p) for n, p in paths.items()}
     rid = {n: root_id(s) for n, s in qml.items()}
     mem = {n: members(s) for n, s in qml.items()}
     # A file inherits the members of the type it is based on, here or in shared/ (GlassSearchPopup is a
@@ -216,7 +239,7 @@ for d, _, fs in os.walk(here):
                     continue
                 for pt in ps:
                     if u not in mem[pt]:
-                        print('    %s/%s.qml: %s.%s is not a member of %s.qml' % (os.path.relpath(d, here), c, prop, u, pt))
+                        print('    %s: %s.%s is not a member of %s.qml' % (os.path.relpath(paths[c], here), prop, u, pt))
                         bad += 1
 sys.exit(1 if bad else 0)
 PY

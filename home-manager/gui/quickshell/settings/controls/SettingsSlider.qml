@@ -1,0 +1,90 @@
+import QtQuick
+import qs.shared
+
+// The slider of a number setting: a groove with a handle and the value as text to the right (200 x 44 unless
+// `width` is set: the groove takes what the 50 px of the value leave).
+// It only reports: `moved(v)` while it is dragged (and on the press), `released(v)` when it is let go,
+// `typed(v)` when a value was typed over the text (a click on it, or `edit()`); `v`
+// is clamped and rounded to `step`. `dimmed` draws it in the muted colours (a value that is not set).
+Item {
+    id: root
+
+    property real from: 0
+    property real to: 1
+    property real step: 0.01
+    property real value: 0
+    property int decimals: 2
+    property bool dimmed: false
+
+    signal moved(real v)
+    signal released(real v)
+    signal typed(real v)
+
+    width: 200
+    height: 44
+
+    function clamp(v) {
+        const s = Math.round(v / step) * step
+        return Math.max(from, Math.min(to, Number(s.toFixed(4))))
+    }
+
+    function at(mx) {
+        const f = Math.max(0, Math.min(1, (mx - handle.width / 2) / (groove.width - handle.width)))
+        return clamp(from + f * (to - from))
+    }
+
+    Rectangle {
+        id: groove
+        x: 0
+        y: 20
+        width: root.width - 50
+        height: 4
+        radius: 2
+        color: Theme.surface
+        border.width: 1
+        border.color: Theme.surfaceAlt
+
+        Rectangle {
+            width: handle.x + handle.width / 2
+            height: parent.height
+            radius: 2
+            color: root.dimmed ? Theme.surfaceAlt : Theme.accent
+        }
+
+        Rectangle {
+            id: handle
+            width: 14
+            height: 14
+            radius: 7
+            anchors.verticalCenter: parent.verticalCenter
+            x: (root.value - root.from) / (root.to - root.from) * (groove.width - width)
+            color: root.dimmed ? Theme.textMuted : Theme.text
+        }
+    }
+
+    MouseArea {
+        x: 0
+        width: groove.width
+        height: parent.height
+        cursorShape: Qt.PointingHandCursor
+        // A drag moves the slider; the page's Flickable must not take it over.
+        preventStealing: true
+
+        onPressed: mouse => root.moved(root.at(mouse.x))
+        onPositionChanged: mouse => { if (pressed) root.moved(root.at(mouse.x)) }
+        onReleased: mouse => root.released(root.at(mouse.x))
+    }
+
+    // The value: a click (or `edit()`) types a new one, reported with `typed(v)` (clamped and rounded).
+    ValueText {
+        id: valueText
+        x: groove.width + 10
+        anchors.verticalCenter: parent.verticalCenter
+        width: 40
+        text: root.value.toFixed(root.decimals)
+        color: root.dimmed ? Theme.textMuted : Theme.textSecondary
+        onSubmitted: v => root.typed(root.clamp(v))
+    }
+
+    function edit() { valueText.edit() }
+}

@@ -1,5 +1,8 @@
 import QtQuick
 import qs.shared
+import qs.controls
+import qs.core
+import qs.fields
 
 // The search results: the settings that match, as the real controls (change a value right
 // here), grouped by category with the selected one first. Each has a button that jumps to the
@@ -50,6 +53,9 @@ SettingsPage {
                     required property var modelData
                     width: group.width
                     height: field.height
+
+                    // Keyboard (KeyNav): Enter on a result shows it in its page.
+                    function navJump() { root.jump(row.modelData.catId, row.modelData.key) }
 
                     SettingField {
                         id: field

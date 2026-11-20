@@ -5,7 +5,7 @@ import qs.shared
 // with the accent colour; an optional `count` follows the text, and `removable` adds a "×" (`removed()`).
 // The defaults are the themed pill with an outline (nothing translucent: it sits over the glass); the
 // palette and the shape are properties, so a variant is a few lines (wallpapers/SegmentChip.qml is the
-// unthemed one for the dark plates over the wallpaper pictures, settings/Segmented.qml a row of squarer
+// unthemed one for the dark plates over the wallpaper pictures, settings/controls/Segmented.qml a row of squarer
 // ones). The texts are CenteredText: centred on the capital letters, so any font looks right.
 Rectangle {
     id: root
