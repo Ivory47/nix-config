@@ -39,7 +39,7 @@ Column {
                     delegate: Item {
                         id: cell
                         required property var modelData
-                        readonly property color value: Theme[modelData.key]
+                        readonly property color value: Theme.value(modelData.key)
                         readonly property bool open: ThemeStore.openColor === modelData.key
 
                         width: grid.cellWidth

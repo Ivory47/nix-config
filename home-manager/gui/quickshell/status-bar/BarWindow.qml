@@ -22,7 +22,7 @@ PanelWindow {
     readonly property int gap: 6
     readonly property int pillH: barH - 2 * gap
     property int panelH: 420
-    readonly property int shadowRoom: Math.ceil(Theme.notificationShadowBlur + Math.abs(Theme.notificationShadowOffset)) + 4
+    readonly property int shadowRoom: Math.ceil(Theme.notificationShadow.blur + Math.abs(Theme.notificationShadow.offset)) + 4
     property bool panelOpen: false
 
     implicitHeight: barH + panelH + shadowRoom

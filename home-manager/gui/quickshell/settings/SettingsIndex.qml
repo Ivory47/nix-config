@@ -60,8 +60,8 @@ QtObject {
                         spec: item,
                         label: item.label.toLowerCase(),
                         note: (item.note || "").toLowerCase(),
-                        // "radiusLarge" -> "radius large"
-                        key: item.key.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(),
+                        // "radiusLarge" -> "radius large", "glassBar.tintStrength" -> "glass bar tint strength"
+                        key: item.key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\./g, " ").toLowerCase(),
                         keywords: (item.keywords || []).map(k => k.toLowerCase()),
                         place: (where + " " + c.name + " " + top).toLowerCase(),
                         // The headlines: "status bar", "notifications" find everything under them

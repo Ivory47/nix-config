@@ -35,7 +35,7 @@ PanelWindow {
     // The surface is wider than the cards, on the left, so that their shadow is not cut off; the cards
     // are `cardWidth` wide with `spacingMedium` to the screen edge and to the bar.
     readonly property int cardWidth: 380
-    readonly property int shadowRoom: Math.ceil(Theme.notificationShadowBlur + Math.abs(Theme.notificationShadowOffset)) + 4
+    readonly property int shadowRoom: Math.ceil(Theme.notificationShadow.blur + Math.abs(Theme.notificationShadow.offset)) + 4
     margins {
         top: Theme.statusBarHeight
     }

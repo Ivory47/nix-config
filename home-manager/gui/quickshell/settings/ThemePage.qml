@@ -60,7 +60,7 @@ Item {
         const p = placeOf[key]
         if (!p)
             return
-        if (p.showIf && Theme[p.showIf.key] !== p.showIf.is)
+        if (p.showIf && Theme.value(p.showIf.key) !== p.showIf.is)
             key = p.showIf.key
         if (p.group && !openGroups[p.group]) {
             setGroupOpen(p.group, true)

@@ -19,7 +19,7 @@ Item {
     // A bigger piece with text on it (a panel, the history): tinted like the popups, so that what is
     // behind does not disturb the text.
     property bool strong: false
-    // A drop shadow (Theme.notificationShadow*, outside the pill only): for the panels.
+    // A drop shadow (Theme.notificationShadow, outside the pill only): for the panels.
     property bool shadow: false
     // False: draws nothing of its own (no glass, panel, outline or shadow), only holds its children.
     property bool drawBackground: true
@@ -49,8 +49,8 @@ Item {
         style: BarGlassStyle {
             cornerRadius: pill.cornerRadius
             edges: pill.edges
-            tint: pill.strong ? Theme.background : Theme.barTint
-            tintStrength: pill.strong ? Theme.panelTintStrength : Theme.barTintStrength
+            tint: pill.strong ? Theme.background : Theme.barGlass.tint
+            tintStrength: pill.strong ? Theme.panelGlass.tintStrength : Theme.barGlass.tintStrength
         }
     }
 
@@ -67,9 +67,9 @@ Item {
             panelWidth: parent.width
             panelHeight: parent.height
             cornerRadius: pill.cornerRadius
-            strength: Theme.notificationShadowOpacity
-            softness: Theme.notificationShadowBlur
-            drop: Theme.notificationShadowOffset
+            strength: Theme.notificationShadow.opacity
+            softness: Theme.notificationShadow.blur
+            drop: Theme.notificationShadow.offset
         }
     }
 

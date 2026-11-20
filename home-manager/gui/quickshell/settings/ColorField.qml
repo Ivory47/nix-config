@@ -8,7 +8,7 @@ import qs.shared
 SettingsRow {
     id: root
 
-    readonly property color value: Theme[spec.key]
+    readonly property color value: Theme.value(spec.key)
     readonly property bool hasAlpha: !!spec.alpha
     // Only one picker is open at a time: the store holds which colour it is.
     readonly property bool open: ThemeStore.openColor === spec.key

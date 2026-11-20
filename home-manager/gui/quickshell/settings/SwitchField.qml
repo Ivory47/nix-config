@@ -4,7 +4,7 @@ import qs.shared
 SettingsRow {
     id: root
 
-    readonly property bool value: Theme[spec.key]
+    readonly property bool value: Theme.value(spec.key)
 
     Rectangle {
         id: track

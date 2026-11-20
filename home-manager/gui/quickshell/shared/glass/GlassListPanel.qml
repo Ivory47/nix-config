@@ -27,18 +27,18 @@ Item {
     property real selectedStrength: 0.7
     property real hoveredStrength: 0.5
     // How much of the tint colour is mixed into the glass (more hides more of what is behind).
-    property real tintStrength: Theme.panelTintStrength
+    property real tintStrength: Theme.panelGlass.tintStrength
     // Opacity of the whole panel (1 = opaque glass; lower lets the live desktop show through).
     property real panelOpacity: 1.0
 
-    // A soft drop shadow around the panel (Theme.popupShadow*), outside it only. Its opacity is
+    // A soft drop shadow around the panel (Theme.popupShadow), outside it only. Its opacity is
     // capped (GlassShadow.maxOpacity) so that over the settings' veil the stack still lets about
     // 3% of the background through.
     property bool shadow: false
 
     GlassShadow {
         z: -1
-        visible: root.shadow && Theme.popupShadowOpacity > 0
+        visible: root.shadow && Theme.popupShadow.opacity > 0
         panelWidth: root.width
         panelHeight: root.height
         cornerRadius: Theme.radiusLarge

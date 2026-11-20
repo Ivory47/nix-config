@@ -13,7 +13,7 @@ Column {
     property var items: []
     property var showIf: null
 
-    visible: !showIf || Theme[showIf.key] === showIf.is
+    visible: !showIf || Theme.value(showIf.key) === showIf.is
 
     BlockTitle {
         visible: root.title.length > 0
@@ -28,7 +28,7 @@ Column {
             required property var modelData
             readonly property var cond: modelData.showIf
             width: root.width
-            visible: !cond || Theme[cond.key] === cond.is
+            visible: !cond || Theme.value(cond.key) === cond.is
 
             Item { width: 1; height: entry.modelData.gapBefore ? Theme.spacingLarge : 0 }
 

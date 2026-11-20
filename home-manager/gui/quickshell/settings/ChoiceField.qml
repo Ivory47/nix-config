@@ -5,7 +5,7 @@ import qs.shared
 SettingsRow {
     id: root
 
-    readonly property var value: Theme[spec.key]
+    readonly property var value: Theme.value(spec.key)
 
     Segmented {
         y: 7

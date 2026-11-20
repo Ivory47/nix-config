@@ -32,9 +32,45 @@ Singleton {
         return "#" + (alpha ? h(c.a) : "") + h(c.r) + h(c.g) + h(c.b)
     }
 
+    // The default of a key: "background", or a path into a group ("glassBar.frost").
+    function defaultOf(key) {
+        const dot = key.indexOf(".")
+        if (dot < 0)
+            return ThemeDefaults[key]
+        const group = ThemeDefaults[key.slice(0, dot)]
+        return group ? group[key.slice(dot + 1)] : undefined
+    }
+
+    // Settings files written before the glass looks and the shadows were groups have flat keys
+    // ("glassBarTintStrength", "popupShadowOpacity"): rewritten once to paths ("glassBar.tintStrength").
+    // Only the settings app writes the file, so only it does this; the other shells read the result.
+    readonly property var legacyKey: /^(glassDefault|glassPanel|glassBar|popupShadow|notificationShadow)([A-Z]\w*)$/
+    function migrate() {
+        const vals = ThemeFromSettingsApp.values
+        const old = Object.keys(vals).filter(k => legacyKey.test(k) && k !== "glassPanelLook" && k !== "glassBarLook")
+        if (old.length === 0)
+            return
+        const next = Object.assign({}, vals)
+        for (const k of old) {
+            const m = legacyKey.exec(k)
+            const path = m[1] + "." + m[2].charAt(0).toLowerCase() + m[2].slice(1)
+            // (A value equal to its default is dropped, as set() does.)
+            if (next[path] === undefined && !same(vals[k], defaultOf(path)))
+                next[path] = vals[k]
+            delete next[k]
+        }
+        ThemeFromSettingsApp.values = next
+        commit()
+    }
+    property Connections migrateOnLoad: Connections {
+        target: ThemeFromSettingsApp
+        function onValuesChanged() { root.migrate() }
+    }
+    Component.onCompleted: migrate()
+
     function preview(key, value) {
         const next = Object.assign({}, ThemeFromSettingsApp.values)
-        if (same(value, ThemeDefaults[key]))
+        if (same(value, defaultOf(key)))
             delete next[key]
         else
             next[key] = value
@@ -86,7 +122,7 @@ Singleton {
     Timer {
         id: writeTimer
         interval: 30
-        onTriggered: ThemeFromSettingsApp.file.write(ThemeFromSettingsApp.values)
+        onTriggered: ThemeFromSettingsApp.writeValues(ThemeFromSettingsApp.values)
     }
 
     Timer {

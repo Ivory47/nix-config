@@ -5,10 +5,20 @@ import QtQuick
 // What every Quickshell config (status-bar, app-launcher, clipboard, settings) uses: `Theme.x`.
 // Each value is ThemeDefaults.qml's, unless the settings app has set it (ThemeFromSettingsApp.qml).
 // Edit the defaults in ThemeDefaults.qml; the settings app never changes that file. To add a
-// value: add it to ThemeDefaults.qml and a line here with the same name.
+// value: add it to ThemeDefaults.qml and a line here with the same name. Grouped values (the glass looks,
+// the shadows) are objects (GlassLook, ShadowLook): Theme.glassBar.tintStrength; their keys in the settings
+// file are paths ("glassBar.tintStrength"), which `value(key)` reads.
 // default.nix copies this folder into each config at build time (`import qs.shared`).
 QtObject {
+    id: root
+
     readonly property var defaults: ThemeDefaults
+
+    // A value by its key in the settings file: "background", or a path into a group ("glassBar.frost").
+    function value(key) {
+        const dot = key.indexOf(".")
+        return dot < 0 ? root[key] : root[key.slice(0, dot)][key.slice(dot + 1)]
+    }
 
     // Colors
     readonly property color background: ThemeFromSettingsApp.color("background", ThemeDefaults.background)
@@ -41,60 +51,20 @@ QtObject {
     readonly property int blurMaxTaps: ThemeFromSettingsApp.integer("blurMaxTaps", ThemeDefaults.blurMaxTaps)
     readonly property real blurTapsFalloff: ThemeFromSettingsApp.real("blurTapsFalloff", ThemeDefaults.blurTapsFalloff)
     readonly property real popupOpacity: ThemeFromSettingsApp.real("popupOpacity", ThemeDefaults.popupOpacity)
-    readonly property real popupShadowOpacity: ThemeFromSettingsApp.real("popupShadowOpacity", ThemeDefaults.popupShadowOpacity)
-    readonly property real popupShadowBlur: ThemeFromSettingsApp.real("popupShadowBlur", ThemeDefaults.popupShadowBlur)
-    readonly property real popupShadowOffset: ThemeFromSettingsApp.real("popupShadowOffset", ThemeDefaults.popupShadowOffset)
-    readonly property real notificationShadowOpacity: ThemeFromSettingsApp.real("notificationShadowOpacity", ThemeDefaults.notificationShadowOpacity)
-    readonly property real notificationShadowBlur: ThemeFromSettingsApp.real("notificationShadowBlur", ThemeDefaults.notificationShadowBlur)
-    readonly property real notificationShadowOffset: ThemeFromSettingsApp.real("notificationShadowOffset", ThemeDefaults.notificationShadowOffset)
+    readonly property ShadowLook popupShadow: ShadowLook { name: "popupShadow" }
+    readonly property ShadowLook notificationShadow: ShadowLook { name: "notificationShadow" }
     readonly property real notificationTimeout: ThemeFromSettingsApp.real("notificationTimeout", ThemeDefaults.notificationTimeout)
     readonly property real scrimDim: ThemeFromSettingsApp.real("scrimDim", ThemeDefaults.scrimDim)
-    // The look of the glass (see ThemeDefaults.qml)
-    readonly property real glassDefaultFrost: ThemeFromSettingsApp.real("glassDefaultFrost", ThemeDefaults.glassDefaultFrost)
-    readonly property real glassDefaultTintStrength: ThemeFromSettingsApp.real("glassDefaultTintStrength", ThemeDefaults.glassDefaultTintStrength)
-    readonly property real glassDefaultBrightness: ThemeFromSettingsApp.real("glassDefaultBrightness", ThemeDefaults.glassDefaultBrightness)
-    readonly property real glassDefaultContrast: ThemeFromSettingsApp.real("glassDefaultContrast", ThemeDefaults.glassDefaultContrast)
-    readonly property real glassDefaultSaturation: ThemeFromSettingsApp.real("glassDefaultSaturation", ThemeDefaults.glassDefaultSaturation)
-    readonly property real glassDefaultBevel: ThemeFromSettingsApp.real("glassDefaultBevel", ThemeDefaults.glassDefaultBevel)
-    readonly property real glassDefaultThickness: ThemeFromSettingsApp.real("glassDefaultThickness", ThemeDefaults.glassDefaultThickness)
-    readonly property real glassDefaultBevelProfile: ThemeFromSettingsApp.real("glassDefaultBevelProfile", ThemeDefaults.glassDefaultBevelProfile)
-    readonly property real glassDefaultRefraction: ThemeFromSettingsApp.real("glassDefaultRefraction", ThemeDefaults.glassDefaultRefraction)
-    readonly property real glassDefaultIor: ThemeFromSettingsApp.real("glassDefaultIor", ThemeDefaults.glassDefaultIor)
-    readonly property real glassDefaultDispersion: ThemeFromSettingsApp.real("glassDefaultDispersion", ThemeDefaults.glassDefaultDispersion)
-    readonly property real glassDefaultShine: ThemeFromSettingsApp.real("glassDefaultShine", ThemeDefaults.glassDefaultShine)
+    // The looks of the glass (see ThemeDefaults.qml): Theme.glassDefault.frost, ...
+    readonly property GlassLook glassDefault: GlassLook { name: "glassDefault"; fallbackTint: root.background }
+    readonly property GlassLook glassPanel: GlassLook { name: "glassPanel"; fallbackTint: root.background }
+    readonly property GlassLook glassBar: GlassLook { name: "glassBar"; fallbackTint: root.background }
+    // "default" (follow glassDefault) or "own".
     readonly property string glassPanelLook: ThemeFromSettingsApp.text("glassPanelLook", ThemeDefaults.glassPanelLook)
     readonly property string glassBarLook: ThemeFromSettingsApp.text("glassBarLook", ThemeDefaults.glassBarLook)
-    // Derived (not settings): the tint the panels and the bar really use, after the default / own choice.
-    readonly property real panelTintStrength: glassPanelLook === "own" ? glassPanelTintStrength : glassDefaultTintStrength
-    readonly property real barTintStrength: glassBarLook === "own" ? glassBarTintStrength : glassDefaultTintStrength
-    readonly property color barTint: glassBarLook === "own" ? glassBarTint : background
-    readonly property real glassPanelFrost: ThemeFromSettingsApp.real("glassPanelFrost", ThemeDefaults.glassPanelFrost)
-    readonly property real glassPanelTintStrength: ThemeFromSettingsApp.real("glassPanelTintStrength", ThemeDefaults.glassPanelTintStrength)
-    readonly property real glassPanelBrightness: ThemeFromSettingsApp.real("glassPanelBrightness", ThemeDefaults.glassPanelBrightness)
-    readonly property real glassPanelContrast: ThemeFromSettingsApp.real("glassPanelContrast", ThemeDefaults.glassPanelContrast)
-    readonly property real glassPanelSaturation: ThemeFromSettingsApp.real("glassPanelSaturation", ThemeDefaults.glassPanelSaturation)
-    readonly property real glassPanelBevel: ThemeFromSettingsApp.real("glassPanelBevel", ThemeDefaults.glassPanelBevel)
-    readonly property real glassPanelThickness: ThemeFromSettingsApp.real("glassPanelThickness", ThemeDefaults.glassPanelThickness)
-    readonly property real glassPanelBevelProfile: ThemeFromSettingsApp.real("glassPanelBevelProfile", ThemeDefaults.glassPanelBevelProfile)
-    readonly property real glassPanelRefraction: ThemeFromSettingsApp.real("glassPanelRefraction", ThemeDefaults.glassPanelRefraction)
-    readonly property real glassPanelIor: ThemeFromSettingsApp.real("glassPanelIor", ThemeDefaults.glassPanelIor)
-    readonly property real glassPanelDispersion: ThemeFromSettingsApp.real("glassPanelDispersion", ThemeDefaults.glassPanelDispersion)
-    readonly property real glassPanelShine: ThemeFromSettingsApp.real("glassPanelShine", ThemeDefaults.glassPanelShine)
-
-    readonly property real glassBarFrost: ThemeFromSettingsApp.real("glassBarFrost", ThemeDefaults.glassBarFrost)
-    // Follows `background` until the settings app sets its own colour.
-    readonly property color glassBarTint: ThemeFromSettingsApp.color("glassBarTint", background)
-    readonly property real glassBarTintStrength: ThemeFromSettingsApp.real("glassBarTintStrength", ThemeDefaults.glassBarTintStrength)
-    readonly property real glassBarBrightness: ThemeFromSettingsApp.real("glassBarBrightness", ThemeDefaults.glassBarBrightness)
-    readonly property real glassBarContrast: ThemeFromSettingsApp.real("glassBarContrast", ThemeDefaults.glassBarContrast)
-    readonly property real glassBarSaturation: ThemeFromSettingsApp.real("glassBarSaturation", ThemeDefaults.glassBarSaturation)
-    readonly property real glassBarBevel: ThemeFromSettingsApp.real("glassBarBevel", ThemeDefaults.glassBarBevel)
-    readonly property real glassBarThickness: ThemeFromSettingsApp.real("glassBarThickness", ThemeDefaults.glassBarThickness)
-    readonly property real glassBarBevelProfile: ThemeFromSettingsApp.real("glassBarBevelProfile", ThemeDefaults.glassBarBevelProfile)
-    readonly property real glassBarRefraction: ThemeFromSettingsApp.real("glassBarRefraction", ThemeDefaults.glassBarRefraction)
-    readonly property real glassBarIor: ThemeFromSettingsApp.real("glassBarIor", ThemeDefaults.glassBarIor)
-    readonly property real glassBarDispersion: ThemeFromSettingsApp.real("glassBarDispersion", ThemeDefaults.glassBarDispersion)
-    readonly property real glassBarShine: ThemeFromSettingsApp.real("glassBarShine", ThemeDefaults.glassBarShine)
+    // Derived (not settings): the looks the panels and the bar really use, after that choice.
+    readonly property GlassLook panelGlass: glassPanelLook === "own" ? glassPanel : glassDefault
+    readonly property GlassLook barGlass: glassBarLook === "own" ? glassBar : glassDefault
     readonly property real backdropBlur: ThemeFromSettingsApp.real("backdropBlur", ThemeDefaults.backdropBlur)
 
     // Shape

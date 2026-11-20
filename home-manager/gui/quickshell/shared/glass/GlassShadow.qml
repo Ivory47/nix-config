@@ -4,17 +4,17 @@ import qs.shared
 // A soft drop shadow around a rounded rectangle, like the one under Windows 11 menus. It is
 // drawn only outside the panel (shadow.frag): glass must have nothing under it, see
 // GlassListPanel. Give it the panel's size; it extends over the panel by `extent` on every side.
-// Set Theme.popupShadowOpacity to 0 to turn it off.
+// Set Theme.popupShadow.opacity to 0 to turn it off.
 ShaderEffect {
     id: root
 
     property real panelWidth: 0
     property real panelHeight: 0
     property real cornerRadius: Theme.radiusLarge
-    // The look: by default the popups' (Theme.popupShadow*); notifications pass their own.
-    property real strength: Theme.popupShadowOpacity
-    property real softness: Theme.popupShadowBlur
-    property real drop: Theme.popupShadowOffset
+    // The look: by default the popups' (Theme.popupShadow); notifications pass their own.
+    property real strength: Theme.popupShadow.opacity
+    property real softness: Theme.popupShadow.blur
+    property real drop: Theme.popupShadow.offset
 
     // Over the settings' veil (alpha 0.92) a shadow of 0.6 still lets 3.2% of the background
     // through, about the least that can be recovered, so the opacity is capped there.

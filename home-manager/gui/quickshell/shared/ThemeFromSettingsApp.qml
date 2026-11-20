@@ -9,8 +9,11 @@ import Quickshell.Io
 //
 // The file is outside the nix store, so it survives `hms`, and every Quickshell process
 // (status bar, launcher, clipboard, settings app) watches it: a change shows up in all of them
-// at once. Only the settings app writes it. Format: one flat JSON object with only the changed
-// keys, named like the properties of ThemeDefaults.qml, e.g. {"background": "#101020", "radiusLarge": 12}.
+// at once. Only the settings app writes it. Format: a JSON object with only the changed keys, named
+// like the properties of ThemeDefaults.qml, the groups (glass looks, shadows) as objects of their own:
+// {"background": "#101020", "radiusLarge": 12, "glassBar": {"tintStrength": 0.45}}.
+// In memory (`values`) a grouped key is a path, "glassBar.tintStrength": `flatten` and `nest` convert
+// between the two when the file is read and written (writeValues).
 Singleton {
     id: root
 
@@ -43,6 +46,46 @@ Singleton {
         return typeof v === "boolean" ? v : fallback
     }
 
+    function isGroup(v) {
+        return v !== null && typeof v === "object" && !Array.isArray(v)
+    }
+
+    // {"glassBar": {"frost": 1}} -> {"glassBar.frost": 1} (one level: groups hold plain values).
+    function flatten(obj) {
+        const out = {}
+        for (const k of Object.keys(obj)) {
+            if (isGroup(obj[k])) {
+                for (const sub of Object.keys(obj[k]))
+                    out[k + "." + sub] = obj[k][sub]
+            } else {
+                out[k] = obj[k]
+            }
+        }
+        return out
+    }
+
+    // The reverse, for the file: {"glassBar.frost": 1} -> {"glassBar": {"frost": 1}}.
+    function nest(flat) {
+        const out = {}
+        for (const k of Object.keys(flat)) {
+            const dot = k.indexOf(".")
+            if (dot < 0) {
+                out[k] = flat[k]
+            } else {
+                const group = k.slice(0, dot)
+                if (!isGroup(out[group]))
+                    out[group] = {}
+                out[group][k.slice(dot + 1)] = flat[k]
+            }
+        }
+        return out
+    }
+
+    // Writes these values (paths in memory) to the file, nested.
+    function writeValues(flat) {
+        file.write(nest(flat))
+    }
+
     // The file. The settings app writes it through `file.save()` / `file.write()` (ThemeStore); what it
     // wrote itself is not read back, so a late watcher event cannot undo newer changes it holds in memory.
     // (A file that does not exist yet is looked for every 2 s: the settings app creates it on first save.)
@@ -51,7 +94,7 @@ Singleton {
         id: file
         path: root.path
         name: "settings-app-theme.json"
-        onParsed: value => root.values = (value !== null && typeof value === "object" && !Array.isArray(value)) ? value : ({})
+        onParsed: value => root.values = (value !== null && typeof value === "object" && !Array.isArray(value)) ? root.flatten(value) : ({})
         onMissing: root.values = ({})
         onInvalid: root.values = ({})   // the defaults
     }

@@ -21,7 +21,7 @@ import qs.shared
 //    to show them and to start an override from them). A base rule with glass can FOLLOW THE DEFAULT
 //    LOOK (`follow`, by rule name): the file then gets a rule with the same match whose lucent_glass is
 //    the base rule's own blur radius, quality, corner radius and opacity plus the default look
-//    (`defaultLook`, from Theme.glassDefault* and Background: the settings app's Glass page). It comes
+//    (`defaultLook`, from Theme.glassDefault and Background: the settings app's Glass page). It comes
 //    before the rules made here (they still win) and is put in the global table LucentGlassFollowers
 //    under the base rule's name, so that hyprland.lua's on/off bind can switch it too.
 //  - When the default look changes, the file is written again if something follows it.
@@ -55,19 +55,19 @@ Singleton {
 
     // The default look (the settings app's Glass page) as lucent_glass parameters.
     readonly property var defaultLookParams: ({
-        frost: Theme.glassDefaultFrost,
+        frost: Theme.glassDefault.frost,
         tint: ThemeStore.colorString(Theme.background, false),
-        tint_strength: Theme.glassDefaultTintStrength,
-        brightness: Theme.glassDefaultBrightness,
-        contrast: Theme.glassDefaultContrast,
-        saturation: Theme.glassDefaultSaturation,
-        bevel: Theme.glassDefaultBevel,
-        thickness: Theme.glassDefaultThickness,
-        bevel_profile: Theme.glassDefaultBevelProfile,
-        refraction: Theme.glassDefaultRefraction,
-        ior: Theme.glassDefaultIor,
-        dispersion: Theme.glassDefaultDispersion,
-        shine: Theme.glassDefaultShine
+        tint_strength: Theme.glassDefault.tintStrength,
+        brightness: Theme.glassDefault.brightness,
+        contrast: Theme.glassDefault.contrast,
+        saturation: Theme.glassDefault.saturation,
+        bevel: Theme.glassDefault.bevel,
+        thickness: Theme.glassDefault.thickness,
+        bevel_profile: Theme.glassDefault.bevelProfile,
+        refraction: Theme.glassDefault.refraction,
+        ior: Theme.glassDefault.ior,
+        dispersion: Theme.glassDefault.dispersion,
+        shine: Theme.glassDefault.shine
     })
     readonly property string defaultLook: glassParams
         .filter(p => defaultLookParams[p.key] !== undefined)

@@ -5,7 +5,7 @@ import qs.shared
 SettingsRow {
     id: root
 
-    readonly property real value: Theme[spec.key]
+    readonly property real value: Theme.value(spec.key)
     readonly property bool isInt: spec.kind === "int"
     readonly property real step: spec.step || (isInt ? 1 : 0.01)
 

@@ -64,7 +64,7 @@ Column {
                         id: cell
                         required property string modelData
                         readonly property var spec: root.specOf(modelData)
-                        readonly property real value: Theme[modelData]
+                        readonly property real value: Theme.value(modelData)
                         width: root.cellWidth
                         height: 44
 

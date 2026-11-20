@@ -65,74 +65,75 @@ QtObject {
     readonly property real popupOpacity: 1.0
 
     // Drop shadow around the app launcher and the clipboard popup (outside the panel only; under
-    // the glass it would break the background recovery). Opacity 0 turns it off.
-    readonly property real popupShadowOpacity: 0.4
-    readonly property real popupShadowBlur: 24      // how far it fades out, logical pixels
-    readonly property real popupShadowOffset: 8     // how far it falls downwards
+    // the glass it would break the background recovery). Opacity 0 turns it off; blur is how far it
+    // fades out and offset how far it falls downwards, in logical pixels. (Theme.popupShadow.*)
+    readonly property var popupShadow: ({ opacity: 0.4, blur: 24, offset: 8 })
 
     // How long a notification stays on the screen, in seconds (one with actions stays 1.6 times as
     // long; a notification that sets its own timeout keeps it; critical ones stay until closed).
     // 0 = until it is clicked away.
     readonly property real notificationTimeout: 5
     // The drop shadow of notification cards and of the notification centre (the history panel).
-    readonly property real notificationShadowOpacity: 0.35
-    readonly property real notificationShadowBlur: 28
-    readonly property real notificationShadowOffset: 10
+    readonly property var notificationShadow: ({ opacity: 0.35, blur: 28, offset: 10 })
 
     // How dark the desktop behind the settings overlay gets (the strength of the Background tint over
-    // it; it is blurred like the panels, with glassBlurRadius). 0: not darker.
+    // it; it is not blurred). 0: not darker.
     readonly property real scrimDim: 0.35
 
     // The look of the glass (the same parameters as the Lucent plugin's glass and GlassStyle; see
-    // shared/glass/PanelGlassStyle.qml and BarGlassStyle.qml). `Default` is the look everything follows
-    // unless it has its own: `Panel` (the launcher, the clipboard, the settings and the wallpaper picker)
-    // and `Bar` (the status bar) are used only when glassPanelLook / glassBarLook is "own"; window rules
+    // shared/glass/PanelGlassStyle.qml and BarGlassStyle.qml). `glassDefault` is the look everything follows
+    // unless it has its own: `glassPanel` (the launcher, the clipboard, the settings and the wallpaper picker)
+    // and `glassBar` (the status bar) are used only when glassPanelLook / glassBarLook is "own"; window rules
     // of the settings app can follow it too. The defaults are the look the shells had before these were
     // settings (the default look = the panels' look). The rim curve is only used by the compositor glass.
 
-    readonly property real glassDefaultFrost: 1.0
-    readonly property real glassDefaultTintStrength: 0.65
-    readonly property real glassDefaultBrightness: 0.02
-    readonly property real glassDefaultContrast: 1.04
-    readonly property real glassDefaultSaturation: 1.2
-    readonly property real glassDefaultBevel: 14
-    readonly property real glassDefaultThickness: 0.7
-    readonly property real glassDefaultBevelProfile: 3
-    readonly property real glassDefaultRefraction: 1.0
-    readonly property real glassDefaultIor: 1.45
-    readonly property real glassDefaultDispersion: 0.05
-    readonly property real glassDefaultShine: 0.6
+    // Each is a GlassLook in Theme (Theme.glassDefault.frost, ...); keys in the settings file "glassBar.frost".
+    readonly property var glassDefault: ({
+        frost: 1.0,
+        tintStrength: 0.65,
+        brightness: 0.02,
+        contrast: 1.04,
+        saturation: 1.2,
+        bevel: 14,
+        thickness: 0.7,
+        bevelProfile: 3,
+        refraction: 1.0,
+        ior: 1.45,
+        dispersion: 0.05,
+        shine: 0.6
+    })
+    readonly property var glassPanel: ({
+        frost: 1.0,
+        tintStrength: 0.65,
+        brightness: 0.02,
+        contrast: 1.04,
+        saturation: 1.2,
+        bevel: 14,
+        thickness: 0.7,
+        bevelProfile: 3,
+        refraction: 1.0,
+        ior: 1.45,
+        dispersion: 0.05,
+        shine: 0.6
+    })
+    readonly property var glassBar: ({
+        tint: "#1e1e2e",   // only the bar has a tint colour setting (follows Background until set)
+        frost: 0.9,
+        tintStrength: 0.35,
+        brightness: 0.02,
+        contrast: 1.04,
+        saturation: 1.2,
+        bevel: 14,
+        thickness: 0.7,
+        bevelProfile: 3,
+        refraction: 1.0,
+        ior: 1.45,
+        dispersion: 0.05,
+        shine: 0.6
+    })
 
-    readonly property string glassPanelLook: "default"   // "default": follow the default look; "own": glassPanel*
-    readonly property string glassBarLook: "own"         // "default" or "own" (glassBar*, with its tint colour)
-
-
-    readonly property real glassPanelFrost: 1.0
-    readonly property real glassPanelTintStrength: 0.65
-    readonly property real glassPanelBrightness: 0.02
-    readonly property real glassPanelContrast: 1.04
-    readonly property real glassPanelSaturation: 1.2
-    readonly property real glassPanelBevel: 14
-    readonly property real glassPanelThickness: 0.7
-    readonly property real glassPanelBevelProfile: 3
-    readonly property real glassPanelRefraction: 1.0
-    readonly property real glassPanelIor: 1.45
-    readonly property real glassPanelDispersion: 0.05
-    readonly property real glassPanelShine: 0.6
-
-    readonly property real glassBarFrost: 0.9
-    readonly property color glassBarTint: "#1e1e2e"  // the bar glass tint colour (same as background)
-    readonly property real glassBarTintStrength: 0.35
-    readonly property real glassBarBrightness: 0.02
-    readonly property real glassBarContrast: 1.04
-    readonly property real glassBarSaturation: 1.2
-    readonly property real glassBarBevel: 14
-    readonly property real glassBarThickness: 0.7
-    readonly property real glassBarBevelProfile: 3
-    readonly property real glassBarRefraction: 1.0
-    readonly property real glassBarIor: 1.45
-    readonly property real glassBarDispersion: 0.05
-    readonly property real glassBarShine: 0.6
+    readonly property string glassPanelLook: "default"   // "default": follow the default look; "own": glassPanel
+    readonly property string glassBarLook: "own"         // "default" or "own" (glassBar, with its tint colour)
 
     // Backdrop blur, used by shared/BackdropBlur.qml (independent of the compositor's blur).
     // 0.0 = off, 1.0 = strongest. Every config that uses BackdropBlur inherits this value.

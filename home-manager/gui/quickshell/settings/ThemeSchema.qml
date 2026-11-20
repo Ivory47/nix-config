@@ -5,9 +5,9 @@ import QtQuick
 // Every value of Theme.qml as the settings app lists it, in categories (the sidebar entries, each a
 // ThemePage) made of sections: what the pages show and what the search finds. One entry per value
 // (`key` is the Theme property):
-//   key, label, type ("color" | "number" | "bool" | "choice"), kind ("int" | "real", numbers), min, max,
+//   key (the Theme value, or a path into a group: "glassBar.frost"; Theme.value(key) reads it), label, type ("color" | "number" | "bool" | "choice"), kind ("int" | "real", numbers), min, max,
 //   step, alpha (colours with transparency), options (choices: [{ id, label }]), note (small grey text),
-//   keywords (synonyms for the search), showIf ({ key, is }: only shown while Theme[key] === is; a block can
+//   keywords (synonyms for the search), showIf ({ key, is }: only shown while Theme.value(key) === is; a block can
 //   have one too, for all its settings).
 //
 // A category: { id, group (the top-level heading in the sidebar: SettingsIndex.groups), name, icon,
@@ -20,33 +20,33 @@ import QtQuick
 QtObject {
     id: root
 
-    // The look settings of one kind of glass (Theme.<prefix>Frost, ...: see ThemeDefaults.qml), in
+    // The look settings of one kind of glass (Theme.<prefix>.frost, ...: a GlassLook, see ThemeDefaults.qml), in
     // three blocks, shown only while `showIf` holds (if given).
     function lookBlocks(prefix, showIf) {
         const look = ["glass", "blur", "frosted", "lens", "liquid", "style", "appearance"]
         const rim = look.concat(["bevel", "edge", "border", "refraction"])
         const tone = [
-            { key: prefix + "Frost", keywords: look.concat(["blurred", "sharp", "transparency"]), label: "Frost", type: "number", kind: "real", min: 0, max: 1, step: 0.05, note: "1: only the blurred picture. Lower: some sharp shows" },
-            { key: prefix + "TintStrength", keywords: look.concat(["tint", "colour", "color", "background", "dark", "opaque", "opacity", "hide"]), label: "Tint", type: "number", kind: "real", min: 0, max: 1, step: 0.05, note: "How much background colour is mixed in" },
-            { key: prefix + "Brightness", keywords: look.concat(["light", "dark", "lighten", "darken", "tone"]), label: "Brightness", type: "number", kind: "real", min: -0.5, max: 0.5, step: 0.01, note: "Added to what is behind" },
-            { key: prefix + "Contrast", keywords: look.concat(["tone", "flat", "sharpen"]), label: "Contrast", type: "number", kind: "real", min: 0.5, max: 1.5, step: 0.01 },
-            { key: prefix + "Saturation", keywords: look.concat(["colour", "color", "vivid", "grey", "gray", "tone"]), label: "Saturation", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "0 is grey" }
+            { key: prefix + ".frost", keywords: look.concat(["blurred", "sharp", "transparency"]), label: "Frost", type: "number", kind: "real", min: 0, max: 1, step: 0.05, note: "1: only the blurred picture. Lower: some sharp shows" },
+            { key: prefix + ".tintStrength", keywords: look.concat(["tint", "colour", "color", "background", "dark", "opaque", "opacity", "hide"]), label: "Tint", type: "number", kind: "real", min: 0, max: 1, step: 0.05, note: "How much background colour is mixed in" },
+            { key: prefix + ".brightness", keywords: look.concat(["light", "dark", "lighten", "darken", "tone"]), label: "Brightness", type: "number", kind: "real", min: -0.5, max: 0.5, step: 0.01, note: "Added to what is behind" },
+            { key: prefix + ".contrast", keywords: look.concat(["tone", "flat", "sharpen"]), label: "Contrast", type: "number", kind: "real", min: 0.5, max: 1.5, step: 0.01 },
+            { key: prefix + ".saturation", keywords: look.concat(["colour", "color", "vivid", "grey", "gray", "tone"]), label: "Saturation", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "0 is grey" }
         ]
         // The bar glass also has a tint colour (the panels use Background).
         if (prefix === "glassBar")
-            tone.splice(2, 0, { key: "glassBarTint", keywords: look.concat(["tint", "colour", "color", "bar", "background", "hue"]), label: "Tint colour", type: "color", note: "Follows Background until set" })
+            tone.splice(2, 0, { key: "glassBar.tint", keywords: look.concat(["tint", "colour", "color", "bar", "background", "hue"]), label: "Tint colour", type: "color", note: "Follows Background until set" })
         const blocks = [
             { title: "Tone", items: tone },
             { title: "Rim", items: [
-                { key: prefix + "Bevel", keywords: rim.concat(["rim", "width", "curved"]), label: "Width", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "The curved glass edge, in px. 0 is flat" },
-                { key: prefix + "Thickness", keywords: rim.concat(["rim", "height", "depth", "lens"]), label: "Height", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "How far the rim bends what is behind" },
-                { key: prefix + "BevelProfile", keywords: rim.concat(["rim", "curve", "profile", "smooth", "shape"]), label: "Curve", type: "number", kind: "real", min: 2, max: 4, step: 0.5, note: "2 round, 3 smooth, 4 smoothest. Compositor glass only" }
+                { key: prefix + ".bevel", keywords: rim.concat(["rim", "width", "curved"]), label: "Width", type: "number", kind: "real", min: 0, max: 40, step: 1, note: "The curved glass edge, in px. 0 is flat" },
+                { key: prefix + ".thickness", keywords: rim.concat(["rim", "height", "depth", "lens"]), label: "Height", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "How far the rim bends what is behind" },
+                { key: prefix + ".bevelProfile", keywords: rim.concat(["rim", "curve", "profile", "smooth", "shape"]), label: "Curve", type: "number", kind: "real", min: 2, max: 4, step: 0.5, note: "2 round, 3 smooth, 4 smoothest. Compositor glass only" }
             ] },
             { title: "Light", items: [
-                { key: prefix + "Refraction", keywords: rim.concat(["bend", "lens", "distortion", "magnify"]), label: "Refraction", type: "number", kind: "real", min: 0, max: 4, step: 0.1, note: "How strongly the rim bends the background" },
-                { key: prefix + "Ior", keywords: rim.concat(["index", "refraction", "ior", "bend", "lens"]), label: "Index of refraction", type: "number", kind: "real", min: 1, max: 3, step: 0.05, note: "Higher bends more. 1.45 is glass" },
-                { key: prefix + "Dispersion", keywords: rim.concat(["fringe", "rainbow", "chromatic", "colour", "color"]), label: "Dispersion", type: "number", kind: "real", min: 0, max: 0.5, step: 0.01, note: "Coloured fringes along the rim" },
-                { key: prefix + "Shine", keywords: rim.concat(["light", "highlight", "gloss", "reflection", "glow"]), label: "Shine", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "Light that catches the rim" }
+                { key: prefix + ".refraction", keywords: rim.concat(["bend", "lens", "distortion", "magnify"]), label: "Refraction", type: "number", kind: "real", min: 0, max: 4, step: 0.1, note: "How strongly the rim bends the background" },
+                { key: prefix + ".ior", keywords: rim.concat(["index", "refraction", "ior", "bend", "lens"]), label: "Index of refraction", type: "number", kind: "real", min: 1, max: 3, step: 0.05, note: "Higher bends more. 1.45 is glass" },
+                { key: prefix + ".dispersion", keywords: rim.concat(["fringe", "rainbow", "chromatic", "colour", "color"]), label: "Dispersion", type: "number", kind: "real", min: 0, max: 0.5, step: 0.01, note: "Coloured fringes along the rim" },
+                { key: prefix + ".shine", keywords: rim.concat(["light", "highlight", "gloss", "reflection", "glow"]), label: "Shine", type: "number", kind: "real", min: 0, max: 2, step: 0.05, note: "Light that catches the rim" }
             ] }
         ]
         if (showIf)
@@ -148,9 +148,9 @@ QtObject {
                 { key: "scrimDim", keywords: ["dim", "dark", "darker", "veil", "background", "desktop", "scrim", "settings", "backdrop", "overlay"], label: "Desktop dim", type: "number", kind: "real", min: 0, max: 0.9, step: 0.05, note: "How much darker the desktop gets behind the settings. 0: as it is" }
             ] },
             { id: "shadow", title: "Shadow", note: "Under the launcher, clipboard and settings overlay", items: [
-                { key: "popupShadowOpacity", keywords: root.shadowKeywords.concat(["launcher", "clipboard", "popup"]), label: "Opacity", type: "number", kind: "real", min: 0, max: 0.6, step: 0.05, note: "0 is off" },
-                { key: "popupShadowBlur", keywords: root.shadowKeywords.concat(["soft", "spread", "size", "launcher", "clipboard", "popup"]), label: "Softness", type: "number", kind: "real", min: 4, max: 60, step: 1, note: "How far the shadow fades out" },
-                { key: "popupShadowOffset", keywords: root.shadowKeywords.concat(["distance", "height", "launcher", "clipboard", "popup"]), label: "Drop", type: "number", kind: "real", min: 0, max: 30, step: 1, note: "How far it falls below the popup" }
+                { key: "popupShadow.opacity", keywords: root.shadowKeywords.concat(["launcher", "clipboard", "popup"]), label: "Opacity", type: "number", kind: "real", min: 0, max: 0.6, step: 0.05, note: "0 is off" },
+                { key: "popupShadow.blur", keywords: root.shadowKeywords.concat(["soft", "spread", "size", "launcher", "clipboard", "popup"]), label: "Softness", type: "number", kind: "real", min: 4, max: 60, step: 1, note: "How far the shadow fades out" },
+                { key: "popupShadow.offset", keywords: root.shadowKeywords.concat(["distance", "height", "launcher", "clipboard", "popup"]), label: "Drop", type: "number", kind: "real", min: 0, max: 30, step: 1, note: "How far it falls below the popup" }
             ] }
         ] },
 
@@ -159,9 +159,9 @@ QtObject {
                 { key: "notificationTimeout", keywords: ["notification", "notify", "popup", "toast", "timeout", "duration", "dismiss", "disappear", "how long"], label: "Show for", type: "number", kind: "real", min: 0, max: 60, step: 1, note: "Seconds. 0: until clicked away. Critical ones always stay" }
             ] },
             { id: "shadow", title: "Shadow", note: "Under the cards and the notification centre", items: [
-                { key: "notificationShadowOpacity", keywords: root.shadowKeywords.concat(["notification", "notification centre", "history", "popup", "card"]), label: "Opacity", type: "number", kind: "real", min: 0, max: 0.6, step: 0.05, note: "0 is off" },
-                { key: "notificationShadowBlur", keywords: root.shadowKeywords.concat(["soft", "spread", "size", "notification", "notification centre"]), label: "Softness", type: "number", kind: "real", min: 4, max: 60, step: 1, note: "How far the shadow fades out" },
-                { key: "notificationShadowOffset", keywords: root.shadowKeywords.concat(["distance", "height", "notification", "notification centre"]), label: "Drop", type: "number", kind: "real", min: 0, max: 30, step: 1, note: "How far it falls below the card" }
+                { key: "notificationShadow.opacity", keywords: root.shadowKeywords.concat(["notification", "notification centre", "history", "popup", "card"]), label: "Opacity", type: "number", kind: "real", min: 0, max: 0.6, step: 0.05, note: "0 is off" },
+                { key: "notificationShadow.blur", keywords: root.shadowKeywords.concat(["soft", "spread", "size", "notification", "notification centre"]), label: "Softness", type: "number", kind: "real", min: 4, max: 60, step: 1, note: "How far the shadow fades out" },
+                { key: "notificationShadow.offset", keywords: root.shadowKeywords.concat(["distance", "height", "notification", "notification centre"]), label: "Drop", type: "number", kind: "real", min: 0, max: 30, step: 1, note: "How far it falls below the card" }
             ] }
         ] },
 
