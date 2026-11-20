@@ -34,6 +34,8 @@ Rectangle {
             return "glass off"
         if (g.mode === "inherit")
             return "no effect yet"
+        if (g.mode === "default")
+            return "glass: default look"
         const n = Object.keys(g.params).length
         return n === 0 ? "glass: plain blur" : "glass: " + n + (n === 1 ? " parameter" : " parameters")
     }
@@ -272,6 +274,7 @@ Rectangle {
             Segmented {
                 options: [
                     { id: "inherit", label: "No change" },
+                    { id: "default", label: "Default look" },
                     { id: "custom", label: "Glass" },
                     { id: "off", label: "Glass off" }
                 ]
@@ -286,6 +289,7 @@ Rectangle {
                 text: !root.rule ? ""
                     : root.rule.glass.mode === "inherit" ? "This rule does nothing yet. Pick Glass to add glass, or Glass off to switch the glass of a matching base rule off."
                     : root.rule.glass.mode === "off" ? "Matching windows get no glass, even if a rule in the base config gives them some (this rule comes later, so it wins)."
+                    : root.rule.glass.mode === "default" ? "The look set on the Theme › Glass page, kept up to date when it changes. Blur, corners and opacity below are this rule's own."
                     : "Only the parameters you change are set (marked with ↺); the rest keep the plugin's defaults, shown dimmed. It shows where the window itself is translucent."
                 color: Theme.textMuted
                 font.pixelSize: Theme.textSmall - 1
@@ -293,24 +297,16 @@ Rectangle {
 
             Item { width: 1; height: Theme.spacingSmall }
 
-            // The parameters: a fixed list, shown only for Glass. (Not a model that changes with the
-            // rule: the rows must survive the edits, a slider is being dragged in one of them.)
-            Column {
-                visible: !!root.rule && root.rule.glass.mode === "custom"
+            // The parameters, grouped (Blur, Tone, Rim, Light, Window); with the default look only the
+            // rule's own keys (the look comes from Theme › Glass).
+            GlassParamBlocks {
+                visible: !!root.rule && (root.rule.glass.mode === "custom" || root.rule.glass.mode === "default")
                 width: parent.width
-
-                Repeater {
-                    model: HyprlandStore.glassParams
-
-                    delegate: ParamRow {
-                        required property var modelData
-                        spec: modelData
-                        value: root.rule ? root.rule.glass.params[modelData.key] : undefined
-                        onPreview: v => HyprlandStore.previewParam(root.ruleId, modelData.key, v)
-                        onCommit: v => HyprlandStore.setParam(root.ruleId, modelData.key, v)
-                        onCleared: HyprlandStore.clearParam(root.ruleId, modelData.key)
-                    }
-                }
+                values: root.rule ? root.rule.glass.params : ({})
+                keys: root.rule && root.rule.glass.mode === "default" ? HyprlandStore.ownKeys : null
+                onPreview: (k, v) => HyprlandStore.previewParam(root.ruleId, k, v)
+                onCommit: (k, v) => HyprlandStore.setParam(root.ruleId, k, v)
+                onCleared: k => HyprlandStore.clearParam(root.ruleId, k)
             }
 
             Rectangle {

@@ -2,14 +2,14 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// What the buttons of the settings sections do (ThemeSchema `button`): `actions` is id -> { title, note,
-// label, busy, busyText, run() }, shown by SectionAction.
+// What the buttons in the header of a settings page do (ThemeSchema category `actions`): `actions` is
+// id -> { label, icon, busy, busyText, run() }, shown by ThemePage as ActionButtons.
 Scope {
     id: root
 
     readonly property var actions: ({
-        restartBar: { title: "Restart status bar", note: "Applies the height and glass changes", label: "Restart", glyph: "\u21BB ", busy: root.restarting, busyText: "Restarting\u2026", run: () => root.restartBar() },
-        testNotification: { title: "Test notification", note: "Shows a notification with the settings above", label: "Send", icon: "play", busy: root.testSent, busyText: "Sent", run: () => root.sendTest() }
+        restartBar: { label: "\u21BB Restart bar", busy: root.restarting, busyText: "Restarting\u2026", run: () => root.restartBar() },
+        testNotification: { label: "Send test", icon: "play", busy: root.testSent, busyText: "Sent", run: () => root.sendTest() }
     })
     property bool restarting: false
     property bool testSent: false

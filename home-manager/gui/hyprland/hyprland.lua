@@ -550,6 +550,12 @@ if lucentFile then
     hl.bind(mainMod .. " + ALT + G", function()
         lucentGlassOn = not lucentGlassOn
         lucentGlassRule:set_enabled(lucentGlassOn)
+        -- The same rule with the default look, when the settings app makes it follow that (Window
+        -- rules page; written to hyprland-settings.lua, which is loaded at the end of this file).
+        local follower = LucentGlassFollowers and LucentGlassFollowers["lucent-glass-kitty"]
+        if follower then
+            follower:set_enabled(lucentGlassOn)
+        end
     end)
 end
 
@@ -637,7 +643,7 @@ end
 ---- SETTINGS APP (Hyprland) ------
 -----------------------------------
 
--- Window rules (with the Lucent glass parameters) that are made in the settings app, Settings > Hyprland.
+-- Window rules (with the Lucent glass parameters) that are made in the settings app, Hyprland › Window rules.
 -- The app writes them to hyprland-settings.lua next to this file's source (like hyprmod's
 -- hyprland-gui.lua; it is in .gitignore, so it never goes to GitHub) and runs `hyprctl reload`, so they
 -- apply at once, without hms. It is loaded LAST on purpose: a later rule wins, so a rule there overrides

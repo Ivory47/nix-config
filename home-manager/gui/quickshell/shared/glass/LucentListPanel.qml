@@ -74,7 +74,7 @@ LucentGlassPanel {
     hlRect2: hoveredRect
     hlColor2: highlight(hoveredStrength)
 
-    // The look of the panels (Settings > Glass > Panels), with the rounding of a Hyprland window
+    // The look of the panels (Settings › Theme › Panels), with the rounding of a Hyprland window
     // (decoration.rounding): the window rounds its own content only, the glass rounds itself.
     // Override `style` for another look.
     style: PanelGlassStyle {

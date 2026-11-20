@@ -1,31 +1,36 @@
 import QtQuick
 import qs.shared
 
-// Every value of Theme.qml, in groups. Changing one writes it to the settings app's file (see
-// ThemeStore) and every shell follows. The reset arrow next to a value brings back the default
-// from ThemeDefaults.qml.
+// The page of one Theme category of the settings app (ThemeSchema `categories`, chosen by `catId`): a header
+// (name, description, the category's buttons and "Reset page") over its sections. Changing a value writes it
+// to the settings app's file (see ThemeStore) and every shell follows; a reset arrow brings back the
+// default from ThemeDefaults.qml.
 Item {
     id: root
 
-    readonly property var sections: ThemeSchema.sections
+    required property string catId
+    readonly property var category: SettingsIndex.categories[SettingsIndex.indexOf(catId)]
+    readonly property var sections: category.sections
+    readonly property var pageKeys: SettingsIndex.keysOf(catId)
 
     ThemeActions {
         id: themeActions
     }
-    readonly property var actions: themeActions.actions
 
-    // key -> the field of that setting, to scroll to it.
+    // key -> the field of that setting, to scroll to it (set by the fields themselves).
     property var fields: ({})
 
-    // The collapsible groups (ThemeSchema `groups`): which are open (id -> true), and which group a
-    // setting is in (key -> id). All start closed.
+    // The collapsed sections (kind "collapsed"): which are open (id -> true). All start closed.
     property var openGroups: ({})
-    readonly property var groupOf: {
+    // key -> where it is: { group (collapsed section id), showIf }.
+    readonly property var placeOf: {
         const out = {}
         for (const s of sections)
-            for (const g of (s.groups || []))
-                for (const item of g.items)
-                    out[item.key] = g.id
+            for (const { item, showIf } of ThemeSchema.flatten(s))
+                out[item.key] = {
+                    group: s.kind === "collapsed" ? s.id : "",
+                    showIf: showIf
+                }
         return out
     }
 
@@ -38,8 +43,8 @@ Item {
         openGroups = next
     }
 
-    // How many of the settings of a group were changed from their defaults (shown on a closed group,
-    // so that a change cannot hide in it).
+    // How many of these settings were changed from their defaults (shown on a closed group, so that a
+    // change cannot hide in it).
     function changedIn(items) {
         let n = 0
         for (const item of items)
@@ -48,12 +53,17 @@ Item {
         return n
     }
 
-    // Scrolls the page so that the setting is near the top, and outlines it for a moment. A setting in
-    // a closed group opens the group first (and waits for the page to be laid out again).
+    // Scrolls the page so that the setting is near the top, and outlines it for a moment. A setting in a
+    // closed group opens the group (and waits for the page to be laid out again); one hidden by `showIf`
+    // shows the setting it depends on instead.
     function scrollTo(key) {
-        const g = groupOf[key]
-        if (g && !openGroups[g]) {
-            setGroupOpen(g, true)
+        const p = placeOf[key]
+        if (!p)
+            return
+        if (p.showIf && Theme[p.showIf.key] !== p.showIf.is)
+            key = p.showIf.key
+        if (p.group && !openGroups[p.group]) {
+            setGroupOpen(p.group, true)
             scrollTimer.key = key
             scrollTimer.restart()
             return
@@ -66,7 +76,7 @@ Item {
         if (!f)
             return
         flick.stopGlide()
-        flick.contentY = flick.clampContentY(f.mapToItem(flick.contentItem, 0, 0).y - 70)
+        flick.contentY = flick.clampContentY(f.mapToItem(flick.contentItem, 0, 0).y - 40)
         f.flash()
     }
 
@@ -77,101 +87,48 @@ Item {
         onTriggered: root._scrollNow(key)
     }
 
+    PageHeader {
+        id: header
+        width: parent.width
+        title: root.category.name
+        description: root.category.description || ""
+
+        Repeater {
+            model: root.category.actions || []
+
+            delegate: ActionButton {
+                required property string modelData
+                readonly property var action: themeActions.actions[modelData]
+                text: action.label
+                icon: action.icon || ""
+                busy: action.busy
+                busyText: action.busyText
+                onClicked: action.run()
+            }
+        }
+
+        ActionButton {
+            text: "Reset page"
+            active: root.pageKeys.some(k => ThemeStore.isSet(k))
+            onClicked: ThemeStore.resetKeys(root.pageKeys)
+        }
+    }
+
     SettingsPage {
         id: flick
-        anchors.fill: parent
+        anchors.top: header.bottom
+        anchors.topMargin: Theme.spacingMedium
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
         spacing: 0
 
         Repeater {
             model: root.sections
 
-            delegate: Column {
-                id: section
-                required property var modelData
-                required property int index
+            delegate: ThemeSection {
+                page: root
                 width: flick.column.width
-
-                // The section title.
-                Item {
-                    width: parent.width
-                    height: sectionTitle.implicitHeight
-
-                    Text {
-                        id: sectionTitle
-                        topPadding: section.index === 0 ? 0 : Theme.spacingLarge
-                        bottomPadding: 2
-                        text: section.modelData.title
-                        color: Theme.accent
-                        font.pixelSize: Theme.textLarge - 2
-                        font.bold: true
-                    }
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: Theme.surfaceAlt
-                }
-
-                Repeater {
-                    model: section.modelData.items
-
-                    delegate: SettingField {
-                        id: field
-                        required property var modelData
-                        width: section.width
-                        spec: modelData
-
-                        Component.onCompleted: root.fields[modelData.key] = field
-                    }
-                }
-
-                // The section's collapsible groups: a header row (click to open or close; closed
-                // shows how many of its settings were changed), then its settings.
-                Repeater {
-                    model: section.modelData.groups || []
-
-                    delegate: ThemeGroup {
-                        page: root
-                        width: section.width
-                    }
-
-                }
-
-                // The section's action (ThemeSchema `button`) as a row of its own, like a
-                // setting: label and note on the left, the button where the controls are.
-                SectionAction {
-                    action: root.actions[section.modelData.button]
-                    width: parent.width
-                }
-            }
-        }
-
-        Item { width: 1; height: Theme.spacingLarge }
-
-        Rectangle {
-            id: resetAll
-            width: 150
-            height: 32
-            radius: Theme.radiusSmall
-            color: "transparent"
-            border.width: 1
-            border.color: resetAllArea.containsMouse ? Theme.red : Theme.surfaceAlt
-            opacity: Object.keys(ThemeStore.values).length > 0 ? 1 : 0.4
-
-            CenteredText {
-                anchors.centerIn: parent
-                text: "Reset all to defaults"
-                color: Theme.text
-                font.pixelSize: Theme.textSmall
-            }
-
-            MouseArea {
-                id: resetAllArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: ThemeStore.resetAll()
             }
         }
     }

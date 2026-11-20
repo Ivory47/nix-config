@@ -68,6 +68,15 @@ Singleton {
         commit()
     }
 
+    // Several at once, one write ("Reset page").
+    function resetKeys(keys) {
+        const next = Object.assign({}, ThemeFromSettingsApp.values)
+        for (const k of keys)
+            delete next[k]
+        ThemeFromSettingsApp.values = next
+        commit()
+    }
+
     function resetAll() {
         ThemeFromSettingsApp.values = ({})
         commit()

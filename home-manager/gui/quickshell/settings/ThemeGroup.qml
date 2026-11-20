@@ -1,9 +1,9 @@
 import QtQuick
 import qs.shared
 
-// A collapsible group of settings (ThemeSchema `groups`): a header row (click to open or close; closed, it shows
-// how many of its settings were changed), then its settings with a line on the left that closes it again.
-// `page` is the ThemePage (which groups are open, the fields to scroll to). Set `width`.
+// A collapsed section of ThemeSchema (kind "collapsed": { id, title, note, items }): a header row (click to open
+// or close; closed, it shows how many of its settings were changed), then its settings with a line on the left
+// that closes it again. `page` is the ThemePage (which are open, the fields to scroll to). Set `width`.
 Column {
     id: group
 

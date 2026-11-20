@@ -79,14 +79,33 @@ QtObject {
     readonly property real notificationShadowBlur: 28
     readonly property real notificationShadowOffset: 10
 
-    // Blur strength of the settings app, which blurs the whole desktop while it is open (the
-    // blurred picture is shared by that veil and the settings panel). Sigma in logical pixels.
-    readonly property real scrimBlurRadius: 10.5
+    // How dark the desktop behind the settings overlay gets (the strength of the Background tint over
+    // it; it is blurred like the panels, with glassBlurRadius). 0: not darker.
+    readonly property real scrimDim: 0.35
 
     // The look of the glass (the same parameters as the Lucent plugin's glass and GlassStyle; see
-    // shared/glass/PanelGlassStyle.qml and BarGlassStyle.qml). The defaults are the look the shells had
-    // before these were settings. `Panel` is the launcher, the clipboard, the settings and the wallpaper
-    // picker; `Bar` is the status bar. The rim curve is only used by the compositor glass.
+    // shared/glass/PanelGlassStyle.qml and BarGlassStyle.qml). `Default` is the look everything follows
+    // unless it has its own: `Panel` (the launcher, the clipboard, the settings and the wallpaper picker)
+    // and `Bar` (the status bar) are used only when glassPanelLook / glassBarLook is "own"; window rules
+    // of the settings app can follow it too. The defaults are the look the shells had before these were
+    // settings (the default look = the panels' look). The rim curve is only used by the compositor glass.
+
+    readonly property real glassDefaultFrost: 1.0
+    readonly property real glassDefaultTintStrength: 0.65
+    readonly property real glassDefaultBrightness: 0.02
+    readonly property real glassDefaultContrast: 1.04
+    readonly property real glassDefaultSaturation: 1.2
+    readonly property real glassDefaultBevel: 14
+    readonly property real glassDefaultThickness: 0.7
+    readonly property real glassDefaultBevelProfile: 3
+    readonly property real glassDefaultRefraction: 1.0
+    readonly property real glassDefaultIor: 1.45
+    readonly property real glassDefaultDispersion: 0.05
+    readonly property real glassDefaultShine: 0.6
+
+    readonly property string glassPanelLook: "default"   // "default": follow the default look; "own": glassPanel*
+    readonly property string glassBarLook: "own"         // "default" or "own" (glassBar*, with its tint colour)
+
 
     readonly property real glassPanelFrost: 1.0
     readonly property real glassPanelTintStrength: 0.65
