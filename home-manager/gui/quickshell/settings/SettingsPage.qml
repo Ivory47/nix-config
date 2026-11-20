@@ -20,7 +20,10 @@ KineticFlickable {
         id: bar
         width: 6
         policy: ScrollBar.AsNeeded
+        // (A custom handle: AsNeeded only hides the style's own, so it hides itself while
+        // everything fits, size 1 = all of the content is in view.)
         contentItem: Rectangle {
+            visible: bar.size < 1
             implicitWidth: 4
             radius: 2
             color: Theme.surfaceAlt

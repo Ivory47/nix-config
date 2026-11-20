@@ -25,8 +25,11 @@ GridView {
     cacheBuffer: cellHeight * 2
 
     ScrollBar.vertical: ScrollBar {
+        id: scrollBar
         policy: ScrollBar.AsNeeded
+        // (A custom handle hides itself while everything fits: AsNeeded only hides the style's.)
         contentItem: Rectangle {
+            visible: scrollBar.size < 1
             implicitWidth: 4
             radius: 2
             color: Theme.surfaceAlt
